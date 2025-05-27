@@ -19,6 +19,51 @@ export const operationalLguChartData: ChartDataPoint[] = [
   { name: 'Region III', operational: 8, developmental: 21 },
   { name: 'Region IV-A', operational: 24, developmental: 17 },
   { name: 'Region IV-B', operational: 21, developmental: 18 },
+  { name: 'CAR', operational: 21, developmental: 9 },
+  { name: 'Region I', operational: 35, developmental: 22 },
+  { name: 'Region II', operational: 28, developmental: 15 },
+  { name: 'Region III', operational: 8, developmental: 21 },
+  { name: 'Region IV-A', operational: 24, developmental: 17 },
+  { name: 'Region IV-B', operational: 21, developmental: 18 },
+  
+];
+
+export const transactionChartData = [
+  { 
+    name: 'CAR', 
+    paid: 38, 
+    pending: 64, 
+    paidEGov: 16, 
+    paidLinkBiz: 39 
+  },
+  { 
+    name: 'Region I', 
+    paid: 38, 
+    pending: 24, 
+    paidEGov: 16, 
+    paidLinkBiz: 39 
+  },
+  { 
+    name: 'Region II', 
+    paid: 78, 
+    pending: 64, 
+    paidEGov: 19, 
+    paidLinkBiz: 34
+  },
+  { 
+    name: 'Region III', 
+    paid: 88, 
+    pending: 14, 
+    paidEGov: 14, 
+    paidLinkBiz: 37
+  },
+  { 
+    name: 'Region IV-A', 
+    paid: 58, 
+    pending: 14, 
+    paidEGov: 51, 
+    paidLinkBiz: 38 
+  }
 ];
 
 export const monthlyComparisonChartData: ChartDataPoint[] = [

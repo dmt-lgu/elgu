@@ -221,7 +221,7 @@ const FilterSection: React.FC = () => {
                 ? `${filterState.selectedModules.length} selected`
                 : 'Select modules'}
             </span>
-            <ChevronDown size={18} className={`text-gray-500 transition-transform ${isModuleOpen ? 'transform rotate-180' : ''}`} />
+            <ChevronDown size={18} className={`text-secondary-foreground  transition-transform ${isModuleOpen ? 'transform rotate-180' : ''}`} />
           </button>
           {isModuleOpen && (
             <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-md shadow-lg z-10">
@@ -273,7 +273,7 @@ const FilterSection: React.FC = () => {
 
       {/* Region, Group of Islands, Province, City/Municipality */}
       <div className="flex flex-col" ref={regionRef}>
-        <label className="text-sm font-bold text-blue-700 mb-2">Region:</label>
+        <label className="text-sm font-bold text-secondary-foreground mb-1">Region:</label>
         <div className="relative">
           <button
             onClick={() => setIsRegionOpen(!isRegionOpen)}
@@ -284,7 +284,7 @@ const FilterSection: React.FC = () => {
                 ? 'All Regions'
                 : `${filterState.selectedRegions.length} selected`}
             </span>
-            <ChevronDown size={18} className={`text-gray-500 transition-transform ${isRegionOpen ? 'transform rotate-180' : ''}`} />
+            <ChevronDown size={18} className={`text-secondary-foreground  transition-transform ${isRegionOpen ? 'transform rotate-180' : ''}`} />
           </button>
           {isRegionOpen && (
             <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-md shadow-lg z-10">
@@ -308,7 +308,7 @@ const FilterSection: React.FC = () => {
                   <label className="block text-sm font-bold text-blue-700 mb-2">Group of Islands</label>
                   <div className="flex gap-6 mb-2">
                     {groupOfIslands.map(island => (
-                      <label key={island} className="flex items-center gap-1 text-gray-700 text-sm">
+                      <label key={island} className="flex items-center gap-1 text-secondary-foreground  text-sm">
                         <input
                           type="checkbox"
                           checked={selectedIslands.includes(island)}
@@ -327,7 +327,7 @@ const FilterSection: React.FC = () => {
                   {regionGroups.map((col, colIdx) => (
                     <div key={colIdx} className="flex flex-col gap-2">
                       {col.map(region => (
-                        <label key={region} className="flex items-center gap-1 text-gray-700 text-sm">
+                        <label key={region} className="flex items-center gap-1 text-secondary-foreground  text-sm">
                           <input
                             type="checkbox"
                             checked={filterState.selectedRegions.includes(region)}

@@ -43,7 +43,7 @@ function Login() {
       <div className="fixed top-4 right-4 z-50">
         <ModeToggle />
       </div>
-      <div className="w-screen h-screen flex items-center justify-center bg-background">
+      <div className="w-screen h-screen flex items-center justify-center bg-card">
         <img src={Buildings} className="pointer-events-none absolute w-full z-0 object-contain bottom-0" />
         <form className="w-[400px] max-w-[500px] md:w-full px-4 flex flex-col gap-2" onSubmit={handleSubmit}>
           <img src={eLGULogo} className="w-[140px] object-contain flex self-center" alt="" />
