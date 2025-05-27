@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import Select from 'react-select';
 import { Check, ChevronDown } from 'lucide-react';
 import DateRangePicker from './DateRangePicker';
-import { modules, regions,groupOfIslands,regionGroups,provinces ,cities,islandRegionMap,regionProvinceMap } from '../utils/mockData';
+import { modules,groupOfIslands,regionGroups,provinces ,cities,islandRegionMap,regionProvinceMap } from '../utils/mockData';
 import { FilterState } from '../utils/types';
 
 
@@ -14,7 +14,7 @@ const getCityOptions = (selectedProvinces: string[]) => {
   let cityList: { value: string; label: string }[] = [];
   selectedProvinces.forEach(province => {
     cityList = cityList.concat(
-      (cities[province] || []).map(city => ({
+      (cities[province] || []).map((city:any) => ({
         value: city,
         label: city,
         province,
