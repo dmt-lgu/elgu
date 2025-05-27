@@ -1,0 +1,43 @@
+import { StatisticData, ChartDataPoint } from './types';
+
+export const mainStats: StatisticData[] = [
+  { title: 'No. of Transaction', value: '8,846', showInfo: true },
+  { title: 'Operational LGU', value: '836', showInfo: true },
+  { title: 'Developmental', value: '76', showInfo: true },
+];
+
+export const genderStats: StatisticData[] = [
+  { title: 'No. of Male', value: '4,046' },
+  { title: 'No. of Female', value: '4,800' },
+  { title: 'Non-Binary', value: '0' },
+];
+
+export const operationalLguChartData: ChartDataPoint[] = [
+  { name: 'CAR', operational: 21, developmental: 9 },
+  { name: 'Region I', operational: 35, developmental: 22 },
+  { name: 'Region II', operational: 28, developmental: 15 },
+  { name: 'Region III', operational: 8, developmental: 21 },
+  { name: 'Region IV-A', operational: 24, developmental: 17 },
+  { name: 'Region IV-B', operational: 21, developmental: 18 },
+];
+
+export const monthlyComparisonChartData: ChartDataPoint[] = [
+  { name: 'CAR', previous: 25, current: 18 },
+  { name: 'Region I', previous: 15, current: 13 },
+  { name: 'Region II', previous: 29, current: 26 },
+  { name: 'Region III', previous: 34, current: 38 },
+  { name: 'Region IV-A', previous: 19, current: 13 },
+  { name: 'Region IV-B', previous: 12, current: 15 },
+];
+
+export const modules = [
+  "Business Permit",
+    "Building Permit",
+    "Certificate of Occupancy",
+    "Working Permit",
+    "Barangay Clearance",
+];
+
+export const regions = [
+  "R1","R2","R3","R4A","R4B","R5","CAR","NCR","R6","R7","R8","R9","R10","R11","R12","R13","BARMM I","BARMM II"
+];

@@ -21,8 +21,8 @@ const DashboardPage= lazy(() =>
   wait(1300).then(() => import("./screens/Admin/Dashboard/Dashboard.tsx")));
 
 
-const Page2= lazy(() =>
-  wait(1300).then(() => import("./screens/page2.tsx"))
+const Reports = lazy(() =>
+  wait(1300).then(() => import("./screens/Admin/Reports/Reports.tsx"))
 );
 
 const router = createBrowserRouter([
@@ -64,10 +64,10 @@ const router = createBrowserRouter([
       </>,
       },
       {
-        path: "/react-vite-supreme/admin/dashboard2",
+        path: "/react-vite-supreme/admin/reports",
         element: <>
         <Suspense fallback={<Loader2 />}>
-          <Page2 />
+          <Reports />
         </Suspense>
       </>,
       },
