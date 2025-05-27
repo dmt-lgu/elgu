@@ -19,10 +19,11 @@ const Admin= lazy(() =>
   wait(1300).then(() => import("./screens/Admin/Admin.tsx")));
 const DashboardPage= lazy(() =>
   wait(1300).then(() => import("./screens/Admin/Dashboard/Dashboard.tsx")));
+const Report = lazy(() =>
+  wait(1300).then(() => import("./screens/Admin/Report/Reports.tsx")));
 
-
-const Reports = lazy(() =>
-  wait(1300).then(() => import("./screens/Admin/Reports/Reports.tsx"))
+const Page2= lazy(() =>
+  wait(1300).then(() => import("./screens/page2.tsx"))
 );
 
 const router = createBrowserRouter([
@@ -64,10 +65,10 @@ const router = createBrowserRouter([
       </>,
       },
       {
-        path: "/react-vite-supreme/admin/reports",
+        path: "/react-vite-supreme/admin/report",
         element: <>
         <Suspense fallback={<Loader2 />}>
-          <Reports />
+          <Report />
         </Suspense>
       </>,
       },

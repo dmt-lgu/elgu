@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Check, ChevronDown } from 'lucide-react';
 import DateRangePicker from './DateRangePicker';
-import { modules, regions } from './../utils/mockData';
-import { FilterState } from './../utils/types';
-
+import { modules, regions } from '../utils/mockData';
+import { FilterState } from '../utils/types';
+import { Button } from '@/components/ui/button';
 
 const FilterSection: React.FC = () => {
   const [filterState, setFilterState] = useState<FilterState>({
@@ -11,8 +11,8 @@ const FilterSection: React.FC = () => {
     selectedRegions: [],
     dateRange: {
       start: null,
-      end: null
-    }
+      end: null,
+    },
   });
 
   const [isModuleOpen, setIsModuleOpen] = useState(false);
@@ -35,60 +35,60 @@ const FilterSection: React.FC = () => {
   }, []);
 
   const toggleModule = (module: string) => {
-    setFilterState(prev => ({
+    setFilterState((prev) => ({
       ...prev,
       selectedModules: prev.selectedModules.includes(module)
-        ? prev.selectedModules.filter(m => m !== module)
-        : [...prev.selectedModules, module]
+        ? prev.selectedModules.filter((m) => m !== module)
+        : [...prev.selectedModules, module],
     }));
   };
 
   const toggleRegion = (region: string) => {
-    setFilterState(prev => ({
+    setFilterState((prev) => ({
       ...prev,
       selectedRegions: prev.selectedRegions.includes(region)
-        ? prev.selectedRegions.filter(r => r !== region)
-        : [...prev.selectedRegions, region]
+        ? prev.selectedRegions.filter((r) => r !== region)
+        : [...prev.selectedRegions, region],
     }));
   };
 
   const selectAllModules = () => {
-    setFilterState(prev => ({
+    setFilterState((prev) => ({
       ...prev,
-      selectedModules: [...modules]
+      selectedModules: [...modules],
     }));
   };
 
   const deselectAllModules = () => {
-    setFilterState(prev => ({
+    setFilterState((prev) => ({
       ...prev,
-      selectedModules: []
+      selectedModules: [],
     }));
   };
 
   const selectAllRegions = () => {
-    setFilterState(prev => ({
+    setFilterState((prev) => ({
       ...prev,
-      selectedRegions: [...regions]
+      selectedRegions: [...regions],
     }));
   };
 
   const deselectAllRegions = () => {
-    setFilterState(prev => ({
+    setFilterState((prev) => ({
       ...prev,
-      selectedRegions: []
+      selectedRegions: [],
     }));
   };
 
   const handleDateRangeChange = (range: { start: Date | null; end: Date | null }) => {
-    setFilterState(prev => ({
+    setFilterState((prev) => ({
       ...prev,
-      dateRange: range
+      dateRange: range,
     }));
   };
 
   return (
-    <div className="grid  grid-cols-3 md:grid-cols-1 gap-4 mb-6">
+    <div className="grid grid-cols-4 md:grid-cols-1 gap-4 mb-6">
       <div className="flex flex-col" ref={moduleRef}>
         <label className="text-sm font-medium text-secondary-foreground mb-1">Module:</label>
         <div className="relative">
@@ -101,7 +101,12 @@ const FilterSection: React.FC = () => {
                 ? `${filterState.selectedModules.length} selected`
                 : 'Select modules'}
             </span>
-            <ChevronDown size={18} className={`text-gray-500 transition-transform ${isModuleOpen ? 'transform rotate-180' : ''}`} />
+            <ChevronDown
+              size={18}
+              className={`text-gray-500 transition-transform ${
+                isModuleOpen ? 'transform rotate-180' : ''
+              }`}
+            />
           </button>
           {isModuleOpen && (
             <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-md shadow-lg z-10">
@@ -114,7 +119,7 @@ const FilterSection: React.FC = () => {
                 </button>
                 <button
                   onClick={deselectAllModules}
-                   className="text-sm text-red-400 hover:text-red-800"
+                  className="text-sm text-red-400 hover:text-red-800"
                 >
                   Deselect All
                 </button>
@@ -132,11 +137,13 @@ const FilterSection: React.FC = () => {
                         onChange={() => toggleModule(module)}
                         className="opacity-0 absolute h-4 w-4 cursor-pointer"
                       />
-                      <div className={`border h-4 w-4 rounded flex items-center justify-center ${
-                        filterState.selectedModules.includes(module)
-                          ? 'bg-blue-600 border-blue-600'
-                          : 'border-gray-300'
-                      }`}>
+                      <div
+                        className={`border h-4 w-4 rounded flex items-center justify-center ${
+                          filterState.selectedModules.includes(module)
+                            ? 'bg-blue-600 border-blue-600'
+                            : 'border-gray-300'
+                        }`}
+                      >
                         {filterState.selectedModules.includes(module) && (
                           <Check size={12} className="text-white" />
                         )}
@@ -163,7 +170,12 @@ const FilterSection: React.FC = () => {
                 ? 'All Regions'
                 : `${filterState.selectedRegions.length} selected`}
             </span>
-            <ChevronDown size={18} className={`text-gray-500 transition-transform ${isRegionOpen ? 'transform rotate-180' : ''}`} />
+            <ChevronDown
+              size={18}
+              className={`text-gray-500 transition-transform ${
+                isRegionOpen ? 'transform rotate-180' : ''
+              }`}
+            />
           </button>
           {isRegionOpen && (
             <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-md shadow-lg z-10">
@@ -194,11 +206,13 @@ const FilterSection: React.FC = () => {
                         onChange={() => toggleRegion(region)}
                         className="opacity-0 absolute h-4 w-4 cursor-pointer"
                       />
-                      <div className={`border h-4 w-4 rounded flex items-center justify-center ${
-                        filterState.selectedRegions.includes(region)
-                          ? 'bg-blue-600 border-blue-600'
-                          : 'border-gray-300'
-                      }`}>
+                      <div
+                        className={`border h-4 w-4 rounded flex items-center justify-center ${
+                          filterState.selectedRegions.includes(region)
+                            ? 'bg-blue-600 border-blue-600'
+                            : 'border-gray-300'
+                        }`}
+                      >
                         {filterState.selectedRegions.includes(region) && (
                           <Check size={12} className="text-white" />
                         )}
@@ -216,6 +230,14 @@ const FilterSection: React.FC = () => {
       <div className="flex flex-col">
         <label className="text-sm font-medium text-secondary-foreground mb-1">Date Range:</label>
         <DateRangePicker onChange={handleDateRangeChange} />
+      </div>
+
+      <div className="flex flex-col">
+        <div className="grid grid-cols-3 gap-2 mt-[25px] md:mt-0">
+          <Button className="bg-[#CB371C] hover:bg-[#CB371C]">Reset</Button>
+          <Button className="bg-primary">Search</Button>
+          <Button className="bg-[#8411DD] hover:bg-[#8411DD]">Download</Button>
+        </div>
       </div>
     </div>
   );
