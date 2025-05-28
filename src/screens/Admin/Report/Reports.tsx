@@ -1,17 +1,25 @@
+import React, { useState } from 'react';
 
-import FilterSection from "./components/FilterSection"
-import TableReport from "./table/TableReport"
+import TableReport from './table/TableReport';
+import FilterSection from './components/FilterSection';
 
 
-function Reports() {
+const Reports: React.FC = () => {
+  const [filterState, setFilterState] = useState<any>({
+    selectedModules: [],
+    selectedRegions: [],
+    dateRange: {
+      start: null,
+      end: null,
+    },
+  });
+
   return (
-    <div className="p-6 max-w-[1200px] mx-auto  bg-background ">
-      <FilterSection />
+    <div className='p-6 max-w-[1200px] mx-auto  bg-background'>
+      <FilterSection filterState={filterState} setFilterState={setFilterState} />
+      <TableReport selectedRegions={filterState.selectedRegions} dateRange={filterState.dateRange} />
+    </div>
+  );
+};
 
-      <TableReport />
-     </div>
-    
-  )
-}
-
-export default Reports
+export default Reports;

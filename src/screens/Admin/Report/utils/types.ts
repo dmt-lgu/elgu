@@ -26,3 +26,22 @@ export interface FilterState {
     end: Date | null;
   };
 }
+
+export interface RegionData {
+  region: string;
+  newPaid: number;
+  newGeoPay: number;
+  newPending: number;
+  newTotal: number;
+  renewalPaid: number;
+  renewalGeoPay: number;
+  renewalPending: number;
+  renewalTotal: number;
+  malePaid: number;
+  malePending: number;
+  maleTotal: number;
+  femalePaid: number;
+  femalePending: number;
+  femaleTotal: number;
+  [key: string]: number | string;
+}

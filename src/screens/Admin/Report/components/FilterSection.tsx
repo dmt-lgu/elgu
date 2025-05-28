@@ -1,24 +1,29 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { Check, ChevronDown } from 'lucide-react';
 import DateRangePicker from './DateRangePicker';
 import { modules, regions } from '../utils/mockData';
 import { FilterState } from '../utils/types';
 import { Button } from '@/components/ui/button';
 
-const FilterSection: React.FC = () => {
-  const [filterState, setFilterState] = useState<FilterState>({
-    selectedModules: [modules[0]],
-    selectedRegions: [],
-    dateRange: {
-      start: null,
-      end: null,
-    },
-  });
+interface FilterSectionProps {
+  filterState: FilterState;
+  setFilterState: React.Dispatch<React.SetStateAction<FilterState>>;
+}
 
+const FilterSection: React.FC<FilterSectionProps> = ({ filterState, setFilterState }) => {
   const [isModuleOpen, setIsModuleOpen] = useState(false);
   const [isRegionOpen, setIsRegionOpen] = useState(false);
   const moduleRef = useRef<HTMLDivElement>(null);
   const regionRef = useRef<HTMLDivElement>(null);
+
+  // Local state for filters
+  const [localModules, setLocalModules] = useState<string[]>(
+  filterState.selectedModules.length > 0
+    ? filterState.selectedModules
+    : ["Business Permit"]
+  );
+  const [localRegions, setLocalRegions] = useState<string[]>(filterState.selectedRegions);
+  const [localDateRange, setLocalDateRange] = useState<{ start: Date | null; end: Date | null }>(filterState.dateRange);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -29,66 +34,56 @@ const FilterSection: React.FC = () => {
         setIsRegionOpen(false);
       }
     };
-
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Module handlers
   const toggleModule = (module: string) => {
-    setFilterState((prev) => ({
-      ...prev,
-      selectedModules: prev.selectedModules.includes(module)
-        ? prev.selectedModules.filter((m) => m !== module)
-        : [...prev.selectedModules, module],
-    }));
+    setLocalModules((prev) =>
+      prev.includes(module) ? prev.filter((m) => m !== module) : [...prev, module]
+    );
   };
+  const selectAllModules = () => setLocalModules([...modules]);
+  const deselectAllModules = () => setLocalModules([]);
 
+  // Region handlers
   const toggleRegion = (region: string) => {
-    setFilterState((prev) => ({
-      ...prev,
-      selectedRegions: prev.selectedRegions.includes(region)
-        ? prev.selectedRegions.filter((r) => r !== region)
-        : [...prev.selectedRegions, region],
-    }));
+    setLocalRegions((prev) =>
+      prev.includes(region) ? prev.filter((r) => r !== region) : [...prev, region]
+    );
   };
+  const selectAllRegions = () => setLocalRegions([...regions]);
+  const deselectAllRegions = () => setLocalRegions([]);
 
-  const selectAllModules = () => {
-    setFilterState((prev) => ({
-      ...prev,
-      selectedModules: [...modules],
-    }));
-  };
-
-  const deselectAllModules = () => {
-    setFilterState((prev) => ({
-      ...prev,
-      selectedModules: [],
-    }));
-  };
-
-  const selectAllRegions = () => {
-    setFilterState((prev) => ({
-      ...prev,
-      selectedRegions: [...regions],
-    }));
-  };
-
-  const deselectAllRegions = () => {
-    setFilterState((prev) => ({
-      ...prev,
-      selectedRegions: [],
-    }));
-  };
-
+  // Date range handler
   const handleDateRangeChange = (range: { start: Date | null; end: Date | null }) => {
-    setFilterState((prev) => ({
-      ...prev,
-      dateRange: range,
-    }));
+    setLocalDateRange(range);
+  };
+
+  // Search applies local state to parent
+  const handleSearch = () => {
+    setFilterState({
+      selectedModules: localModules,
+      selectedRegions: localRegions,
+      dateRange: localDateRange,
+    });
+  };
+
+  // Reset both local and parent state
+  const handleReset = () => {
+    setLocalRegions([]);
+    setLocalDateRange({ start: null, end: null });
+    setFilterState({
+      selectedModules: [],
+      selectedRegions: [],
+      dateRange: { start: null, end: null },
+    });
   };
 
   return (
     <div className="grid grid-cols-4 md:grid-cols-1 gap-4 mb-6">
+      {/* Module Filter */}
       <div className="flex flex-col" ref={moduleRef}>
         <label className="text-sm font-medium text-secondary-foreground mb-1">Module:</label>
         <div className="relative">
@@ -97,15 +92,13 @@ const FilterSection: React.FC = () => {
             className="w-full bg-card border border-border rounded-md py-2 px-3 text-left flex justify-between items-center focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <span className="text-sm text-secondary-foreground">
-              {filterState.selectedModules.length > 0
-                ? `${filterState.selectedModules.length} selected`
+              {localModules.length > 0
+                ? `${localModules.length} selected`
                 : 'Select modules'}
             </span>
             <ChevronDown
               size={18}
-              className={`text-gray-500 transition-transform ${
-                isModuleOpen ? 'transform rotate-180' : ''
-              }`}
+              className={`text-gray-500 transition-transform ${isModuleOpen ? 'transform rotate-180' : ''}`}
             />
           </button>
           {isModuleOpen && (
@@ -133,18 +126,18 @@ const FilterSection: React.FC = () => {
                     <div className="relative flex items-center">
                       <input
                         type="checkbox"
-                        checked={filterState.selectedModules.includes(module)}
+                        checked={localModules.includes(module)}
                         onChange={() => toggleModule(module)}
                         className="opacity-0 absolute h-4 w-4 cursor-pointer"
                       />
                       <div
                         className={`border h-4 w-4 rounded flex items-center justify-center ${
-                          filterState.selectedModules.includes(module)
+                          localModules.includes(module)
                             ? 'bg-blue-600 border-blue-600'
                             : 'border-gray-300'
                         }`}
                       >
-                        {filterState.selectedModules.includes(module) && (
+                        {localModules.includes(module) && (
                           <Check size={12} className="text-white" />
                         )}
                       </div>
@@ -158,6 +151,7 @@ const FilterSection: React.FC = () => {
         </div>
       </div>
 
+      {/* Region Filter */}
       <div className="flex flex-col" ref={regionRef}>
         <label className="text-sm font-medium text-secondary-foreground mb-1">Region:</label>
         <div className="relative">
@@ -166,15 +160,13 @@ const FilterSection: React.FC = () => {
             className="w-full bg-card border border-border rounded-md py-2 px-3 text-left flex justify-between items-center focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <span className="text-sm text-secondary-foreground">
-              {filterState.selectedRegions.length === 0
+              {localRegions.length === 0
                 ? 'All Regions'
-                : `${filterState.selectedRegions.length} selected`}
+                : `${localRegions.length} selected`}
             </span>
             <ChevronDown
               size={18}
-              className={`text-gray-500 transition-transform ${
-                isRegionOpen ? 'transform rotate-180' : ''
-              }`}
+              className={`text-gray-500 transition-transform ${isRegionOpen ? 'transform rotate-180' : ''}`}
             />
           </button>
           {isRegionOpen && (
@@ -202,18 +194,18 @@ const FilterSection: React.FC = () => {
                     <div className="relative flex items-center">
                       <input
                         type="checkbox"
-                        checked={filterState.selectedRegions.includes(region)}
+                        checked={localRegions.includes(region)}
                         onChange={() => toggleRegion(region)}
                         className="opacity-0 absolute h-4 w-4 cursor-pointer"
                       />
                       <div
                         className={`border h-4 w-4 rounded flex items-center justify-center ${
-                          filterState.selectedRegions.includes(region)
+                          localRegions.includes(region)
                             ? 'bg-blue-600 border-blue-600'
                             : 'border-gray-300'
                         }`}
                       >
-                        {filterState.selectedRegions.includes(region) && (
+                        {localRegions.includes(region) && (
                           <Check size={12} className="text-white" />
                         )}
                       </div>
@@ -227,15 +219,17 @@ const FilterSection: React.FC = () => {
         </div>
       </div>
 
+      {/* Date Range Filter */}
       <div className="flex flex-col">
         <label className="text-sm font-medium text-secondary-foreground mb-1">Date Range:</label>
-        <DateRangePicker onChange={handleDateRangeChange} />
+        <DateRangePicker onChange={handleDateRangeChange} value={localDateRange} />
       </div>
 
+      {/* Action Buttons */}
       <div className="flex flex-col">
         <div className="grid grid-cols-3 gap-2 mt-[25px] md:mt-0">
-          <Button className="bg-[#CB371C] hover:bg-[#CB371C]">Reset</Button>
-          <Button className="bg-primary">Search</Button>
+          <Button className="bg-[#CB371C] hover:bg-[#CB371C]" onClick={handleReset}>Reset</Button>
+          <Button className="bg-primary" onClick={handleSearch}>Search</Button>
           <Button className="bg-[#8411DD] hover:bg-[#8411DD]">Download</Button>
         </div>
       </div>
