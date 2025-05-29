@@ -4,13 +4,15 @@ import DateRangePicker from './DateRangePicker';
 import { modules, regions } from '../utils/mockData';
 import { FilterState } from '../utils/types';
 import { Button } from '@/components/ui/button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 interface FilterSectionProps {
   filterState: FilterState;
   setFilterState: React.Dispatch<React.SetStateAction<FilterState>>;
+  onDownload?: (type: "pdf" | "excel") => void; // <-- Add this line
 }
 
-const FilterSection: React.FC<FilterSectionProps> = ({ filterState, setFilterState }) => {
+const FilterSection: React.FC<FilterSectionProps> = ({ filterState, setFilterState, onDownload }) => {
   const [isModuleOpen, setIsModuleOpen] = useState(false);
   const [isRegionOpen, setIsRegionOpen] = useState(false);
   const moduleRef = useRef<HTMLDivElement>(null);
@@ -83,7 +85,6 @@ const FilterSection: React.FC<FilterSectionProps> = ({ filterState, setFilterSta
 
   return (
     <div className="grid grid-cols-4 md:grid-cols-1 gap-4 mb-6">
-      {/* Module Filter */}
       <div className="flex flex-col" ref={moduleRef}>
         <label className="text-sm font-medium text-secondary-foreground mb-1">Module:</label>
         <div className="relative">
@@ -230,7 +231,17 @@ const FilterSection: React.FC<FilterSectionProps> = ({ filterState, setFilterSta
         <div className="grid grid-cols-3 gap-2 mt-[25px] md:mt-0">
           <Button className="bg-[#CB371C] hover:bg-[#CB371C]" onClick={handleReset}>Reset</Button>
           <Button className="bg-primary" onClick={handleSearch}>Search</Button>
-          <Button className="bg-[#8411DD] hover:bg-[#8411DD]">Download</Button>
+          <DropdownMenu >
+            <DropdownMenuTrigger>
+              <Button className="bg-[#8411DD] hover:bg-[#8411DD] max-w-full ">Download</Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuLabel>Download Options</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => onDownload?.("pdf")}>PDF</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onDownload?.("excel")}>Excel</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </div>
