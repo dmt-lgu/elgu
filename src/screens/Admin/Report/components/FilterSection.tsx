@@ -1,32 +1,48 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Check, ChevronDown } from 'lucide-react';
 import DateRangePicker from './DateRangePicker';
-import { modules, regions } from '../utils/mockData';
+import { modules } from '../utils/mockData';
 import { FilterState } from '../utils/types';
 import { Button } from '@/components/ui/button';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { regionMapping } from '../utils/mockData';
 
 interface FilterSectionProps {
   filterState: FilterState;
   setFilterState: React.Dispatch<React.SetStateAction<FilterState>>;
-  onDownload?: (type: "pdf" | "excel") => void; // <-- Add this line
+  onDownload?: (type: "pdf" | "excel") => void;
 }
 
-const FilterSection: React.FC<FilterSectionProps> = ({ filterState, setFilterState, onDownload }) => {
+const FilterSection: React.FC<FilterSectionProps> = ({
+  filterState,
+  setFilterState,
+  onDownload,
+}) => {
   const [isModuleOpen, setIsModuleOpen] = useState(false);
   const [isRegionOpen, setIsRegionOpen] = useState(false);
   const moduleRef = useRef<HTMLDivElement>(null);
   const regionRef = useRef<HTMLDivElement>(null);
 
-  // Local state for filters
-  const [localModules, setLocalModules] = useState<string[]>(
-  filterState.selectedModules.length > 0
-    ? filterState.selectedModules
-    : ["Business Permit"]
-  );
+  // Local state for filters, synced with parent
+  const [localModules, setLocalModules] = useState<string[]>(filterState.selectedModules.length > 0 ? filterState.selectedModules : ["Business Permit"]);
   const [localRegions, setLocalRegions] = useState<string[]>(filterState.selectedRegions);
   const [localDateRange, setLocalDateRange] = useState<{ start: Date | null; end: Date | null }>(filterState.dateRange);
 
+  // Sync local state with parent filterState
+  useEffect(() => {
+    setLocalModules(filterState.selectedModules.length > 0 ? filterState.selectedModules : ["Business Permit"]);
+    setLocalRegions(filterState.selectedRegions);
+    setLocalDateRange(filterState.dateRange);
+  }, [filterState]);
+
+  // Close dropdowns on outside click
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (moduleRef.current && !moduleRef.current.contains(event.target as Node)) {
@@ -55,7 +71,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({ filterState, setFilterSta
       prev.includes(region) ? prev.filter((r) => r !== region) : [...prev, region]
     );
   };
-  const selectAllRegions = () => setLocalRegions([...regions]);
+  const selectAllRegions = () => setLocalRegions(Object.keys(regionMapping));
   const deselectAllRegions = () => setLocalRegions([]);
 
   // Date range handler
@@ -63,7 +79,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({ filterState, setFilterSta
     setLocalDateRange(range);
   };
 
-  // Search applies local state to parent
+  // Apply filters
   const handleSearch = () => {
     setFilterState({
       selectedModules: localModules,
@@ -74,6 +90,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({ filterState, setFilterSta
 
   // Reset both local and parent state
   const handleReset = () => {
+    setLocalModules(["Business Permit"]);
     setLocalRegions([]);
     setLocalDateRange({ start: null, end: null });
     setFilterState({
@@ -85,6 +102,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({ filterState, setFilterSta
 
   return (
     <div className="grid grid-cols-4 md:grid-cols-1 gap-4 mb-6">
+      {/* Module Filter */}
       <div className="flex flex-col" ref={moduleRef}>
         <label className="text-sm font-medium text-secondary-foreground mb-1">Module:</label>
         <div className="relative">
@@ -187,7 +205,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({ filterState, setFilterSta
                 </button>
               </div>
               <div className="max-h-[300px] overflow-y-auto">
-                {regions.map((region, index) => (
+                {Object.entries(regionMapping).map(([key, value], index) => (
                   <label
                     key={`region-${index}`}
                     className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer"
@@ -195,22 +213,22 @@ const FilterSection: React.FC<FilterSectionProps> = ({ filterState, setFilterSta
                     <div className="relative flex items-center">
                       <input
                         type="checkbox"
-                        checked={localRegions.includes(region)}
-                        onChange={() => toggleRegion(region)}
+                        checked={localRegions.includes(key)}
+                        onChange={() => toggleRegion(key)}
                         className="opacity-0 absolute h-4 w-4 cursor-pointer"
                       />
                       <div
                         className={`border h-4 w-4 rounded flex items-center justify-center ${
-                          localRegions.includes(region)
+                          localRegions.includes(key)
                             ? 'bg-blue-600 border-blue-600'
                             : 'border-gray-300'
                         }`}
                       >
-                        {localRegions.includes(region) && (
+                        {localRegions.includes(key) && (
                           <Check size={12} className="text-white" />
                         )}
                       </div>
-                      <span className="ml-2 text-sm text-secondary-foreground">{region}</span>
+                      <span className="ml-2 text-sm text-secondary-foreground">{value}</span>
                     </div>
                   </label>
                 ))}
@@ -231,9 +249,9 @@ const FilterSection: React.FC<FilterSectionProps> = ({ filterState, setFilterSta
         <div className="grid grid-cols-3 gap-2 mt-[25px] md:mt-0">
           <Button className="bg-[#CB371C] hover:bg-[#CB371C]" onClick={handleReset}>Reset</Button>
           <Button className="bg-primary" onClick={handleSearch}>Search</Button>
-          <DropdownMenu >
+          <DropdownMenu>
             <DropdownMenuTrigger>
-              <Button className="bg-[#8411DD] hover:bg-[#8411DD] max-w-full ">Download</Button>
+              <Button className="bg-[#8411DD] hover:bg-[#8411DD] max-w-full">Download</Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
               <DropdownMenuLabel>Download Options</DropdownMenuLabel>

@@ -41,3 +41,23 @@ export const modules = [
 export const regions = [
   "R1","R2","R3","R4A","R4B","R5","CAR","NCR","R6","R7","R8","R9","R10","R11","R12","R13","BARMM I","BARMM II"
 ];
+
+export const regionMapping: Record<string, string> = {
+      CAR: "CAR",
+      region1: "R1",
+      region2: "R2",
+      region3: "R3",
+      region4a: "R4A",
+      region4b: "R4B",
+      region5: "R5",
+      region6: "R6",
+      region7: "R7",
+      region8: "R8",
+      region9: "R9",
+      region10: "R10",
+      region11: "R11",
+      region12: "R12",
+      region13: "R13",
+      BARMM1: "BARMM I",
+      BARMM2: "BARMM II",
+    };
