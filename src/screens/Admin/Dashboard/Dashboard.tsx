@@ -6,9 +6,11 @@ import {
   mainStats, 
   genderStats, 
   operationalLguChartData, 
-  monthlyComparisonChartData 
+  monthlyComparisonChartData,
+  transactionChartData
 } from './utils/mockData';
 import { StatisticData } from './utils/types';
+import TransactionChart from './components/TransChartComponent2';
 
 const DashboardPage = () => {
   const [statistics] = useState<{
@@ -64,6 +66,11 @@ const DashboardPage = () => {
         barKey2="current"
         barName1="Previous Month"
         barName2="Current Month"
+        period="2024-12"
+      />
+      <TransactionChart
+        data={transactionChartData}
+        title="NUMBER OF TRANSACTION PER REGION FOR NEW APPLICATION"
         period="2024-12"
       />
     </div>
