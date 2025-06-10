@@ -9,6 +9,8 @@ import {
 } from "@/components/ui/table";
 import { format, parse } from "date-fns";
 import TableLoader from '../utils/TableLoder';
+// Import the region key to code utility
+import { getRegionCode } from "../utils/mockData";
 
 interface TableReportProps {
   selectedRegions: string[];
@@ -44,7 +46,7 @@ function groupResultsByRegion(results: any[], lguToRegion: Record<string, string
 }
 
 const TableReport = forwardRef<HTMLDivElement, TableReportProps>(
-  ({ dateRange, apiData, loading, lguToRegion }, ref) => {
+  ({ selectedRegions, dateRange, apiData, loading, lguToRegion }, ref) => {
     // Format date range label
     let dateRangeLabel = "";
     if (dateRange?.start && dateRange?.end) {
@@ -106,7 +108,7 @@ const TableReport = forwardRef<HTMLDivElement, TableReportProps>(
                   className="border px-2 py-1 text-center font-bold align-middle border-b-2"
                   rowSpan={regionRowCount}
                 >
-                  {region}
+                  {getRegionCode(region)}
                 </TableCell>
               )}
               <TableCell className="border px-2 py-1 text-start font-bold">
@@ -138,9 +140,6 @@ const TableReport = forwardRef<HTMLDivElement, TableReportProps>(
 
     return (
       <div className="bg-card p-4 rounded-md border text-secondary-foreground border-border shadow-sm mb-6">
-        {/* <div className="flex items-center justify-start mb-4">
-          <h2 className="text-sm font-bold uppercase mb-4">Report Table</h2>
-        </div> */}
         <div className="overflow-auto" ref={ref}>
           <Table className="w-full border-collapse text-[10px]">
             <TableHeader>
@@ -189,13 +188,23 @@ const TableReport = forwardRef<HTMLDivElement, TableReportProps>(
                   </TableCell>
                 </TableRow>
               ) : results.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={16} className="text-center py-4 border">
-                    <span className='font-bold'>
-                      Please select the regions and date range you want to view.
-                    </span>
-                  </TableCell>
-                </TableRow>
+                (selectedRegions.length > 0 || (dateRange?.start && dateRange?.end)) ? (
+                  <TableRow>
+                    <TableCell colSpan={16} className="text-center py-4 border">
+                      <span className='font-bold text-lg text-muted-foreground'>
+                        No results found, Please try again!
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={16} className="text-center py-4 border">
+                      <span className='font-bold text-sm text-muted-foreground'>
+                        Please select the category, regions and date range you want to view.
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                )
               ) : (
                 tableRows
               )}

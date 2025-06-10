@@ -9,6 +9,14 @@ import { FilterState } from './utils/types';
 import axios from '../../../plugin/axios';
 import { regionMapping } from '../../../screens/Admin/Report/utils/mockData'
 
+// interface FilterSectionProps {
+//   filterState: FilterState;
+//   setFilterState: React.Dispatch<React.SetStateAction<FilterState>>;
+//   onSearch: (filters: FilterState) => void;
+//   onDownload: (type: "pdf" | "excel") => Promise<void>;
+//   onReset: () => void;
+// }
+
 const Reports: React.FC = () => {
   const [filterState, setFilterState] = useState<FilterState>({
     selectedModules: [],
@@ -19,6 +27,7 @@ const Reports: React.FC = () => {
     },
   });
 
+  const [searchFilters, setSearchFilters] = useState<FilterState>(filterState);
   const [tableData, setTableData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
@@ -52,22 +61,22 @@ const Reports: React.FC = () => {
     fetchLguToRegion();
   }, []);
 
-  // Fetch data when filterState changes
+  // Fetch data when searchFilters changes (i.e., after Search button)
   useEffect(() => {
     const transaction = async () => {
-      if (!filterState.selectedRegions.length && !filterState.dateRange.start && !filterState.dateRange.end) {
+      if (!searchFilters.selectedRegions.length && !searchFilters.dateRange.start && !searchFilters.dateRange.end) {
         setTableData(null);
         return;
       }
       setLoading(true);
       try {
         const payload = {
-          locationName: filterState.selectedRegions,
-          startDate: filterState.dateRange.start
-            ? filterState.dateRange.start.toISOString().slice(0, 10)
+          locationName: searchFilters.selectedRegions,
+          startDate: searchFilters.dateRange.start
+            ? searchFilters.dateRange.start.toISOString().slice(0, 10)
             : null,
-          endDate: filterState.dateRange.end
-            ? filterState.dateRange.end.toISOString().slice(0, 10)
+          endDate: searchFilters.dateRange.end
+            ? searchFilters.dateRange.end.toISOString().slice(0, 10)
             : null,
         };
         const response = await axios.post('transaction-count', payload);
@@ -79,7 +88,7 @@ const Reports: React.FC = () => {
       }
     };
     transaction();
-  }, [filterState]);
+  }, [searchFilters]);
 
   const handleDownload = async (type: "pdf" | "excel") => {
     if (!tableRef.current) return;
@@ -107,17 +116,41 @@ const Reports: React.FC = () => {
     }
   };
 
+  // Handler for Search button
+  const handleSearch = (filters: FilterState) => {
+    setSearchFilters({ ...filters });
+  };
+
+  // Handler for Reset button: reset all except modules and clear TableReport data
+  const handleReset = () => {
+    setFilterState(prev => ({
+      ...prev,
+      selectedRegions: [],
+      dateRange: { start: null, end: null },
+      // keep selectedModules as is
+    }));
+    setSearchFilters(prev => ({
+      ...prev,
+      selectedRegions: [],
+      dateRange: { start: null, end: null },
+      // keep selectedModules as is
+    }));
+    setTableData(null);
+  };
+
   return (
     <div className='p-6 max-w-[1200px] mx-auto bg-background'>
       <FilterSection
         filterState={filterState}
         setFilterState={setFilterState}
+        onSearch={handleSearch}
         onDownload={handleDownload}
+        onReset={handleReset}
       />
       <TableReport
         ref={tableRef}
-        selectedRegions={filterState.selectedRegions}
-        dateRange={filterState.dateRange}
+        selectedRegions={searchFilters.selectedRegions}
+        dateRange={searchFilters.dateRange}
         apiData={tableData}
         loading={loading || lguRegionLoading}
         lguToRegion={lguToRegion}
