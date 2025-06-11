@@ -5,9 +5,42 @@ import eLGULogo from "./../../assets/logo/lgu-logo.png";
 import { Link, Outlet } from "react-router-dom";
 import { ModeToggle } from "@/components/mode-toggle";
 import { ThemeProvider } from "@/components/theme-provider";
+import axios from "./../../plugin/axios";
+import Swal from "sweetalert2";
 
 function Admin() {
   const location = useLocation();
+
+
+  axios.get("lgu-list/")
+    .then(response => {
+
+      console.log("LGU List:", response.data);
+      axios.get("municipality-list/")
+        .then(regionResponse => {
+          console.log("Municipality:", regionResponse.data);
+          // You can store the regions in a state or context if needed
+        })
+        .catch(regionError => {
+          Swal.fire({
+            icon: "error",
+            title: "Error",
+            text: regionError.response?.data?.message || "Failed to fetch regions",
+            showConfirmButton: false,
+          });
+        });
+    })
+    .catch(error => {
+      Swal.fire({
+        icon: "error",  
+        title: "Error",
+        text: error.response?.data?.message || "Failed to fetch LGU list",
+        showConfirmButton: false,
+      });
+    });
+
+
+
 
   return (
     <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
