@@ -20,7 +20,7 @@ const Admin= lazy(() =>
 const DashboardPage= lazy(() =>
   wait(1300).then(() => import("./screens/Admin/Dashboard/Dashboard.tsx")));
 const Report = lazy(() =>
-  wait(1300).then(() => import("./screens/Admin/Report/Report.tsx")));
+  wait(1300).then(() => import("./screens/Admin/Report/Reports.tsx")));
 
 const Page2= lazy(() =>
   wait(1300).then(() => import("./screens/page2.tsx"))
