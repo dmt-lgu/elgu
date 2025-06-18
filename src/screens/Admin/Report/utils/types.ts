@@ -1,3 +1,5 @@
+import { cities } from './mockData';
+
 export interface StatisticData {
   title: string;
   value: string | number;
@@ -21,6 +23,8 @@ export interface FilterOptions {
 export interface FilterState {
   selectedModules: string[];
   selectedRegions: string[];
+  selectedProvinces: string[];
+  selectedCities?: string[];
   dateRange: {
     start: Date | null;
     end: Date | null;
@@ -44,4 +48,16 @@ export interface RegionData {
   femalePending: number;
   femaleTotal: number;
   [key: string]: number | string;
+}
+
+export function generateLguProvinceList(): { lgu: string; province: string }[] {
+  const result: { lgu: string; province: string }[] = [];
+  Object.entries(cities).forEach(([province, lguList]) => {
+    if (Array.isArray(lguList)) {
+      lguList.forEach(lgu => {
+        result.push({ lgu, province });
+      });
+    }
+  });
+  return result;
 }

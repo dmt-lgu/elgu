@@ -1,11 +1,9 @@
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import React from "react";
-import { DateRange } from "react-day-picker";
-import { addDays, format, startOfMonth, endOfMonth, isAfter, isBefore, isSameMonth } from "date-fns";
+import { format, startOfMonth, endOfMonth, isAfter } from "date-fns";
 
 type MonthYear = { month: number; year: number };
 
@@ -23,53 +21,77 @@ function getMonthLabel(month: number, year: number) {
 
 const months = Array.from({ length: 12 }, (_, i) => i);
 
+interface DateRangeMonthProps {
+  className?: string;
+  value?: { start: Date | null; end: Date | null };
+  onChange?: (range: { start: Date | null; end: Date | null }) => void;
+}
+
 function DateRangeMonth({
   className,
-}: React.HTMLAttributes<HTMLDivElement>) {
+  value,
+  onChange,
+}: DateRangeMonthProps) {
   const currentYear = new Date().getFullYear();
   const [open, setOpen] = React.useState(false);
+
+  // Internal state for month/year selection
   const [from, setFrom] = React.useState<MonthYear | null>(null);
   const [to, setTo] = React.useState<MonthYear | null>(null);
 
-  // Compute the date range based on selected months
-  const dateRange: DateRange | undefined = from && to
-    ? {
-        from: getFirstDay(from.month, from.year),
-        to: getLastDay(to.month, to.year),
-      }
-    : from
-    ? {
-        from: getFirstDay(from.month, from.year),
-        to: undefined,
-      }
-    : undefined;
-
-  // Handler for month selection
-  const handleMonthSelect = (selected: MonthYear) => {
-    if (!from || (from && to)) {
-      setFrom(selected);
-      setTo(null);
-    } else if (from) {
-      // If selecting the same month, treat as single month
-      if (from.month === selected.month && from.year === selected.year) {
-        setTo(selected);
-        setOpen(false);
-      } else if (
-        isAfter(new Date(selected.year, selected.month, 1), new Date(from.year, from.month, 1))
-      ) {
-        setTo(selected);
-        setOpen(false);
-      } else {
-        // If selected month is before from, swap
-        setTo(from);
-        setFrom(selected);
-        setOpen(false);
-      }
+  // Sync with value prop
+  React.useEffect(() => {
+    if (value?.start) {
+      setFrom({ month: value.start.getMonth(), year: value.start.getFullYear() });
+    } else {
+      setFrom(null);
     }
-  };
+    if (value?.end) {
+      setTo({ month: value.end.getMonth(), year: value.end.getFullYear() });
+    } else {
+      setTo(null);
+    }
+  }, [value?.start, value?.end]);
+
 
   // Generate years for dropdown (e.g., currentYear-10 to currentYear+1)
   const years = Array.from({ length: 15 }, (_, i) => currentYear - 10 + i);
+
+  // Apply button handler
+  const handleApply = () => {
+    if (from && to && onChange) {
+      // Always ensure start <= end
+      let startMonth = from;
+      let endMonth = to;
+      const fromDate = new Date(from.year, from.month, 1);
+      const toDate = new Date(to.year, to.month, 1);
+      if (isAfter(fromDate, toDate)) {
+        // swap
+        startMonth = to;
+        endMonth = from;
+      }
+      onChange({
+        start: getFirstDay(startMonth.month, startMonth.year),
+        end: getLastDay(endMonth.month, endMonth.year),
+      });
+    } else if (from && onChange) {
+      onChange({
+        start: getFirstDay(from.month, from.year),
+        end: null,
+      });
+    }
+    setOpen(false);
+  };
+
+  // Clear button handler
+  const handleClear = () => {
+    setFrom(null);
+    setTo(null);
+    if (onChange) {
+      onChange({ start: null, end: null });
+    }
+    setOpen(false);
+  };
 
   return (
     <div className={cn("grid gap-2", className)}>
@@ -80,18 +102,17 @@ function DateRangeMonth({
             variant="outline"
             className={cn(
               "w-[350px] justify-start text-left font-normal",
-              !dateRange && "text-muted-foreground"
+              !from && "text-muted-foreground"
             )}
           >
             <CalendarIcon className="mr-2 h-4 w-4" />
-            {dateRange?.from ? (
-              dateRange.to ? (
+            {from ? (
+              to ? (
                 <>
-                  {format(dateRange.from, "LLLL yyyy")} -{" "}
-                  {format(dateRange.to, "LLLL yyyy")}
+                  {getMonthLabel(from.month, from.year)} - {getMonthLabel(to.month, to.year)}
                 </>
               ) : (
-                format(dateRange.from, "LLLL yyyy")
+                getMonthLabel(from.month, from.year)
               )
             ) : (
               <span>Select month</span>
@@ -167,18 +188,14 @@ function DateRangeMonth({
             <div className="flex gap-2 mt-2">
               <Button
                 variant="default"
-                onClick={() => setOpen(false)}
-                disabled={!from || !to}
+                onClick={handleApply}
+                disabled={!from}
               >
                 Apply
               </Button>
               <Button
                 variant="outline"
-                onClick={() => {
-                  setFrom(null);
-                  setTo(null);
-                  setOpen(false);
-                }}
+                onClick={handleClear}
               >
                 Clear
               </Button>

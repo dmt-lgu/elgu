@@ -8,8 +8,6 @@ import {
   groupOfIslands,
   dateRange,
   regionGroups,
-  provinces,
-  cities,
   islandRegionMap,
   regionProvinceMap,
   regionMapping,
@@ -26,6 +24,88 @@ import {
 } from '@/components/ui/dropdown-menu';
 import DateRangeMonth from './DateRangeMonth';
 import DateRangeYear from './DateRangeYear';
+import axios from '../../../../plugin/axios';
+
+// --- City Normalization Utilities and API Integration ---
+
+function displayCityName(name: string) {
+  if (/^City of /i.test(name.trim())) return name;
+  const match = name.match(/^(.+?)\s*City$/i);
+  if (match) {
+    return `City of ${match[1].trim()}`;
+  }
+  return name.trim();
+}
+
+function normalizeApiCities(apiCities: Record<string, string[]>): Record<string, string[]> {
+  const normalized: Record<string, string[]> = {};
+  for (const [province, cityList] of Object.entries(apiCities)) {
+    normalized[province] = cityList.map(cityProv => {
+      const city = cityProv.split(',')[0].trim();
+      return displayCityName(city);
+    });
+  }
+  return normalized;
+}
+
+function useCities() {
+  const [cities, setCities] = useState<Record<string, string[]>>({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    setLoading(true);
+    axios
+      .get('municipality-list')
+      .then(res => {
+        if (mounted) {
+          setCities(normalizeApiCities(res.data));
+          setLoading(false);
+        }
+      })
+      .catch(err => {
+        if (mounted) {
+          setError(err.message || 'Failed to fetch cities');
+          setLoading(false);
+        }
+      });
+    return () => { mounted = false; };
+  }, []);
+
+  return { cities, loading, error };
+}
+
+// --- Province API Integration ---
+function useProvinces() {
+  const [provinces, setProvinces] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    setLoading(true);
+    axios
+      .get('municipality-list')
+      .then(res => {
+        if (mounted) {
+          setProvinces(Object.keys(res.data));
+          setLoading(false);
+        }
+      })
+      .catch(err => {
+        if (mounted) {
+          setError(err.message || 'Failed to fetch provinces');
+          setLoading(false);
+        }
+      });
+    return () => { mounted = false; };
+  }, []);
+
+  return { provinces, loading, error };
+}
+
+// --- End of city/province API integration ---
 
 interface FilterSectionProps {
   filterState: FilterState;
@@ -35,22 +115,20 @@ interface FilterSectionProps {
   onReset?: () => void;
 }
 
-const provinceOptions = provinces.map(province => ({
-  value: province,
-  label: province,
-}));
-const getCityOptions = (selectedProvinces: string[]) => {
+const getCityOptions = (
+  selectedProvinces: string[],
+  cities: Record<string, string[]>
+) => {
   let cityList: { value: string; label: string; province?: string }[] = [];
   selectedProvinces.forEach(province => {
     cityList = cityList.concat(
       (cities[province] || []).map((city: any) => ({
         value: city,
-        label: city,
+        label: displayCityName(city),
         province,
       }))
     );
   });
-  // Remove duplicates
   return Array.from(new Map(cityList.map(item => [item.value, item])).values());
 };
 
@@ -79,6 +157,16 @@ const FilterSection: React.FC<FilterSectionProps> = ({
   const categoryRef = useRef<HTMLDivElement>(null);
   const dateRef = useRef<HTMLDivElement>(null);
 
+  // --- Fetch cities and provinces from API ---
+  const { cities, loading: citiesLoading, error: citiesError } = useCities();
+  const { provinces } = useProvinces();
+
+  // Province options (dynamic)
+  const provinceOptions = provinces.map(province => ({
+    value: province,
+    label: province,
+  }));
+
   // Ensure "Business Permit" is checked by default
   useEffect(() => {
     if (!filterState.selectedModules.includes("Business Permit")) {
@@ -87,8 +175,8 @@ const FilterSection: React.FC<FilterSectionProps> = ({
         selectedModules: ["Business Permit", ...prev.selectedModules.filter(m => m !== "Business Permit")]
       }));
     }
-
-  }, []); // Only run on mount
+    // eslint-disable-next-line
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -185,7 +273,6 @@ const FilterSection: React.FC<FilterSectionProps> = ({
   );
 
   // --- Handlers ---
-  // When group of islands is toggled, select/deselect its regions
   const toggleIsland = (island: string) => {
     setSelectedIslands(prev => {
       let newIslands: string[];
@@ -207,7 +294,6 @@ const FilterSection: React.FC<FilterSectionProps> = ({
     });
   };
 
-  // When region is toggled, update selectedRegions and reset provinces/cities if needed
   const toggleRegion = (region: string) => {
     setFilterState(prev => {
       let newRegions: string[];
@@ -227,68 +313,89 @@ const FilterSection: React.FC<FilterSectionProps> = ({
     });
   };
 
-  // Province select handler (multi)
   const handleProvinceChange = (options: any) => {
     setSelectedProvinceOptions(options || []);
     setSelectedCityOptions([]);
+    setFilterState(prev => ({
+      ...prev,
+      selectedProvinces: (options || []).map((opt: any) => opt.value),
+    }));
   };
 
-  // City select handler (multi)
   const handleCityChange = (options: any) => {
     setSelectedCityOptions(options || []);
   };
 
-  // const handleDateTypeChange = (dateType: string) => {
-  //   setFilterState(prev => ({
-  //     ...prev,
-  //     dateRange: { start: null, end: null }
-  //   }));
-  // };
-
-  // --- Date Range Logic ---
   const selectAllDates = () => setSelectedDates([...dateRange]);
-  const deselectAllDates = () => setSelectedDates([]);
+  const deselectAllDates = () => {
+    setSelectedDates([]);
+    setFilterState(prev => ({
+      ...prev,
+      dateRange: { start: null, end: null }
+    }));
+  };
 
-  // --- Search Button Handler ---
   const handleSearchClick = () => {
-    // Map region codes (e.g. "X") to API keys (e.g. "region10")
     const selectedRegions = filterState.selectedRegions
       .map(label => regionMapping[label] || label)
       .filter(Boolean);
 
-    // Build the API filter object
     const apiFilter = {
       locationName: selectedRegions,
       startDate: filterState.dateRange?.start,
       endDate: filterState.dateRange?.end,
-      // Add other fields as needed
     };
 
-    // Pass the mapped filter to your API handler
-    onSearch({ ...filterState, selectedRegions, ...apiFilter });
+    onSearch({
+      ...filterState,
+      selectedRegions,
+      selectedCities: selectedCityOptions.map(opt => opt.value),
+      ...apiFilter
+    });
   };
 
-  // --- Reset Functionality (always clear selectedDates) ---
   const handleReset = () => {
-    setSelectedDates([]); // Always clear date range checkboxes
-    setSelectedCategories([]); // Always clear category checkboxes
+    setSelectedDates([]);
+    setSelectedCategories([]);
+    setSelectedCityOptions([]);
     if (onReset) {
       onReset();
     } else {
-      // fallback: reset only local UI state
       setIsCategoryOpen(false);
       setIsDateOpen(false);
       setIsRegionOpen(false);
       setSelectedIslands([]);
       setSelectedProvinceOptions([]);
-      setSelectedCityOptions([]);
       setFilterState(prev => ({
         ...prev,
         selectedRegions: [],
         dateRange: { start: null, end: null },
-        // keep selectedModules as is
       }));
     }
+  };
+
+  useEffect(() => {
+    setSelectedProvinceOptions(
+      provinceOptions.filter(opt =>
+        filterState.selectedProvinces?.includes(opt.value)
+      )
+    );
+  }, [filterState.selectedProvinces, provinceOptions]);
+
+  const handleDateTypeToggle = (dateType: string) => {
+    setSelectedDates(prev => {
+      let newDates;
+      if (prev.includes(dateType)) {
+        newDates = prev.filter(d => d !== dateType);
+        setFilterState(prevState => ({
+          ...prevState,
+          dateRange: { start: null, end: null }
+        }));
+      } else {
+        newDates = [...prev, dateType];
+      }
+      return newDates;
+    });
   };
 
   return (
@@ -470,9 +577,9 @@ const FilterSection: React.FC<FilterSectionProps> = ({
                 </div>
                 {/* Regions */}
                 <label className="block text-sm font-bold text-blue-700 mb-2">Regions</label>
-                <div className="grid grid-cols-5 gap-2 mb-4">
+                <div className="grid grid-cols-4 gap-2 mb-4">
                   {Object.keys(regionGroups).map(region => (
-                    <label key={region} className="flex items-center gap-1 text-secondary-foreground  text-sm">
+                    <label key={region} className="flex items-center gap-1 text-secondary-foreground text-sm">
                       <input
                         type="checkbox"
                         checked={filterState.selectedRegions.includes(region)}
@@ -483,6 +590,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({
                     </label>
                   ))}
                 </div>
+  
                 {/* Province (multi) */}
                 <div className="mb-2 relative z-50">
                   <label className="block text-sm font-bold text-blue-700 mb-1">Province</label>
@@ -509,22 +617,28 @@ const FilterSection: React.FC<FilterSectionProps> = ({
                 <div className="relative z-50">
                   <label className="block text-sm font-bold text-blue-700 mb-1">City/Municipality</label>
                   <div className="relative">
-                    <Select
-                      options={getCityOptions(selectedProvinceOptions.map(opt => opt.value))}
-                      value={selectedCityOptions}
-                      onChange={handleCityChange}
-                      placeholder="Select city/municipality"
-                      isClearable
-                      isMulti
-                      isDisabled={selectedProvinceOptions.length === 0}
-                      classNamePrefix="react-select"
-                      className="text-sm"
-                      menuPortalTarget={document.body}
-                      styles={{
-                        menuPortal: base => ({ ...base, zIndex: 9999 }),
-                        menu: base => ({ ...base, zIndex: 9999 }),
-                      }}
-                    />
+                    {citiesLoading ? (
+                      <div className="text-xs text-muted-foreground py-2 px-2">Loading cities...</div>
+                    ) : citiesError ? (
+                      <div className="text-xs text-red-500 py-2 px-2">Failed to load cities</div>
+                    ) : (
+                      <Select
+                        options={getCityOptions(selectedProvinceOptions.map(opt => opt.value), cities)}
+                        value={selectedCityOptions}
+                        onChange={handleCityChange}
+                        placeholder="Select city/municipality"
+                        isClearable
+                        isMulti
+                        isDisabled={selectedProvinceOptions.length === 0}
+                        classNamePrefix="react-select"
+                        className="text-sm"
+                        menuPortalTarget={document.body}
+                        styles={{
+                          menuPortal: base => ({ ...base, zIndex: 9999 }),
+                          menu: base => ({ ...base, zIndex: 9999 }),
+                        }}
+                      />
+                    )}
                   </div>
                 </div>
               </div>
@@ -574,11 +688,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({
                       <input
                         type="checkbox"
                         checked={selectedDates.includes(date)}
-                        onChange={() => setSelectedDates(prev =>
-                          prev.includes(date)
-                            ? prev.filter(d => d !== date)
-                            : [...prev, date]
-                        )}
+                        onChange={() => handleDateTypeToggle(date)}
                         className="opacity-0 absolute h-4 w-4 cursor-pointer"
                       />
                       <div className={`border h-4 w-4 rounded flex items-center justify-center ${
@@ -604,10 +714,22 @@ const FilterSection: React.FC<FilterSectionProps> = ({
                     <DateRangeDay value={filterState.dateRange} onChange={handleDateRangeChange} />
                   )}
                   {selectedDates.includes('Month') && (
-                    <DateRangeMonth />
+                    <DateRangeMonth
+                      value={filterState.dateRange}
+                      onChange={range => setFilterState(prev => ({
+                        ...prev,
+                        dateRange: range
+                      }))}
+                    />
                   )}
                   {selectedDates.includes('Year') && (
-                    <DateRangeYear />
+                    <DateRangeYear
+                      value={filterState.dateRange}
+                      onChange={range => setFilterState(prev => ({
+                        ...prev,
+                        dateRange: range
+                      }))}
+                    />
                   )}
                 </div>
               </div>
@@ -628,13 +750,13 @@ const FilterSection: React.FC<FilterSectionProps> = ({
           <Button className="bg-primary h-9 text-[12px]" onClick={handleSearchClick}>Search</Button>
           <DropdownMenu>
             <DropdownMenuTrigger>
-              <Button className="bg-[#8411DD] hover:bg-[#8411DD] max-w-full text-[10px] h-9">Download</Button>
+              <Button className="bg-[#8411DD] hover:bg-[#8411DD] max-w-full text-[10px] h-9 md:w-full">Download</Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
               <DropdownMenuLabel>Download Options</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => onDownload?.("pdf")}>PDF</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onDownload?.("excel")}>Excel</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onDownload?.("pdf")} className='cursor-pointer hover:bg-primary hover:text-white'>PDF</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onDownload?.("excel")} className='cursor-pointer'>Excel</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

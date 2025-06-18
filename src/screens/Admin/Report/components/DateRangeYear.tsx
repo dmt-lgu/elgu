@@ -3,21 +3,44 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import React from "react";
-import { DateRange } from "react-day-picker";
 import { format, startOfYear, endOfYear } from "date-fns";
 
 type YearOnly = { year: number };
 
+interface DateRangeYearProps {
+  className?: string;
+  value?: { start: Date | null; end: Date | null };
+  onChange?: (range: { start: Date | null; end: Date | null }) => void;
+}
+
 function DateRangeYear({
   className,
-}: React.HTMLAttributes<HTMLDivElement>) {
+  value,
+  onChange,
+}: DateRangeYearProps) {
   const currentYear = new Date().getFullYear();
   const [open, setOpen] = React.useState(false);
+
+  // Internal state for year selection
   const [from, setFrom] = React.useState<YearOnly | null>(null);
   const [to, setTo] = React.useState<YearOnly | null>(null);
 
+  // Sync with value prop
+  React.useEffect(() => {
+    if (value?.start) {
+      setFrom({ year: value.start.getFullYear() });
+    } else {
+      setFrom(null);
+    }
+    if (value?.end) {
+      setTo({ year: value.end.getFullYear() });
+    } else {
+      setTo(null);
+    }
+  }, [value?.start, value?.end]);
+
   // Compute the date range based on selected years
-  let dateRange: DateRange | undefined = undefined;
+  let dateRange: { from: Date | undefined; to: Date | undefined } = { from: undefined, to: undefined };
   if (from && to) {
     dateRange = {
       from: startOfYear(new Date(from.year, 0, 1)),
@@ -58,6 +81,38 @@ function DateRangeYear({
     }
   };
 
+  // Apply button handler
+  const handleApply = () => {
+    if (from && to && onChange) {
+      let startYear = from;
+      let endYear = to;
+      if (from.year > to.year) {
+        startYear = to;
+        endYear = from;
+      }
+      onChange({
+        start: startOfYear(new Date(startYear.year, 0, 1)),
+        end: endOfYear(new Date(endYear.year, 0, 1)),
+      });
+    } else if (from && onChange) {
+      onChange({
+        start: startOfYear(new Date(from.year, 0, 1)),
+        end: null,
+      });
+    }
+    setOpen(false);
+  };
+
+  // Clear button handler
+  const handleClear = () => {
+    setFrom(null);
+    setTo(null);
+    if (onChange) {
+      onChange({ start: null, end: null });
+    }
+    setOpen(false);
+  };
+
   return (
     <div className={cn("grid gap-2", className)}>
       <Popover open={open} onOpenChange={setOpen}>
@@ -67,14 +122,13 @@ function DateRangeYear({
             variant="outline"
             className={cn(
               "w-[350px] justify-start text-left font-normal",
-              !dateRange && "text-muted-foreground"
+              !dateRange.from && "text-muted-foreground"
             )}
           >
             <CalendarIcon className="mr-2 h-4 w-4" />
             {getLabel()}
           </Button>
         </PopoverTrigger>
-        
         <PopoverContent className="w-auto p-4" align="start">
           <div className="flex flex-col gap-4">
             <div>
@@ -109,34 +163,21 @@ function DateRangeYear({
             <div className="flex gap-2 mt-2">
               <Button
                 variant="default"
-                onClick={() => setOpen(false)}
-                disabled={!from || !to}
+                onClick={handleApply}
+                disabled={!from}
               >
                 Apply
               </Button>
               <Button
                 variant="outline"
-                onClick={() => {
-                  setFrom(null);
-                  setTo(null);
-                  setOpen(false);
-                }}
+                onClick={handleClear}
               >
                 Clear
               </Button>
             </div>
           </div>
         </PopoverContent>
-      
-        
       </Popover>
-      {/* For demonstration: show the computed range */}
-      {/* {dateRange?.from && dateRange.to && (
-        <div className="text-xs mt-2">
-          <span className="font-semibold">Result:</span>{" "}
-          {format(dateRange.from, "yyyy-MM-dd")} to {format(dateRange.to, "yyyy-MM-dd")}
-        </div>
-      )} */}
     </div>
   );
 }

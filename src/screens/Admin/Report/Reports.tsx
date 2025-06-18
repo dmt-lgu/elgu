@@ -9,18 +9,12 @@ import { FilterState } from './utils/types';
 import axios from '../../../plugin/axios';
 import { regionMapping } from '../../../screens/Admin/Report/utils/mockData'
 
-// interface FilterSectionProps {
-//   filterState: FilterState;
-//   setFilterState: React.Dispatch<React.SetStateAction<FilterState>>;
-//   onSearch: (filters: FilterState) => void;
-//   onDownload: (type: "pdf" | "excel") => Promise<void>;
-//   onReset: () => void;
-// }
-
 const Reports: React.FC = () => {
   const [filterState, setFilterState] = useState<FilterState>({
     selectedModules: [],
     selectedRegions: [],
+    selectedProvinces: [], 
+    selectedCities: [],
     dateRange: {
       start: null,
       end: null,
@@ -64,13 +58,18 @@ const Reports: React.FC = () => {
   // Fetch data when searchFilters changes (i.e., after Search button)
   useEffect(() => {
     const transaction = async () => {
-      if (!searchFilters.selectedRegions.length && !searchFilters.dateRange.start && !searchFilters.dateRange.end) {
+      if (
+        !searchFilters.selectedRegions.length &&
+        !searchFilters.selectedProvinces?.length &&
+        !searchFilters.dateRange.start &&
+        !searchFilters.dateRange.end
+      ) {
         setTableData(null);
         return;
       }
       setLoading(true);
       try {
-        const payload = {
+        const payload: any = {
           locationName: searchFilters.selectedRegions,
           startDate: searchFilters.dateRange.start
             ? searchFilters.dateRange.start.toISOString().slice(0, 10)
@@ -79,6 +78,10 @@ const Reports: React.FC = () => {
             ? searchFilters.dateRange.end.toISOString().slice(0, 10)
             : null,
         };
+        // Optionally, send selectedProvinces to the API if supported
+        if (searchFilters.selectedProvinces && searchFilters.selectedProvinces.length > 0) {
+          payload.provinces = searchFilters.selectedProvinces;
+        }
         const response = await axios.post('transaction-count', payload);
         setTableData(response.data);
       } catch (error) {
@@ -100,19 +103,48 @@ const Reports: React.FC = () => {
       const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
       saveAs(new Blob([wbout], { type: "application/octet-stream" }), "report.xlsx");
     } else if (type === "pdf") {
-      const canvas = await html2canvas(tableRef.current, { scale: 2 });
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF({
-        orientation: "landscape",
-        unit: "pt",
-        format: "a4",
-      });
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const imgProps = pdf.getImageProperties(imgData);
-      const pdfWidth = pageWidth;
-      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-      pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
-      pdf.save("report.pdf");
+      const tableElement = tableRef.current;
+      setTimeout(async () => {
+        const canvas = await html2canvas(tableElement, {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: "#fff",
+        });
+        const imgData = canvas.toDataURL("image/png");
+        const pdf = new jsPDF({
+          orientation: "landscape",
+          unit: "pt",
+          format: "a4",
+        });
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const imgWidth = pageWidth - 40;
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+        let imgY = 20;
+        if (imgHeight < pageHeight - 40) {
+          pdf.addImage(imgData, "PNG", 20, imgY, imgWidth, imgHeight);
+        } else {
+          let renderedHeight = 0;
+          while (renderedHeight < imgHeight) {
+            pdf.addImage(
+              imgData,
+              "PNG",
+              20,
+              imgY,
+              imgWidth,
+              imgHeight,
+              undefined,
+              "FAST"
+            );
+            renderedHeight += pageHeight - 40;
+            if (renderedHeight < imgHeight) {
+              pdf.addPage();
+              imgY = 20 - renderedHeight;
+            }
+          }
+        }
+        pdf.save("report.pdf");
+      }, 300);
     }
   };
 
@@ -126,14 +158,14 @@ const Reports: React.FC = () => {
     setFilterState(prev => ({
       ...prev,
       selectedRegions: [],
+      selectedProvinces: [],
       dateRange: { start: null, end: null },
-      // keep selectedModules as is
     }));
     setSearchFilters(prev => ({
       ...prev,
       selectedRegions: [],
+      selectedProvinces: [],
       dateRange: { start: null, end: null },
-      // keep selectedModules as is
     }));
     setTableData(null);
   };
@@ -154,6 +186,8 @@ const Reports: React.FC = () => {
         apiData={tableData}
         loading={loading || lguRegionLoading}
         lguToRegion={lguToRegion}
+        selectedProvinces={searchFilters.selectedProvinces}
+        selectedCities={searchFilters.selectedCities} // <-- add this
       />
     </div>
   );
