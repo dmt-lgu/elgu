@@ -1,37 +1,44 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Select from 'react-select';
 import { Check, ChevronDown } from 'lucide-react';
+import { useSelector, useDispatch } from 'react-redux';
 import DateRangePicker from './DateRangePicker';
-import { modules,groupOfIslands,regionGroups,provinces ,cities,islandRegionMap,regionProvinceMap } from '../utils/mockData';
+import { modules, groupOfIslands, regionGroups } from '../utils/mockData';
 import { FilterState } from '../utils/types';
+import { selectRegions } from '@/redux/regionSlice';
+import { selectData, setData } from '@/redux/dataSlice';
 
-
-const provinceOptions = provinces.map(province => ({
-  value: province,
-  label: province,
-}));
-const getCityOptions = (selectedProvinces: string[]) => {
-  let cityList: { value: string; label: string }[] = [];
-  selectedProvinces.forEach(province => {
-    cityList = cityList.concat(
-      (cities[province] || []).map((city:any) => ({
-        value: city,
-        label: city,
-        province,
-      }))
-    );
-  });
-  // Remove duplicates
-  return Array.from(new Map(cityList.map(item => [item.value, item])).values());
+const formatDate = (date: Date | null): string => {
+  if (!date) return '';
+  return date.toISOString().split('T')[0]; // Returns YYYY-MM-DD format
 };
 
-// Map group of islands to their regions
+// Add this type for the formatted state
+interface FormattedFilterState {
+  selectedModules: string[];
+  selectedRegions: string[];
+  dateRange: {
+    start: string;
+    end: string;
+  };
+}
 
+// Map group of islands to their regions
+const islandRegionMap = {
+  "Luzon": ["I", "II", "III", "IV-A", "V", "CAR", "NCR"],
+  "Visayas": ["VI", "VII", "VIII"],
+  "Mindanao": ["IX", "X", "XI", "XII", "XIII", "BARMM1", "BARMM2"]
+};
 
 const FilterSection: React.FC = () => {
+  const regions = useSelector(selectRegions);
+  const data = useSelector(selectData);
+  const dispatch = useDispatch();
+
+  // Initialize filterState with data from Redux
   const [filterState, setFilterState] = useState<FilterState>({
     selectedModules: [modules[0]],
-    selectedRegions: [],
+    selectedRegions: data?.locationName || [], // Initialize from Redux data
     dateRange: {
       start: null,
       end: null
@@ -41,14 +48,45 @@ const FilterSection: React.FC = () => {
   const [isModuleOpen, setIsModuleOpen] = useState(false);
   const [isRegionOpen, setIsRegionOpen] = useState(false);
   const [selectedIslands, setSelectedIslands] = useState<string[]>([]);
-  const [selectedProvince, setSelectedProvince] = useState<string>("");
-  const [selectedCity, setSelectedCity] = useState<string>("");
-
-  const [selectedProvinceOptions, setSelectedProvinceOptions] = useState<{ value: string; label: string }[]>([]);
-  const [selectedCityOptions, setSelectedCityOptions] = useState<{ value: string; label: string; province?: string }[]>([]);
+  const [selectedCityOptions, setSelectedCityOptions] = useState<{ value: string; label: string; }[]>([]);
 
   const moduleRef = useRef<HTMLDivElement>(null);
   const regionRef = useRef<HTMLDivElement>(null);
+
+  // Sync with Redux data changes
+  useEffect(() => {
+    if (data?.locationName) {
+      setFilterState(prev => ({
+        ...prev,
+        selectedRegions: Array.isArray(data.locationName) ? data.locationName : [data.locationName]
+      }));
+
+      // Update selected islands based on locationName
+      const selectedIslandsList = groupOfIslands.filter(island => {
+        const islandRegions = islandRegionMap[island] || [];
+        return islandRegions.every(region => 
+          Array.isArray(data.locationName) 
+            ? data.locationName.includes(region)
+            : data.locationName === region
+        );
+      });
+      setSelectedIslands(selectedIslandsList);
+    }
+  }, [data?.locationName]);
+
+  // Update Redux when filterState changes
+  useEffect(() => {
+
+    const formattedState = getFormattedState();
+    console.log("Formatted filter state:", formattedState);
+
+    if (JSON.stringify(data?.locationName) !== JSON.stringify(filterState.selectedRegions)) {
+      dispatch(setData({
+        ...data,
+        locationName: filterState.selectedRegions,real:formattedState ? formattedState.selectedRegions : [],
+      }));
+    }
+  }, [filterState.selectedRegions]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -64,6 +102,27 @@ const FilterSection: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Get municipalities for selected regions
+  const getMunicipalitiesForRegions = (selectedRegionTexts: string[]) => {
+    const selectedRegionData = regions.filter(r => selectedRegionTexts.includes(r.text));
+    return selectedRegionData.flatMap(r => r.municipalities);
+  };
+
+  // City select handler (multi)
+  const handleCityChange = (options: any) => {
+    setSelectedCityOptions(options || []);
+  };
+
+  // Get city options based on selected regions
+  const getCityOptions = (selectedRegionTexts: string[]) => {
+    const municipalities = getMunicipalitiesForRegions(selectedRegionTexts);
+    return municipalities.map(city => ({
+      value: city,
+      label: city,
+    }));
+  };
+
+  // --- Other handlers ---
   const toggleModule = (module: string) => {
     setFilterState(prev => ({
       ...prev,
@@ -72,15 +131,6 @@ const FilterSection: React.FC = () => {
         : [...prev.selectedModules, module]
     }));
   };
-
-  // const toggleRegion = (region: string) => {
-  //   setFilterState(prev => ({
-  //     ...prev,
-  //     selectedRegions: prev.selectedRegions.includes(region)
-  //       ? prev.selectedRegions.filter(r => r !== region)
-  //       : [...prev.selectedRegions, region]
-  //   }));
-  // };
 
   const selectAllModules = () => {
     setFilterState(prev => ({
@@ -97,7 +147,6 @@ const FilterSection: React.FC = () => {
   };
 
   const selectAllRegions = () => {
-    // Select all regions from all group of islands
     const allRegions = Array.from(
       new Set(
         groupOfIslands.flatMap(island => islandRegionMap[island] || [])
@@ -116,8 +165,63 @@ const FilterSection: React.FC = () => {
       selectedRegions: [],
     }));
     setSelectedIslands([]);
-    setSelectedProvinceOptions([]);
     setSelectedCityOptions([]);
+  };
+
+  // Helper: get all regions from selected islands
+  const getRegionsFromIslands = (islands: string[]) => {
+    const regionsList = islands.flatMap(island => islandRegionMap[island] || []);
+    return Array.from(new Set(regionsList));
+  };
+
+  // When group of islands is toggled
+  const toggleIsland = (island: string) => {
+    const regionsToAdd = islandRegionMap[island] || [];
+    
+    setFilterState(prevState => {
+      const isRemoving = selectedIslands.includes(island);
+      let newRegions: string[];
+
+      if (isRemoving) {
+        // Remove regions for this island while keeping others
+        newRegions = prevState.selectedRegions.filter(r => !regionsToAdd.includes(r));
+      } else {
+        // Add regions for this island while keeping existing ones
+        newRegions = Array.from(new Set([...prevState.selectedRegions, ...regionsToAdd]));
+      }
+
+      return {
+        ...prevState,
+        selectedRegions: newRegions,
+      };
+    });
+
+    // Update selected islands
+    setSelectedIslands(prev => {
+      if (prev.includes(island)) {
+        return prev.filter(i => i !== island);
+      }
+      return [...prev, island];
+    });
+
+    // Reset city options if removing all regions
+    if (selectedIslands.length === 1 && selectedIslands[0] === island) {
+      setSelectedCityOptions([]);
+    }
+  };
+
+  // Update the toggleRegion function
+  const toggleRegion = (region: string) => {
+    setFilterState(prev => {
+      const newRegions = prev.selectedRegions.includes(region)
+        ? prev.selectedRegions.filter(r => r !== region)
+        : [...prev.selectedRegions, region];
+
+      return {
+        ...prev,
+        selectedRegions: newRegions
+      };
+    });
   };
 
   const handleDateRangeChange = (range: { start: Date | null; end: Date | null }) => {
@@ -127,84 +231,35 @@ const FilterSection: React.FC = () => {
     }));
   };
 
-  // Helper: get all regions from selected islands
-  const getRegionsFromIslands = (islands: string[]) => {
-    const regions = islands.flatMap(island => islandRegionMap[island] || []);
-    // Remove duplicates
-    return Array.from(new Set(regions));
-  };
-
-  // Helper: get all provinces from selected regions
-  const getProvincesFromRegions = (regions: string[]) => {
-    const provs = regions.flatMap(region => regionProvinceMap[region] || []);
-    // Remove duplicates
-    return Array.from(new Set(provs));
-  };
-
-  // Province options filtered by selected regions
-  const filteredProvinceOptions = provinceOptions.filter(opt =>
-    getProvincesFromRegions(filterState.selectedRegions).includes(opt.value)
-  );
-
-  // --- Handlers ---
-  // When group of islands is toggled, select/deselect its regions
-  const toggleIsland = (island: string) => {
-    setSelectedIslands(prev => {
-      let newIslands: string[];
-      if (prev.includes(island)) {
-        newIslands = prev.filter(i => i !== island);
-      } else {
-        newIslands = [...prev, island];
-      }
-      // Update regions based on islands
-      const regionsFromIslands = getRegionsFromIslands(newIslands);
-      setFilterState(prevState => ({
-        ...prevState,
-        selectedRegions: regionsFromIslands,
-      }));
-      // Reset province/city if no region selected
-      if (regionsFromIslands.length === 0) {
-        setSelectedProvinceOptions([]);
-        setSelectedCityOptions([]);
-      }
-      return newIslands;
+  useEffect(() => {
+    // Update selected islands based on selected regions
+    const selectedIslandsList = groupOfIslands.filter(island => {
+      const islandRegions = islandRegionMap[island] || [];
+      return islandRegions.every(region => filterState.selectedRegions.includes(region));
     });
-  };
+    
+    if (JSON.stringify(selectedIslandsList.sort()) !== JSON.stringify(selectedIslands.sort())) {
+      setSelectedIslands(selectedIslandsList);
+    }
+  }, [filterState.selectedRegions]); // Only depend on selectedRegions
 
-  // When region is toggled, update selectedRegions and reset provinces/cities if needed
-  const toggleRegion = (region: string) => {
-    setFilterState(prev => {
-      let newRegions: string[];
-      if (prev.selectedRegions.includes(region)) {
-        newRegions = prev.selectedRegions.filter(r => r !== region);
-      } else {
-        newRegions = [...prev.selectedRegions, region];
+  // Add this function inside your component to format the state
+  const getFormattedState = (): FormattedFilterState => {
+    return {
+      selectedModules: filterState.selectedModules,
+      selectedRegions: filterState.selectedRegions.map(region => {
+        const matchedRegion = regions.find(r => r.text === region);
+        return matchedRegion ? matchedRegion.id : region;
+      }),
+      dateRange: {
+        start: formatDate(filterState.dateRange.start),
+        end: formatDate(filterState.dateRange.end)
       }
-      // Reset province/city if no region selected
-      if (newRegions.length === 0) {
-        setSelectedProvinceOptions([]);
-        setSelectedCityOptions([]);
-      }
-      return {
-        ...prev,
-        selectedRegions: newRegions,
-      };
-    });
+    };
   };
 
-  // Province select handler (multi)
-  const handleProvinceChange = (options: any) => {
-    setSelectedProvinceOptions(options || []);
-    setSelectedCityOptions([]); // Reset city when province changes
-    setSelectedProvince("");
-    setSelectedCity("");
-  };
+  // Update your useEffect to log the formatted state
 
-  // City select handler (multi)
-  const handleCityChange = (options: any) => {
-    setSelectedCityOptions(options || []);
-    setSelectedCity("");
-  };
 
   return (
     <div className="grid grid-cols-3 md:grid-cols-1 gap-4 mb-6">
@@ -326,7 +381,7 @@ const FilterSection: React.FC = () => {
                   
                   {regionGroups.map((col, colIdx) => (
                     <div key={colIdx} className="flex flex-col gap-2">
-                      {col.map(region => (
+                      {col.map((region:any) => (
                         <label key={region} className="flex items-center gap-1 text-secondary-foreground  text-sm">
                           <input
                             type="checkbox"
@@ -340,40 +395,18 @@ const FilterSection: React.FC = () => {
                     </div>
                   ))}
                 </div>
-                {/* Province (multi) */}
-                <div className="mb-2 relative z-50">
-                  <label className="block text-sm font-bold text-blue-700 mb-1">Province</label>
-                  <div className="relative">
-                    <Select
-                      options={filteredProvinceOptions}
-                      value={selectedProvinceOptions}
-                      onChange={handleProvinceChange}
-                      placeholder="Select province(s)"
-                      isClearable
-                      isMulti
-                      isDisabled={filterState.selectedRegions.length === 0}
-                      classNamePrefix="react-select"
-                      className="text-sm z-50"
-                      menuPortalTarget={document.body}
-                      styles={{
-                        menuPortal: base => ({ ...base, zIndex: 9999 }),
-                        menu: base => ({ ...base, zIndex: 9999 }),
-                      }}
-                    />
-                  </div>
-                </div>
                 {/* City/Municipality (multi) */}
                 <div className="relative z-50">
                   <label className="block text-sm font-bold text-blue-700 mb-1">City/Municipality</label>
                   <div className="relative">
                     <Select
-                      options={getCityOptions(selectedProvinceOptions.map(opt => opt.value))}
+                      options={getCityOptions(filterState.selectedRegions)}
                       value={selectedCityOptions}
                       onChange={handleCityChange}
                       placeholder="Select city/municipality"
                       isClearable
                       isMulti
-                      isDisabled={selectedProvinceOptions.length === 0}
+                      isDisabled={filterState.selectedRegions.length === 0}
                       classNamePrefix="react-select"
                       className="text-sm"
                       menuPortalTarget={document.body}

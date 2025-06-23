@@ -1,5 +1,6 @@
 import { UserCheck2Icon, LucideLayoutDashboard, BarChart3Icon } from "lucide-react";
 import { useLocation } from "react-router-dom";
+import { useEffect } from "react";
 
 import eLGULogo from "./../../assets/logo/lgu-logo.png";
 import { Link, Outlet } from "react-router-dom";
@@ -7,38 +8,180 @@ import { ModeToggle } from "@/components/mode-toggle";
 import { ThemeProvider } from "@/components/theme-provider";
 import axios from "./../../plugin/axios";
 import Swal from "sweetalert2";
+import { useSelector, useDispatch,} from 'react-redux';
+import { selectRegions, setRegions } from '@/redux/regionSlice';
+import { selectData } from "@/redux/dataSlice";
+import { setCard } from "@/redux/cardSlice";
+
+
+// Update the region mapping
+const regionMapping = [
+  { id: "region1", text: "I", municipalities: [] },
+  { id: "region2", text: "II", municipalities: [] },
+  { id: "region3", text: "III", municipalities: [] },
+  { id: "region4a", text: "IV-A", municipalities: [] },
+  { id: "region5", text: "V", municipalities: [] },
+  { id: "CAR", text: "CAR", municipalities: [] },
+  { id: "NCR", text: "NCR", municipalities: [] },
+  { id: "region7", text: "VII", municipalities: [] },
+  { id: "region8", text: "VIII", municipalities: [] },
+  { id: "region6", text: "VI", municipalities: [] },
+  { id: "region9", text: "IX", municipalities: [] },
+  { id: "region10", text: "X", municipalities: [] },
+  { id: "region11", text: "XI", municipalities: [] },
+  { id: "region12", text: "XII", municipalities: [] },
+  { id: "BARMM1", text: "BARMM I", municipalities: [] },
+  { id: "BARMM2", text: "BARMM II", municipalities: [] },
+  { id: "region13", text: "XIII", municipalities: [] }
+];
+
+// Add this constant for the grouped display
+export const regionGroups = [
+  ["I", "II", "III", "IV-A", "V"],
+  ["CAR", "NCR", "VII", "VIII"],
+  ["VI", "IX", "X", "XI", "XII"],
+  ["BARMM I", "BARMM II", "XIII"]
+];
+
+// Add this type for better type safety
+interface MonthlyResult {
+  month: string;
+  newPending: number;
+  newPaid: number;
+  newPaidViaEgov: number;
+  renewPending: number;
+  renewPaid: number;
+  renewPaidViaEgov: number;
+  malePending: number;
+  malePaid: number;
+  femalePending: number;
+  femalePaid: number;
+}
+
+interface LGUData {
+  lgu: string;
+  monthlyResults: MonthlyResult[];
+}
+
+interface TransactionResponse {
+  dateRange: {
+    startDate: string;
+    endDate: string;
+  };
+  lguCount: number;
+  results: LGUData[];
+}
+
+interface TotalResults {
+  totalnewPending: number;
+  totalnewPaid: number;
+  totalnewPaidViaEgov: number;
+  totalrenewPending: number;
+  totalrenewPaid: number;
+  totalrenewPaidViaEgov: number;
+  totalmalePending: number;
+  totalmalePaid: number;
+  totalfemalePending: number;
+  totalfemalePaid: number;
+}
+
+// Add this function to calculate totals
+const calculateTotals = (data: TransactionResponse): TotalResults => {
+  const totals: TotalResults = {
+    totalnewPending: 0,
+    totalnewPaid: 0,
+    totalnewPaidViaEgov: 0,
+    totalrenewPending: 0,
+    totalrenewPaid: 0,
+    totalrenewPaidViaEgov: 0,
+    totalmalePending: 0,
+    totalmalePaid: 0,
+    totalfemalePending: 0,
+    totalfemalePaid: 0
+  };
+
+  data.results.forEach(lgu => {
+    lgu.monthlyResults.forEach(result => {
+      totals.totalnewPending += result.newPending;
+      totals.totalnewPaid += result.newPaid;
+      totals.totalnewPaidViaEgov += result.newPaidViaEgov;
+      totals.totalrenewPending += result.renewPending;
+      totals.totalrenewPaid += result.renewPaid;
+      totals.totalrenewPaidViaEgov += result.renewPaidViaEgov;
+      totals.totalmalePending += result.malePending;
+      totals.totalmalePaid += result.malePaid;
+      totals.totalfemalePending += result.femalePending;
+      totals.totalfemalePaid += result.femalePaid;
+    });
+  });
+
+  return totals;
+};
 
 function Admin() {
   const location = useLocation();
+  const dispatch = useDispatch();
+  const regionss = useSelector(selectRegions);
+  const data = useSelector(selectData);
 
 
-  axios.get("lgu-list/")
-    .then(response => {
 
-      console.log("LGU List:", response.data);
-      axios.get("municipality-list/")
-        .then(regionResponse => {
-          console.log("Municipality:", regionResponse.data);
-          // You can store the regions in a state or context if needed
-        })
-        .catch(regionError => {
-          Swal.fire({
-            icon: "error",
-            title: "Error",
-            text: regionError.response?.data?.message || "Failed to fetch regions",
-            showConfirmButton: false,
-          });
+  function fetchRegions() {
+
+    axios.get("lgu-list/")
+      .then(response => {
+        const updatedRegions = regionMapping.map((region:any) => {
+          return  {
+            id: region.id,
+            text:region.text, // Use the mapped ID
+            municipalities: response.data?.[region.id]
+          }
         });
-    })
-    .catch(error => {
-      Swal.fire({
-        icon: "error",  
-        title: "Error",
-        text: error.response?.data?.message || "Failed to fetch LGU list",
-        showConfirmButton: false,
+        console.log("Updated regions:", regionss);
+        dispatch(setRegions(updatedRegions));
+      }).catch(error => {
+        console.error("Error fetching regions:", error);
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: "Failed to fetch regions. Please try again later.",
+        });
       });
-    });
+  }
 
+  // Update your GetTransaction function
+  function GetTransaction() {
+    axios.post("transaction-count/", {
+      "locationName": data.real,
+      "startDate": data.startDate,
+      "endDate": data.endDate
+    })
+      .then(response => {
+        const totals = calculateTotals(response.data);
+        dispatch(setCard(totals))
+
+        console.log("Total results:", totals);
+      })
+      .catch(error => {
+        console.error("Error fetching transaction data:", error);
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: "Failed to fetch transaction data. Please try again later.",
+        });
+      });
+  }
+
+  useEffect(() => {
+    GetTransaction()
+  }, [data]);
+
+
+
+  useEffect(() => {
+    
+fetchRegions()
+  }, []);
 
 
 
