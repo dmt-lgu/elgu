@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import Select from 'react-select';
 import { Check, ChevronDown } from 'lucide-react';
 import DateRangeDay from './DateRangeDay';
@@ -52,6 +52,7 @@ function useCities() {
   const [cities, setCities] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
 
   useEffect(() => {
     let mounted = true;
@@ -162,19 +163,24 @@ const FilterSection: React.FC<FilterSectionProps> = ({
   const { provinces } = useProvinces();
 
   // Province options (dynamic)
-  const provinceOptions = provinces.map(province => ({
+  const provinceOptions = useMemo(() =>
+  provinces.map(province => ({
     value: province,
     label: province,
-  }));
+  })), [provinces]);
+
 
   // Ensure "Business Permit" is checked by default
   useEffect(() => {
-    if (!filterState.selectedModules.includes("Business Permit")) {
-      setFilterState(prev => ({
+  if (!filterState.selectedModules.includes("Business Permit")) {
+    setFilterState(prev => {
+      if (prev.selectedModules.includes("Business Permit")) return prev;
+      return {
         ...prev,
         selectedModules: ["Business Permit", ...prev.selectedModules.filter(m => m !== "Business Permit")]
-      }));
-    }
+      };
+    });
+  }
     // eslint-disable-next-line
   }, []);
 
@@ -268,9 +274,10 @@ const FilterSection: React.FC<FilterSectionProps> = ({
   };
 
   // Province options filtered by selected regions
-  const filteredProvinceOptions = provinceOptions.filter(opt =>
+  const filteredProvinceOptions = useMemo(() =>
+  provinceOptions.filter(opt =>
     getProvincesFromRegions(filterState.selectedRegions).includes(opt.value)
-  );
+  ), [provinceOptions, filterState.selectedRegions]);
 
   // --- Handlers ---
   const toggleIsland = (island: string) => {
@@ -336,23 +343,16 @@ const FilterSection: React.FC<FilterSectionProps> = ({
   };
 
   const handleSearchClick = () => {
-    const selectedRegions = filterState.selectedRegions
-      .map(label => regionMapping[label] || label)
-      .filter(Boolean);
+  const selectedRegions = filterState.selectedRegions
+    .map(label => regionMapping[label] || label)
+    .filter(Boolean);
 
-    const apiFilter = {
-      locationName: selectedRegions,
-      startDate: filterState.dateRange?.start,
-      endDate: filterState.dateRange?.end,
-    };
-
-    onSearch({
-      ...filterState,
-      selectedRegions,
-      selectedCities: selectedCityOptions.map(opt => opt.value),
-      ...apiFilter
-    });
-  };
+  onSearch({
+    ...filterState,
+    selectedRegions,
+    selectedCities: selectedCityOptions.map(opt => opt.value),
+  });
+};
 
   const handleReset = () => {
     setSelectedDates([]);
@@ -576,10 +576,16 @@ const FilterSection: React.FC<FilterSectionProps> = ({
                   </div>
                 </div>
                 {/* Regions */}
-                <label className="block text-sm font-bold text-blue-700 mb-2">Regions</label>
-                <div className="grid grid-cols-4 gap-2 mb-4">
+               <label className="block text-sm font-bold text-blue-700 mb-2">Regions</label>
+                <div
+                  className="columns-4 gap-2 mb-4"
+                  style={{ columnCount: 4 }}       
+                >
                   {Object.keys(regionGroups).map(region => (
-                    <label key={region} className="flex items-center gap-1 text-secondary-foreground text-sm">
+                    <label
+                      key={region}
+                      className="flex items-center gap-1 text-secondary-foreground text-sm break-inside-avoid-column mb-2"
+                    >
                       <input
                         type="checkbox"
                         checked={filterState.selectedRegions.includes(region)}
