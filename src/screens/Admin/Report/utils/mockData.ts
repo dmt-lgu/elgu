@@ -52,7 +52,7 @@ export const dateRange = [
 ];
 
 export const regions = [
-  "R1","R2","R3","R4A","R4B","R5","CAR","NCR","R6","R7","R8","R9","R10","R11","R12","R13","BARMM I","BARMM II"
+  "R1","R2","R3","R4A","R4B","R5","CAR","R6","R7","R8","R9","R10","R11","R12","R13","BARMM I","BARMM II"
 ];
 
 export const regionMapping: Record<string, string> = {
@@ -71,8 +71,6 @@ export const regionMapping: Record<string, string> = {
   "XII": "region12",
   "XIII": "region13",
   "CAR": "CAR",
-  "NCR": "NCR",
-  "NIR": "NIR",
   "BARMM1": "BARMM1",
   "BARMM2": "BARMM2",
 };
@@ -94,8 +92,6 @@ export const regionGroups: Record<string, string> = {
   "XII": "region12",
   "XIII": "region13",
   "CAR": "CAR",
-  "NCR": "NCR",
-  "NIR": "NIR",
   "BARMM1": "BARMM1",
   "BARMM2": "BARMM2",
 };
@@ -116,8 +112,6 @@ export const regionKeyToCode: Record<string, string> = {
   region12: "R12",
   region13: "R13",
   CAR: "CAR",
-  NCR: "NCR",
-  NIR: "NIR",
   BARMM1: "BARMM I",
   BARMM2: "BARMM II",
 };
@@ -193,8 +187,8 @@ export function useCities() {
 // --- End of city API integration ---
 
 export const islandRegionMap: Record<string, string[]> = {
-  "Luzon": ["I", "II", "III", "IV-A", "IV-B", "V", "CAR", "NCR"],
-  "Visayas": ["VI", "VII", "VIII", "NIR"],
+  "Luzon": ["I", "II", "III", "IV-A", "IV-B", "V", "CAR"],
+  "Visayas": ["VI", "VII", "VIII"],
   "Mindanao": ["IX", "X", "XI", "XII", "XIII", "BARMM1", "BARMM2"],
 };
 
