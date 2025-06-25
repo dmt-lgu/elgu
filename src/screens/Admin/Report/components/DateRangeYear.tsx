@@ -122,7 +122,7 @@ function DateRangeYear({
             variant="outline"
             className={cn(
               "w-[350px] justify-start text-left font-normal",
-              !dateRange.from && "text-muted-foreground"
+              !dateRange.from && "text-black"
             )}
           >
             <CalendarIcon className="mr-2 h-4 w-4" />
@@ -165,12 +165,14 @@ function DateRangeYear({
                 variant="default"
                 onClick={handleApply}
                 disabled={!from}
+                className="h-8 "
               >
                 Apply
               </Button>
               <Button
                 variant="outline"
                 onClick={handleClear}
+                className="bg-red-500 text-white hover:bg-red-600 hover:text-white h-8"
               >
                 Clear
               </Button>

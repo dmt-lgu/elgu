@@ -102,7 +102,7 @@ function DateRangeMonth({
             variant="outline"
             className={cn(
               "w-[350px] justify-start text-left font-normal",
-              !from && "text-muted-foreground"
+              !from && "text-black"
             )}
           >
             <CalendarIcon className="mr-2 h-4 w-4" />
@@ -185,8 +185,9 @@ function DateRangeMonth({
                 </select>
               </div>
             </div>
-            <div className="flex gap-2 mt-2">
+            <div className="flex gap-2 mt-2 justify-end">
               <Button
+              className="h-8 "
                 variant="default"
                 onClick={handleApply}
                 disabled={!from}
@@ -194,6 +195,7 @@ function DateRangeMonth({
                 Apply
               </Button>
               <Button
+                className="bg-red-500 text-white hover:bg-red-600 hover:text-white h-8"
                 variant="outline"
                 onClick={handleClear}
               >
