@@ -73,8 +73,10 @@ export const regionMapping: Record<string, string> = {
   "CAR": "CAR",
   "NCR": "NCR",
   "NIR": "NIR",
-  "BARMM": "BARMM1",
+  "BARMM1": "BARMM1",
+  "BARMM2": "BARMM2",
 };
+
 export const groupOfIslands = ["Luzon", "Visayas", "Mindanao"];
 export const regionGroups: Record<string, string> = {
   "I": "region1",
@@ -94,7 +96,8 @@ export const regionGroups: Record<string, string> = {
   "CAR": "CAR",
   "NCR": "NCR",
   "NIR": "NIR",
-  "BARMM": "BARMM1", 
+  "BARMM1": "BARMM1",
+  "BARMM2": "BARMM2",
 };
 
 export const regionKeyToCode: Record<string, string> = {
@@ -123,41 +126,15 @@ export function getRegionCode(regionKey: string): string {
   return regionKeyToCode[regionKey] || regionKey;
 }
 
-// export const provinces = [
-//   // Luzon provinces
-//   "Ilocos Norte", "Ilocos Sur", "La Union", "Pangasinan", // Region I
-//   "Bataan", "Bulacan", "Nueva Ecija", "Pampanga", "Tarlac", "Zambales", // Region III
-//   "Batangas", "Cavite", "Laguna", "Quezon", "Rizal", // Region IV-A
-//   "Albay", "Camarines Norte", "Camarines Sur", "Catanduanes", "Masbate", "Sorsogon", // Region V
-//   "Cagayan", "Isabela", "Nueva Vizcaya", "Quirino", // Region II
-//   "Abra", "Apayao", "Benguet", "Ifugao", "Kalinga", "Mountain Province", // CAR
-//   "Metro Manila", // NCR
+// export const provinces = [ ... ];
 
-//   // Visayas provinces
-//   "Aklan", "Antique", "Capiz", "Guimaras", "Iloilo", "Negros Occidental", // Region VI
-//   "Bohol", "Cebu", "Negros Oriental", "Siquijor", // Region VII
-//   "Biliran", "Eastern Samar", "Leyte", "Northern Samar", "Samar", "Southern Leyte", // Region VIII
-//   "Negros del Norte", // NIR
-
-//   // Mindanao provinces
-//   "Zamboanga del Norte", "Zamboanga del Sur", "Zamboanga Sibugay", // Region IX
-//   "Bukidnon", "Camiguin", "Lanao del Norte", "Misamis Occidental", "Misamis Oriental", // Region X
-//   "Davao de Oro", "Davao del Norte", "Davao del Sur", "Davao Occidental", "Davao Oriental", // Region XI
-//   "Cotabato", "Sarangani", "South Cotabato", "Sultan Kudarat", // Region XII
-//   "Agusan del Norte", "Agusan del Sur", "Dinagat Islands", "Surigao del Norte", "Surigao del Sur", // Region XIII
-//   "Basilan", "Lanao del Sur", "Maguindanao del Norte", "Maguindanao del Sur", "Sulu", "Tawi-Tawi" // BARMM
-// ];
-
-// --- City Normalization Utilities and API Integration ---
 
 export async function fetchProvinces(): Promise<string[]> {
   const res = await axios.get("municipality-list");
   // The keys of the returned object are the province names
   return Object.keys(res.data);
 }
-/**
- * Normalize a city name to "City of <name>" if it ends with " City".
- */
+
 export function displayCityName(name: string) {
   // Already in "City of ..." format
   if (/^City of /i.test(name.trim())) return name;
@@ -169,11 +146,6 @@ export function displayCityName(name: string) {
   return name.trim();
 }
 
-/**
- * Normalize all city names in the API data.
- * API returns: { "Province": ["City, Province", ...], ... }
- * We want: { "Province": ["City of <name>", ...] }
- */
 export function normalizeApiCities(apiCities: Record<string, string[]>): Record<string, string[]> {
   const normalized: Record<string, string[]> = {};
   for (const [province, cityList] of Object.entries(apiCities)) {
@@ -186,44 +158,32 @@ export function normalizeApiCities(apiCities: Record<string, string[]>): Record<
   return normalized;
 }
 
-/**
- * Fetches the city/municipality list from the API and normalizes it.
- * Returns a promise resolving to the normalized cities object.
- */
 export async function fetchAndNormalizeCities(): Promise<Record<string, string[]>> {
   const res = await axios.get('municipality-list');
   return normalizeApiCities(res.data);
 }
 
-/**
- * React hook to fetch and provide normalized cities data.
- * Usage:
- *   const { cities, loading, error } = useCities();
- */
 export function useCities() {
   const [cities, setCities] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  
-  let mounted = true;
-  setLoading(true);
-  fetchAndNormalizeCities()
-    .then(data => {
-      if (mounted) {
-        setCities(data);
-        setLoading(false);
-      }
-    })
-    .catch(err => {
-      if (mounted) {
-        setError(err.message || 'Failed to fetch cities');
-        setLoading(false);
-      }
-      });
-
-
   useEffect(() => {
+    let mounted = true;
+    setLoading(true);
+    fetchAndNormalizeCities()
+      .then(data => {
+        if (mounted) {
+          setCities(data);
+          setLoading(false);
+        }
+      })
+      .catch(err => {
+        if (mounted) {
+          setError(err.message || 'Failed to fetch cities');
+          setLoading(false);
+        }
+      });
     return () => { mounted = false; };
   }, []);
 
@@ -235,28 +195,25 @@ export function useCities() {
 export const islandRegionMap: Record<string, string[]> = {
   "Luzon": ["I", "II", "III", "IV-A", "IV-B", "V", "CAR", "NCR"],
   "Visayas": ["VI", "VII", "VIII", "NIR"],
-  "Mindanao": ["IX", "X", "XI", "XII", "XIII", "BARMM"],
+  "Mindanao": ["IX", "X", "XI", "XII", "XIII", "BARMM1", "BARMM2"],
 };
 
 export const regionProvinceMap: Record<string, string[]> = {
-  "I": ["Ilocos Norte", "Ilocos Sur", "La Union", "Pangasinan"],
-  "II": ["Cagayan", "Isabela", "Nueva Vizcaya", "Quirino"],
-  "III": ["Bataan", "Bulacan", "Nueva Ecija", "Pampanga", "Tarlac", "Zambales"],
-  "IV-A": ["Batangas", "Cavite", "Laguna", "Quezon", "Rizal"],
-  "V": ["Albay", "Camarines Norte", "Camarines Sur", "Catanduanes", "Masbate", "Sorsogon"],
   "CAR": ["Abra", "Apayao", "Benguet", "Ifugao", "Kalinga", "Mountain Province"],
-  "NCR": ["Metro Manila"],
+  "I": ["Ilocos Norte", "Ilocos Sur", "La Union", "Pangasinan"],
+  "II": ["Batanes", "Cagayan", "Isabela", "Nueva Vizcaya", "Quirino"],
+  "III": ["Aurora", "Bataan", "Bulacan", "Nueva Ecija", "Pampanga", "Tarlac", "Zambales"],
+  "IV-A": ["Batangas", "Cavite", "Laguna", "Quezon", "Rizal"],
+  "IV-B": ["Marinduque", "Occidental Mindoro", "Oriental Mindoro", "Palawan", "Romblon"],
+  "V": ["Albay", "Camarines Norte", "Camarines Sur", "Catanduanes", "Masbate", "Sorsogon"],
   "VI": ["Aklan", "Antique", "Capiz", "Guimaras", "Iloilo", "Negros Occidental"],
   "VII": ["Bohol", "Cebu", "Negros Oriental", "Siquijor"],
   "VIII": ["Biliran", "Eastern Samar", "Leyte", "Northern Samar", "Samar", "Southern Leyte"],
-  "NIR": ["Negros del Norte"],
-  "IX": ["Zamboanga del Norte", "Zamboanga del Sur", "Zamboanga Sibugay"],
+  "IX": ["Basilan", "Zamboanga del Norte", "Zamboanga del Sur", "Zamboanga Sibugay"],
   "X": ["Bukidnon", "Camiguin", "Lanao del Norte", "Misamis Occidental", "Misamis Oriental"],
-  "XI": ["Davao de Oro", "Davao del Norte", "Davao del Sur", "Davao Occidental", "Davao Oriental"],
+  "XI": ["Davao de Oro", "Davao del Norte", "Davao del Sur", "Davao Oriental"],
   "XII": ["Cotabato", "Sarangani", "South Cotabato", "Sultan Kudarat"],
   "XIII": ["Agusan del Norte", "Agusan del Sur", "Dinagat Islands", "Surigao del Norte", "Surigao del Sur"],
-  "BARMM": ["Basilan", "Lanao del Sur", "Maguindanao del Norte", "Maguindanao del Sur", "Sulu", "Tawi-Tawi"]
+  "BARMM1": ["Basilan", "Sulu", "Tawi-tawi"],
+  "BARMM2": ["Maguindanao del Norte", "Maguindanao del Sur"]
 };
-
-
-

@@ -271,19 +271,19 @@ const Reports: React.FC = () => {
   }, [searchFilters.dateRange]);
 
   // --- PDF/Excel Export Handler ---
-  const handleDownload = async (type: "pdf" | "excel") => {
-   if (type === "pdf") {
-  const isDayMode = appliedSelectedDates.includes("Day");
-  exportTableReportToPDF({
-    filteredResults,
-    lguToRegion,
-    dateRangeLabel,
-    logoUrl: dictImage,
-    fileLabel: "report",
-    isDayMode,
-  });
-  return;
-}
+    const handleDownload = async (type: "pdf" | "excel") => {
+    if (type === "pdf") {
+    const isDayMode = appliedSelectedDates.includes("Day");
+    exportTableReportToPDF({
+      filteredResults,
+      lguToRegion,
+      dateRangeLabel,
+      logoUrl: dictImage,
+      fileLabel: "report",
+      isDayMode,
+    });
+    return;
+  }
     // Excel export logic (if needed)
     if (type === "excel") {
       const isDayMode = appliedSelectedDates.includes("Day");
