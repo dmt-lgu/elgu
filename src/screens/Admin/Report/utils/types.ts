@@ -1,4 +1,4 @@
-import { cities } from './mockData';
+
 
 export interface StatisticData {
   title: string;
@@ -50,6 +50,8 @@ export interface RegionData {
   [key: string]: number | string;
 }
 
+const cities: { [province: string]: string[] } = {};
+
 export function generateLguProvinceList(): { lgu: string; province: string }[] {
   const result: { lgu: string; province: string }[] = [];
   Object.entries(cities).forEach(([province, lguList]) => {
@@ -61,3 +63,6 @@ export function generateLguProvinceList(): { lgu: string; province: string }[] {
   });
   return result;
 }
+
+
+export const Bp = "Business Permit";

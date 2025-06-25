@@ -12,7 +12,7 @@ import {
   regionProvinceMap,
   regionMapping,
 } from '../utils/mockData';
-import { FilterState } from '../utils/types';
+import { Bp, FilterState } from '../utils/types';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -52,7 +52,6 @@ function useCities() {
   const [cities, setCities] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
 
   useEffect(() => {
     let mounted = true;
@@ -114,6 +113,8 @@ interface FilterSectionProps {
   onSearch: (filters: FilterState & { selectedRegions: string[] }) => void;
   onDownload?: (type: "pdf" | "excel") => void;
   onReset?: () => void;
+  selectedDates: string[];
+  onSelectedDatesChange: (dates: string[] | ((prev: string[]) => string[])) => void;
 }
 
 const getCityOptions = (
@@ -139,12 +140,13 @@ const FilterSection: React.FC<FilterSectionProps> = ({
   onSearch,
   onDownload,
   onReset,
+  selectedDates,
+  onSelectedDatesChange,
 }) => {
   // --- Category State and Logic ---
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
   const [isDateOpen, setIsDateOpen] = useState(false);
-  const [selectedDates, setSelectedDates] = useState<string[]>([]);
 
   const [isModuleOpen, setIsModuleOpen] = useState(false);
   const [isRegionOpen, setIsRegionOpen] = useState(false);
@@ -164,25 +166,25 @@ const FilterSection: React.FC<FilterSectionProps> = ({
 
   // Province options (dynamic)
   const provinceOptions = useMemo(() =>
-  provinces.map(province => ({
-    value: province,
-    label: province,
-  })), [provinces]);
-
+    provinces.map(province => ({
+      value: province,
+      label: province,
+    })), [provinces]);
 
   // Ensure "Business Permit" is checked by default
+
+  
   useEffect(() => {
-  if (!filterState.selectedModules.includes("Business Permit")) {
+  if (!filterState.selectedModules.includes(Bp)) {
     setFilterState(prev => {
-      if (prev.selectedModules.includes("Business Permit")) return prev;
+      if (prev.selectedModules.includes(Bp)) return prev;
       return {
         ...prev,
-        selectedModules: ["Business Permit", ...prev.selectedModules.filter(m => m !== "Business Permit")]
+        selectedModules: [Bp, ...prev.selectedModules.filter(m => m !== Bp)]
       };
     });
   }
-    // eslint-disable-next-line
-  }, []);
+}, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -275,9 +277,9 @@ const FilterSection: React.FC<FilterSectionProps> = ({
 
   // Province options filtered by selected regions
   const filteredProvinceOptions = useMemo(() =>
-  provinceOptions.filter(opt =>
-    getProvincesFromRegions(filterState.selectedRegions).includes(opt.value)
-  ), [provinceOptions, filterState.selectedRegions]);
+    provinceOptions.filter(opt =>
+      getProvincesFromRegions(filterState.selectedRegions).includes(opt.value)
+    ), [provinceOptions, filterState.selectedRegions]);
 
   // --- Handlers ---
   const toggleIsland = (island: string) => {
@@ -333,29 +335,38 @@ const FilterSection: React.FC<FilterSectionProps> = ({
     setSelectedCityOptions(options || []);
   };
 
-  const selectAllDates = () => setSelectedDates([...dateRange]);
+  // --- Date Range Logic (LIFTED STATE) ---
+  // const selectAllDates = () => onSelectedDatesChange([...dateRange]);
   const deselectAllDates = () => {
-    setSelectedDates([]);
+    onSelectedDatesChange([]);
     setFilterState(prev => ({
       ...prev,
       dateRange: { start: null, end: null }
     }));
   };
 
-  const handleSearchClick = () => {
-  const selectedRegions = filterState.selectedRegions
-    .map(label => regionMapping[label] || label)
-    .filter(Boolean);
-
-  onSearch({
-    ...filterState,
-    selectedRegions,
-    selectedCities: selectedCityOptions.map(opt => opt.value),
-  });
+  const handleDateTypeToggle = (dateType: string) => {
+  onSelectedDatesChange([dateType]);
+  setFilterState(prevState => ({
+    ...prevState,
+    dateRange: { start: null, end: null }
+  }));
 };
 
+  const handleSearchClick = () => {
+    const selectedRegions = filterState.selectedRegions
+      .map(label => regionMapping[label] || label)
+      .filter(Boolean);
+
+    onSearch({
+      ...filterState,
+      selectedRegions,
+      selectedCities: selectedCityOptions.map(opt => opt.value),
+    });
+  };
+
   const handleReset = () => {
-    setSelectedDates([]);
+    onSelectedDatesChange([]);
     setSelectedCategories([]);
     setSelectedCityOptions([]);
     if (onReset) {
@@ -382,21 +393,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({
     );
   }, [filterState.selectedProvinces, provinceOptions]);
 
-  const handleDateTypeToggle = (dateType: string) => {
-    setSelectedDates(prev => {
-      let newDates;
-      if (prev.includes(dateType)) {
-        newDates = prev.filter(d => d !== dateType);
-        setFilterState(prevState => ({
-          ...prevState,
-          dateRange: { start: null, end: null }
-        }));
-      } else {
-        newDates = [...prev, dateType];
-      }
-      return newDates;
-    });
-  };
+  
 
   return (
     <div className="grid grid-cols-5 md:grid-cols-1 gap-4 mb-6">
@@ -576,7 +573,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({
                   </div>
                 </div>
                 {/* Regions */}
-               <label className="block text-sm font-bold text-blue-700 mb-2">Regions</label>
+                <label className="block text-sm font-bold text-blue-700 mb-2">Regions</label>
                 <div
                   className="columns-4 gap-2 mb-4"
                   style={{ columnCount: 4 }}       
@@ -655,94 +652,92 @@ const FilterSection: React.FC<FilterSectionProps> = ({
 
       {/* Date Range */}
       <div className="flex flex-col" ref={dateRef}>
-        <label className="text-sm font-medium text-secondary-foreground mb-1">Date Range:</label>
-        <div className="relative">
+  <label className="text-sm font-medium text-secondary-foreground mb-1">Date Range:</label>
+  <div className="relative">
+    <button
+      onClick={() => setIsDateOpen(!isDateOpen)}
+      className="w-full bg-card border border-border rounded-md py-2 px-3 text-left flex justify-between items-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+    >
+      <span className="text-sm text-secondary-foreground">
+        {selectedDates.length > 0
+          ? `${selectedDates.length} selected`
+          : 'Date'}
+      </span>
+      <ChevronDown size={18} className={`text-secondary-foreground  transition-transform ${isDateOpen ? 'transform rotate-180' : ''}`} />
+    </button>
+    {isDateOpen && (
+      <div className="w-[400px] absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-md shadow-lg z-10">
+        <div className="flex justify-center p-2 border-b border-gray-200">
           <button
-            onClick={() => setIsDateOpen(!isDateOpen)}
-            className="w-full bg-card border border-border rounded-md py-2 px-3 text-left flex justify-between items-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+            onClick={deselectAllDates}
+            className="text-sm text-red-400 hover:text-red-800"
           >
-            <span className="text-sm text-secondary-foreground">
-              {selectedDates.length > 0
-                ? `${selectedDates.length} selected`
-                : 'Date'}
-            </span>
-            <ChevronDown size={18} className={`text-secondary-foreground  transition-transform ${isDateOpen ? 'transform rotate-180' : ''}`} />
+            Deselect 
           </button>
-          {isDateOpen && (
-            <div className="w-[400px] absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-md shadow-lg z-10">
-              <div className="flex justify-between p-2 border-b border-gray-200">
-                <button
-                  onClick={selectAllDates}
-                  className="text-sm text-blue-600 hover:text-blue-800"
-                >
-                  Select All
-                </button>
-                <button
-                  onClick={deselectAllDates}
-                  className="text-sm text-red-400 hover:text-red-800"
-                >
-                  Deselect All
-                </button>
-              </div>
-              <div className="max-h-[200px] overflow-y-auto">
-                {dateRange.map((date, index) => (
-                  <label
-                    key={`Date-${index}`}
-                    className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer"
-                  >
-                    <div className="relative flex items-center">
-                      <input
-                        type="checkbox"
-                        checked={selectedDates.includes(date)}
-                        onChange={() => handleDateTypeToggle(date)}
-                        className="opacity-0 absolute h-4 w-4 cursor-pointer"
-                      />
-                      <div className={`border h-4 w-4 rounded flex items-center justify-center ${
-                        selectedDates.includes(date)
-                          ? 'bg-blue-600 border-blue-600'
-                          : 'border-gray-300'
-                      }`}>
-                        {selectedDates.includes(date) && (
-                          <Check size={12} className="text-white" />
-                        )}
-                      </div>
-                      <span className="ml-2 text-sm text-secondary-foreground">{date}</span>
-                    </div>
-                  </label>
-                ))}
-                <div className='flex flex-col gap-4 p-5 border-t border-gray-200'>
-                  {selectedDates.length === 0 && (
-                    <span className="text-sm text-muted-foreground text-center">
-                      Please select day, month, or year
-                    </span>
-                  )}
-                  {selectedDates.includes('Day') && (
-                    <DateRangeDay value={filterState.dateRange} onChange={handleDateRangeChange} />
-                  )}
-                  {selectedDates.includes('Month') && (
-                    <DateRangeMonth
-                      value={filterState.dateRange}
-                      onChange={range => setFilterState(prev => ({
-                        ...prev,
-                        dateRange: range
-                      }))}
-                    />
-                  )}
-                  {selectedDates.includes('Year') && (
-                    <DateRangeYear
-                      value={filterState.dateRange}
-                      onChange={range => setFilterState(prev => ({
-                        ...prev,
-                        dateRange: range
-                      }))}
-                    />
+        </div>
+        <div className="max-h-[200px] overflow-y-auto">
+          {dateRange.map((date, index) => (
+            <label
+              key={`Date-${index}`}
+              className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer"
+            >
+              <div className="relative flex items-center">
+                <input
+                  type="radio"
+                  name="date-range-radio"
+                  checked={selectedDates.includes(date)}
+                  onChange={() => handleDateTypeToggle(date)}
+                  className="opacity-0 absolute h-4 w-4 cursor-pointer"
+                />
+                <div className={`border h-4 w-4 rounded flex items-center justify-center ${
+                  selectedDates.includes(date)
+                    ? 'bg-blue-600 border-blue-600'
+                    : 'border-gray-300'
+                }`}>
+                  {selectedDates.includes(date) && (
+                    <Check size={12} className="text-white" />
                   )}
                 </div>
+                <span className="ml-2 text-sm text-secondary-foreground">{date}</span>
               </div>
-            </div>
-          )}
+            </label>
+          ))}
+          <div className='flex flex-col gap-4 p-5 border-t border-gray-200'>
+            {selectedDates.length === 0 && (
+              <span className="text-sm text-muted-foreground text-center">
+                Please select day, month, or year
+              </span>
+            )}
+            {selectedDates.includes('Day') && (
+              <DateRangeDay value={filterState.dateRange} onChange={handleDateRangeChange} />
+            )}
+            {selectedDates.includes('Month') && (
+              <DateRangeMonth
+                value={filterState.dateRange}
+                onChange={range => setFilterState(prev => ({
+                  ...prev,
+                  dateRange: range
+                }))}
+              />
+            )}
+            {selectedDates.includes('Year') && (
+              <DateRangeYear
+                value={filterState.dateRange}
+                onChange={range => setFilterState(prev => ({
+                  ...prev,
+                  dateRange: range
+                }))}
+              />
+            )}
+          </div>
         </div>
       </div>
+    )}
+  </div>
+</div>
+
+
+
 
       {/* Action button */}
       <div className="flex flex-col ">

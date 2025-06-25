@@ -20,6 +20,7 @@ interface TableReportProps {
   lguToRegion: Record<string, string>;
   selectedProvinces?: string[];
   selectedCities?: string[];
+  selectedDates?: string[];
   lguProvinceFilter?: { lgu: string; province: string };
 }
 
@@ -59,7 +60,6 @@ function isFullMonthRange(start: Date, end: Date) {
 // Helper: Check if a month is in the selected range
 function isMonthInRange(monthStr: string, range: { start: Date | null; end: Date | null }) {
   if (!range.start && !range.end) return true;
-  // monthStr is usually "YYYY-MM" or "YYYY-MM-DD"
   const monthDate = monthStr.length === 7
     ? new Date(monthStr + "-01")
     : new Date(monthStr);
@@ -83,7 +83,6 @@ function extractProvince(lgu: any): string | undefined {
     return lgu.province.trim();
   }
   if (lgu.lgu && typeof lgu.lgu === "string") {
-    // Try to extract after the last comma
     const parts = lgu.lgu.split(",");
     if (parts.length > 1) {
       return parts[parts.length - 1].trim();
@@ -94,11 +93,9 @@ function extractProvince(lgu: any): string | undefined {
 
 // Helper: Extract city/municipality from lgu.lgu or lgu.city
 function extractCity(lgu: any): string | undefined {
-  // If city property exists, use it
   if (lgu.city && typeof lgu.city === "string" && lgu.city.trim() !== "") {
     return lgu.city.trim();
   }
-  // Try to extract from lgu.lgu if format is "City, Province" or "City"
   if (lgu.lgu && typeof lgu.lgu === "string") {
     const parts = lgu.lgu.split(",");
     if (parts.length > 1) {
@@ -109,41 +106,45 @@ function extractCity(lgu: any): string | undefined {
   return undefined;
 }
 
-// Helper: Merge duplicate LGU+province entries by summing their monthlyResults
-// function mergeDuplicateLguProvince(results: any[]) {
-//   const mergedMap: Record<string, any> = {};
+// Merge LGU+province and sum all months in range (for Month/Year selection)
+function mergeLguProvinceSumAllMonths(
+  results: any[],
+  dateRange: { start: Date | null; end: Date | null }
+) {
+  const merged: Record<string, any> = {};
 
-//   results.forEach(lgu => {
-//     const province = extractProvince(lgu) || "";
-//     const lguKey = `${lgu.lgu}||${province}`; // Unique key for LGU+province
+  results.forEach(lgu => {
+    const province = extractProvince(lgu) || "";
+    const key = `${lgu.lgu}||${province}`;
+    if (!merged[key]) {
+      merged[key] = {
+        ...lgu,
+        monthlyResults: [],
+        sum: {},
+        months: [],
+      };
+    }
+    // Filter months in range
+    const filteredMonths = lgu.monthlyResults.filter((month: any) =>
+      isMonthInRange(month.month, dateRange)
+    );
+    filteredMonths.forEach((month: any) => {
+      merged[key].months.push(month.month);
+      Object.keys(month).forEach(k => {
+        if (typeof month[k] === "number") {
+          merged[key].sum[k] = (merged[key].sum[k] || 0) + month[k];
+        }
+      });
+    });
+  });
 
-//     if (!mergedMap[lguKey]) {
-//       // Deep clone to avoid mutating original
-//       mergedMap[lguKey] = {
-//         ...lgu,
-//         monthlyResults: [],
-//       };
-//     }
-//     // Merge monthlyResults by month
-//     lgu.monthlyResults.forEach((month: any) => {
-//       const idx = mergedMap[lguKey].monthlyResults.findIndex((m: any) => m.month === month.month);
-//       if (idx > -1) {
-//         // Sum all numeric fields
-//         Object.keys(month).forEach(key => {
-//           if (typeof month[key] === "number") {
-//             mergedMap[lguKey].monthlyResults[idx][key] =
-//               (mergedMap[lguKey].monthlyResults[idx][key] || 0) + month[key];
-//           }
-//         });
-//       } else {
-//         mergedMap[lguKey].monthlyResults.push({ ...month });
-//       }
-//     });
-//   });
+  // Clean up months (unique)
+  Object.values(merged).forEach((item: any) => {
+    item.months = Array.from(new Set(item.months));
+  });
 
-//   // Return as array
-//   return Object.values(mergedMap);
-// }
+  return Object.values(merged);
+}
 
 const TableReport = forwardRef<HTMLDivElement, TableReportProps>(({
   selectedRegions,
@@ -153,8 +154,8 @@ const TableReport = forwardRef<HTMLDivElement, TableReportProps>(({
   lguToRegion,
   selectedProvinces = [],
   selectedCities = [],
+  selectedDates = [],
 }, ref) => {
-  // Always work with apiData?.results (array)
   const filteredResults = useMemo(() => {
     let filtered = Array.isArray(apiData?.results) ? apiData.results : [];
 
@@ -192,14 +193,31 @@ const TableReport = forwardRef<HTMLDivElement, TableReportProps>(({
       });
     }
 
-    // Merge duplicates here!
-    return mergeDuplicateLguProvince(filtered);
+    // If "Day" is selected, DO NOT merge, just filter by date range
+    if (selectedDates && selectedDates.includes("Day")) {
+      return filtered.map((lgu: any) => ({
+        ...lgu,
+        monthlyResults: lgu.monthlyResults.filter((month: any) =>
+          isMonthInRange(month.month, dateRange)
+        ),
+        months: lgu.monthlyResults
+          .filter((month: any) => isMonthInRange(month.month, dateRange))
+          .map((month: any) => month.month),
+        sum: {}, // Not used in this mode
+      }));
+    }
+
+    // Else, merge and sum duplicates here!
+    return mergeLguProvinceSumAllMonths(filtered, dateRange);
   }, [
     apiData?.results,
-    selectedRegions.join(","),
-    selectedProvinces.join(","),
-    selectedCities.join(","),
+    selectedRegions.join("-"),
+    selectedProvinces.join("-"),
+    selectedCities.join("-"),
     JSON.stringify(lguToRegion),
+    dateRange?.start?.toISOString?.() ?? "",
+    dateRange?.end?.toISOString?.() ?? "",
+    selectedDates?.join("-") ?? "",
   ]);
 
   // Format date range label
@@ -219,21 +237,34 @@ const TableReport = forwardRef<HTMLDivElement, TableReportProps>(({
   // Calculate grand totals (only for filtered months)
   const grandTotals = useMemo(() => filteredResults.reduce(
     (totals: any, lgu: any) => {
-      const filteredMonthlyResults = lgu.monthlyResults.filter((month: any) =>
-        isMonthInRange(month.month, dateRange || { start: null, end: null })
-      );
-      filteredMonthlyResults.forEach((month: any) => {
-        totals.newPaid += month.newPaid;
-        totals.newGeoPay += month.newPaidViaEgov;
-        totals.newPending += month.newPending;
-        totals.renewalPaid += month.renewPaid;
-        totals.renewalGeoPay += month.renewPaidViaEgov;
-        totals.renewalPending += month.renewPending;
-        totals.malePaid += month.malePaid;
-        totals.malePending += month.malePending;
-        totals.femalePaid += month.femalePaid;
-        totals.femalePending += month.femalePending;
-      });
+      // If sum exists, use it (Month/Year mode), else sum per row (Day mode)
+      if (lgu.sum && Object.keys(lgu.sum).length > 0) {
+        const sum = lgu.sum;
+        totals.newPaid += sum.newPaid || 0;
+        totals.newGeoPay += sum.newPaidViaEgov || 0;
+        totals.newPending += sum.newPending || 0;
+        totals.renewalPaid += sum.renewPaid || 0;
+        totals.renewalGeoPay += sum.renewPaidViaEgov || 0;
+        totals.renewalPending += sum.renewPending || 0;
+        totals.malePaid += sum.malePaid || 0;
+        totals.malePending += sum.malePending || 0;
+        totals.femalePaid += sum.femalePaid || 0;
+        totals.femalePending += sum.femalePending || 0;
+      } else {
+        // Day mode: sum per monthlyResults
+        lgu.monthlyResults.forEach((month: any) => {
+          totals.newPaid += month.newPaid || 0;
+          totals.newGeoPay += month.newPaidViaEgov || 0;
+          totals.newPending += month.newPending || 0;
+          totals.renewalPaid += month.renewPaid || 0;
+          totals.renewalGeoPay += month.renewPaidViaEgov || 0;
+          totals.renewalPending += month.renewPending || 0;
+          totals.malePaid += month.malePaid || 0;
+          totals.malePending += month.malePending || 0;
+          totals.femalePaid += month.femalePaid || 0;
+          totals.femalePending += month.femalePending || 0;
+        });
+      }
       return totals;
     },
     {
@@ -252,31 +283,20 @@ const TableReport = forwardRef<HTMLDivElement, TableReportProps>(({
 
   // Group results by region for rowSpan logic
   const regionGroups = useMemo(() => groupResultsByRegion(filteredResults, lguToRegion), [filteredResults, JSON.stringify(lguToRegion)]);
-  const tableRows = useMemo(() => {
+  const tableRowsReport = useMemo(() => {
     const rows: React.ReactNode[] = [];
     Object.entries(regionGroups).forEach(([region, lguList]) => {
-      const regionRowCount = lguList.reduce(
-        (sum, lgu) =>
-          sum +
-          lgu.monthlyResults.filter((month: any) =>
-            isMonthInRange(month.month, dateRange || { start: null, end: null })
-          ).length,
-        0
-      );
       let regionCellRendered = false;
       lguList.forEach((lgu: any) => {
-        const filteredMonthlyResults = lgu.monthlyResults.filter((month: any) =>
-          isMonthInRange(month.month, dateRange || { start: null, end: null })
-
-        
-        );
-        filteredMonthlyResults.forEach((month: any) => {
+        // If sum exists, render one row (Month/Year mode)
+        if (lgu.sum && Object.keys(lgu.sum).length > 0) {
+          const sum = lgu.sum;
           rows.push(
-            <TableRow key={`${region}-${lgu.lgu}-${month.month}`}>
+            <TableRow key={`${region}-${lgu.lgu}`}>
               {!regionCellRendered && (
                 <TableCell
                   className="border px-2 py-1 text-center font-bold align-middle border-b-2"
-                  rowSpan={regionRowCount}
+                  rowSpan={lguList.length}
                 >
                   {getRegionCode(region)}
                 </TableCell>
@@ -285,41 +305,90 @@ const TableReport = forwardRef<HTMLDivElement, TableReportProps>(({
                 {lgu.lgu}
                 <span className="text-xs font-normal text-gray-500">
                   {lgu.province ? `(${lgu.province})` : ""}
-                </span> <br />
+                </span>
+                <br />
                 <span className="text-[10px] font-normal">
-                  ({formatMonthYear(month.month)})
+                  {lgu.months && lgu.months.length > 0 && (
+                    lgu.months.length === 1
+                      ? `(${formatMonthYear(lgu.months[0])})`
+                      : `(${formatMonthYear(lgu.months[0])} - ${formatMonthYear(lgu.months[lgu.months.length - 1])})`
+                  )}
                 </span>
               </TableCell>
-              <TableCell className="border px-2 py-1 text-center">{month.newPaid}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{month.newPaidViaEgov}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{month.newPending}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{month.newPaid + month.newPaidViaEgov + month.newPending}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{month.renewPaid}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{month.renewPaidViaEgov}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{month.renewPending}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{month.renewPaid + month.renewPaidViaEgov + month.renewPending}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{month.malePaid}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{month.malePending}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{month.malePaid + month.malePending}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{month.femalePaid}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{month.femalePending}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{month.femalePaid + month.femalePending}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{sum.newPaid || 0}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{sum.newPaidViaEgov || 0}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{sum.newPending || 0}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{(sum.newPaid || 0) + (sum.newPaidViaEgov || 0) + (sum.newPending || 0)}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{sum.renewPaid || 0}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{sum.renewPaidViaEgov || 0}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{sum.renewPending || 0}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{(sum.renewPaid || 0) + (sum.renewPaidViaEgov || 0) + (sum.renewPending || 0)}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{sum.malePaid || 0}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{sum.malePending || 0}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{(sum.malePaid || 0) + (sum.malePending || 0)}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{sum.femalePaid || 0}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{sum.femalePending || 0}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{(sum.femalePaid || 0) + (sum.femalePending || 0)}</TableCell>
             </TableRow>
           );
           if (!regionCellRendered) regionCellRendered = true;
-        });
+        } else {
+          // Day mode: render per monthlyResults
+          lgu.monthlyResults.forEach((month: any, idx: number) => {
+            rows.push(
+              <TableRow key={`${region}-${lgu.lgu}-${month.month}-${idx}`}>
+                {!regionCellRendered && (
+                  <TableCell
+                    className="border px-2 py-1 text-center font-bold align-middle border-b-2"
+                    rowSpan={lguList.reduce((sum, l) => sum + l.monthlyResults.length, 0)}
+                  >
+                    {getRegionCode(region)}
+                  </TableCell>
+                )}
+                <TableCell className="border px-2 py-1 text-start font-bold">
+                  {lgu.lgu}
+                  <span className="text-xs font-normal text-gray-500">
+                    {lgu.province ? `(${lgu.province})` : ""}
+                  </span>
+                  <br />
+                  <span className="text-[10px] font-normal">
+                    ({formatMonthYear(month.month)})
+                  </span>
+                </TableCell>
+                <TableCell className="border px-2 py-1 text-center">{month.newPaid || 0}</TableCell>
+                <TableCell className="border px-2 py-1 text-center">{month.newPaidViaEgov || 0}</TableCell>
+                <TableCell className="border px-2 py-1 text-center">{month.newPending || 0}</TableCell>
+                <TableCell className="border px-2 py-1 text-center">{(month.newPaid || 0) + (month.newPaidViaEgov || 0) + (month.newPending || 0)}</TableCell>
+                <TableCell className="border px-2 py-1 text-center">{month.renewPaid || 0}</TableCell>
+                <TableCell className="border px-2 py-1 text-center">{month.renewPaidViaEgov || 0}</TableCell>
+                <TableCell className="border px-2 py-1 text-center">{month.renewPending || 0}</TableCell>
+                <TableCell className="border px-2 py-1 text-center">{(month.renewPaid || 0) + (month.renewPaidViaEgov || 0) + (month.renewPending || 0)}</TableCell>
+                <TableCell className="border px-2 py-1 text-center">{month.malePaid || 0}</TableCell>
+                <TableCell className="border px-2 py-1 text-center">{month.malePending || 0}</TableCell>
+                <TableCell className="border px-2 py-1 text-center">{(month.malePaid || 0) + (month.malePending || 0)}</TableCell>
+                <TableCell className="border px-2 py-1 text-center">{month.femalePaid || 0}</TableCell>
+                <TableCell className="border px-2 py-1 text-center">{month.femalePending || 0}</TableCell>
+                <TableCell className="border px-2 py-1 text-center">{(month.femalePaid || 0) + (month.femalePending || 0)}</TableCell>
+              </TableRow>
+            );
+            if (!regionCellRendered) regionCellRendered = true;
+          });
+        }
       });
     });
     return rows;
-  }, [regionGroups, dateRange?.start?.toISOString?.() ?? "", dateRange?.end?.toISOString?.() ?? ""]);
+  }, [regionGroups]);
 
   // Swal loading and no results effect
   const noResultsAlertShown = useRef<boolean>(false);
+  // const title = useMemo(() => {
+  //   if (loading) return `Please wait...`;
+  // }, [loading]);
 
   useEffect(() => {
     if (loading) {
       Swal.fire({
-        title: 'Please wait...',
+        title: "Please wait...",
         allowOutsideClick: false,
         allowEscapeKey: false,
         didOpen: () => {
@@ -341,8 +410,8 @@ const TableReport = forwardRef<HTMLDivElement, TableReportProps>(({
     ) {
       if (!noResultsAlertShown.current) {
         Swal.fire({
-          title: "No results found!",
-          text: "Please try again.",
+          title: "Location not found!",
+          text: "Please try again...",
           icon: "warning",
           confirmButtonText: "OK",
           confirmButtonColor: "#007bff",
@@ -360,42 +429,9 @@ const TableReport = forwardRef<HTMLDivElement, TableReportProps>(({
     dateRange?.end?.toISOString?.() ?? ""
   ]);
 
-  console.log("Table filtered results:", filteredResults);
+ 
+  console.log("Filtered Results:", filteredResults);
 
-  function mergeDuplicateLguProvince(results: any[]) {
-  const mergedMap: Record<string, any> = {};
-
-  results.forEach(lgu => {
-    const province = extractProvince(lgu) || "";
-    const lguKey = `${lgu.lgu}||${province}`; // Unique key for LGU+province
-
-    if (!mergedMap[lguKey]) {
-      // Deep clone to avoid mutating original
-      mergedMap[lguKey] = {
-        ...lgu,
-        monthlyResults: [],
-      };
-    }
-    // Merge monthlyResults by month
-    lgu.monthlyResults.forEach((month: any) => {
-      const idx = mergedMap[lguKey].monthlyResults.findIndex((m: any) => m.month === month.month);
-      if (idx > -1) {
-        // Sum all numeric fields
-        Object.keys(month).forEach(key => {
-          if (typeof month[key] === "number") {
-            mergedMap[lguKey].monthlyResults[idx][key] =
-              (mergedMap[lguKey].monthlyResults[idx][key] || 0) + month[key];
-          }
-        });
-      } else {
-        mergedMap[lguKey].monthlyResults.push({ ...month });
-      }
-    });
-  });
-
-  // Return as array
-  return Object.values(mergedMap);
-}
 
   return (
     <div ref={ref} className="bg-card p-4 rounded-md border text-secondary-foreground border-border shadow-sm mb-6">
@@ -403,6 +439,7 @@ const TableReport = forwardRef<HTMLDivElement, TableReportProps>(({
         <div className='flex justify-center mb-4 p-5'>
           <img src={dictImage} alt="dict logo" className='w-96 h-full'/>
         </div>
+        
         <Table className="w-full border-collapse text-[10px]">
           <TableHeader>
             <TableRow>
@@ -442,27 +479,30 @@ const TableReport = forwardRef<HTMLDivElement, TableReportProps>(({
               <TableHead className="bg-[#cbd5e1] text-black border px-2 py-1 sticky top-[74px] text-center">GRANDTOTAL PER LGU</TableHead>
             </TableRow>
           </TableHeader>
+         
           <TableBody>
-            {filteredResults.length === 0 ? (
-              (selectedRegions.length > 0 || (dateRange?.start && dateRange?.end)) ? (
-                <TableRow>
-                  <TableCell colSpan={16} className="text-center py-4 border">
-                    <span className='font-bold text-lg text-muted-foreground'>
-                      No results found, Please try again!
-                    </span>
-                  </TableCell>
-                </TableRow>
+            {!loading && (
+              filteredResults.length === 0 ? (
+                (selectedRegions.length > 0 || (dateRange?.start && dateRange?.end)) ? (
+                  <TableRow>
+                    <TableCell colSpan={16} className="text-center py-4 border">
+                      <span className='font-bold text-lg text-muted-foreground'>
+                        No results found, Please try again!
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={16} className="text-center py-4 border">
+                      <span className='font-bold text-sm text-muted-foreground'>
+                        Please select regions and date range you want to view.
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                )
               ) : (
-                <TableRow>
-                  <TableCell colSpan={16} className="text-center py-4 border">
-                    <span className='font-bold text-sm text-muted-foreground'>
-                      Please select the category, regions and date range you want to view.
-                    </span>
-                  </TableCell>
-                </TableRow>
+                tableRowsReport
               )
-            ) : (
-              tableRows
             )}
             <TableRow className="bg-[#4b5563] hover:bg-[#4b5563] font-bold text-white border">
               <TableCell className="border px-2 py-1" colSpan={2}>
@@ -471,23 +511,25 @@ const TableReport = forwardRef<HTMLDivElement, TableReportProps>(({
                   ({dateRangeLabel})
                 </span>
               </TableCell>
-              <TableCell className="border px-2 py-1 text-center">{grandTotals.newPaid}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{grandTotals.newGeoPay}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{grandTotals.newPending}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{grandTotals.newPaid + grandTotals.newGeoPay + grandTotals.newPending}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{grandTotals.renewalPaid}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{grandTotals.renewalGeoPay}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{grandTotals.renewalPending}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{grandTotals.renewalPaid + grandTotals.renewalGeoPay + grandTotals.renewalPending}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{grandTotals.malePaid}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{grandTotals.malePending}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{grandTotals.malePaid + grandTotals.malePending}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{grandTotals.femalePaid}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{grandTotals.femalePending}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{grandTotals.femalePaid + grandTotals.femalePending}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{loading ? 0 : grandTotals.newPaid}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{loading ? 0 : grandTotals.newGeoPay}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{loading ? 0 : grandTotals.newPending}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{loading ? 0 : (grandTotals.newPaid + grandTotals.newGeoPay + grandTotals.newPending)}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{loading ? 0 : grandTotals.renewalPaid}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{loading ? 0 : grandTotals.renewalGeoPay}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{loading ? 0 : grandTotals.renewalPending}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{loading ? 0 : (grandTotals.renewalPaid + grandTotals.renewalGeoPay + grandTotals.renewalPending)}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{loading ? 0 : grandTotals.malePaid}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{loading ? 0 : grandTotals.malePending}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{loading ? 0 : (grandTotals.malePaid + grandTotals.malePending)}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{loading ? 0 : grandTotals.femalePaid}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{loading ? 0 : grandTotals.femalePending}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{loading ? 0 : (grandTotals.femalePaid + grandTotals.femalePending)}</TableCell>
             </TableRow>
           </TableBody>
+          
         </Table>
+        
       </div>
     </div>
   );

@@ -233,7 +233,7 @@ export function useCities() {
 // --- End of city API integration ---
 
 export const islandRegionMap: Record<string, string[]> = {
-  "Luzon": ["I", "II", "III", "IV-A", "V", "CAR", "NCR"],
+  "Luzon": ["I", "II", "III", "IV-A", "IV-B", "V", "CAR", "NCR"],
   "Visayas": ["VI", "VII", "VIII", "NIR"],
   "Mindanao": ["IX", "X", "XI", "XII", "XIII", "BARMM"],
 };
@@ -257,4 +257,6 @@ export const regionProvinceMap: Record<string, string[]> = {
   "XIII": ["Agusan del Norte", "Agusan del Sur", "Dinagat Islands", "Surigao del Norte", "Surigao del Sur"],
   "BARMM": ["Basilan", "Lanao del Sur", "Maguindanao del Norte", "Maguindanao del Sur", "Sulu", "Tawi-Tawi"]
 };
+
+
 
