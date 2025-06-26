@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import Select from 'react-select';
 import { Check, ChevronDown } from 'lucide-react';
 import DateRangeDay from './DateRangeDay';
+import DateRangeMonth from './DateRangeMonth';
+import DateRangeYear from './DateRangeYear';
 import {
   modules,
   category,
@@ -9,10 +11,10 @@ import {
   dateRange,
   regionGroups,
   islandRegionMap,
-  regionProvinceMap,
   regionMapping,
+  regionProvinceMap,
 } from '../utils/mockData';
-import { FilterState } from '../utils/types';
+import { Bp, FilterState } from '../utils/types';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -22,11 +24,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import DateRangeMonth from './DateRangeMonth';
-import DateRangeYear from './DateRangeYear';
 import axios from '../../../../plugin/axios';
 
-// --- City Normalization Utilities and API Integration ---
+// --- City/Province API Integration ---
 
 function displayCityName(name: string) {
   if (/^City of /i.test(name.trim())) return name;
@@ -52,13 +52,12 @@ function useCities() {
   const [cities, setCities] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
 
   useEffect(() => {
     let mounted = true;
     setLoading(true);
     axios
-      .get('municipality-list')
+      .get(`${import.meta.env.VITE_URL}/api/bp/municipality-list`)
       .then(res => {
         if (mounted) {
           setCities(normalizeApiCities(res.data));
@@ -77,7 +76,6 @@ function useCities() {
   return { cities, loading, error };
 }
 
-// --- Province API Integration ---
 function useProvinces() {
   const [provinces, setProvinces] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -87,7 +85,7 @@ function useProvinces() {
     let mounted = true;
     setLoading(true);
     axios
-      .get('municipality-list')
+      .get(`${import.meta.env.VITE_URL}/api/bp/municipality-list`)
       .then(res => {
         if (mounted) {
           setProvinces(Object.keys(res.data));
@@ -108,12 +106,17 @@ function useProvinces() {
 
 // --- End of city/province API integration ---
 
+// --- Static region-province mapping (should be imported or defined in mockData) ---
+
+
 interface FilterSectionProps {
   filterState: FilterState;
   setFilterState: React.Dispatch<React.SetStateAction<FilterState>>;
   onSearch: (filters: FilterState & { selectedRegions: string[] }) => void;
   onDownload?: (type: "pdf" | "excel") => void;
   onReset?: () => void;
+  selectedDates: string[];
+  onSelectedDatesChange: (dates: string[] | ((prev: string[]) => string[])) => void;
 }
 
 const getCityOptions = (
@@ -139,12 +142,13 @@ const FilterSection: React.FC<FilterSectionProps> = ({
   onSearch,
   onDownload,
   onReset,
+  selectedDates,
+  onSelectedDatesChange,
 }) => {
   // --- Category State and Logic ---
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
   const [isDateOpen, setIsDateOpen] = useState(false);
-  const [selectedDates, setSelectedDates] = useState<string[]>([]);
 
   const [isModuleOpen, setIsModuleOpen] = useState(false);
   const [isRegionOpen, setIsRegionOpen] = useState(false);
@@ -164,23 +168,19 @@ const FilterSection: React.FC<FilterSectionProps> = ({
 
   // Province options (dynamic)
   const provinceOptions = useMemo(() =>
-  provinces.map(province => ({
-    value: province,
-    label: province,
-  })), [provinces]);
+    provinces.map(province => ({
+      value: province,
+      label: province,
+    })), [provinces]);
 
-
-  // Ensure "Business Permit" is checked by default
+  // Ensure BP is always selected
   useEffect(() => {
-  if (!filterState.selectedModules.includes("Business Permit")) {
-    setFilterState(prev => {
-      if (prev.selectedModules.includes("Business Permit")) return prev;
-      return {
+    if (!filterState.selectedModules.includes(Bp)) {
+      setFilterState(prev => ({
         ...prev,
-        selectedModules: ["Business Permit", ...prev.selectedModules.filter(m => m !== "Business Permit")]
-      };
-    });
-  }
+        selectedModules: [Bp, ...prev.selectedModules.filter(m => m !== Bp)]
+      }));
+    }
     // eslint-disable-next-line
   }, []);
 
@@ -269,15 +269,16 @@ const FilterSection: React.FC<FilterSectionProps> = ({
 
   // Helper: get all provinces from selected regions
   const getProvincesFromRegions = (regions: string[]) => {
-    const provs = regions.flatMap(region => regionProvinceMap[region] || []);
+    // Use the correct mapping object
+    const provs = regions.flatMap(region => (regionProvinceMap as Record<string, string[]>)[region] || []);
     return Array.from(new Set(provs));
   };
 
   // Province options filtered by selected regions
   const filteredProvinceOptions = useMemo(() =>
-  provinceOptions.filter(opt =>
-    getProvincesFromRegions(filterState.selectedRegions).includes(opt.value)
-  ), [provinceOptions, filterState.selectedRegions]);
+    provinceOptions.filter(opt =>
+      getProvincesFromRegions(filterState.selectedRegions).includes(opt.value)
+    ), [provinceOptions, filterState.selectedRegions]);
 
   // --- Handlers ---
   const toggleIsland = (island: string) => {
@@ -333,38 +334,46 @@ const FilterSection: React.FC<FilterSectionProps> = ({
     setSelectedCityOptions(options || []);
   };
 
-  const selectAllDates = () => setSelectedDates([...dateRange]);
+  // --- Date Range Logic (LIFTED STATE) ---
   const deselectAllDates = () => {
-    setSelectedDates([]);
+    onSelectedDatesChange([]);
     setFilterState(prev => ({
       ...prev,
       dateRange: { start: null, end: null }
     }));
   };
 
-  const handleSearchClick = () => {
-  const selectedRegions = filterState.selectedRegions
-    .map(label => regionMapping[label] || label)
-    .filter(Boolean);
+  const handleDateTypeToggle = (dateType: string) => {
+    onSelectedDatesChange([dateType]);
+    setFilterState(prevState => ({
+      ...prevState,
+      dateRange: { start: null, end: null }
+    }));
+  };
 
-  onSearch({
-    ...filterState,
-    selectedRegions,
-    selectedCities: selectedCityOptions.map(opt => opt.value),
-  });
-};
+  const handleSearchClick = () => {
+    const selectedRegions = filterState.selectedRegions
+      .map(label => regionMapping[label] || label)
+      .filter(Boolean);
+
+    onSearch({
+      ...filterState,
+      selectedRegions,
+      selectedCities: selectedCityOptions.map(opt => opt.value),
+    });
+  };
 
   const handleReset = () => {
-    setSelectedDates([]);
+    onSelectedDatesChange([]);
     setSelectedCategories([]);
     setSelectedCityOptions([]);
+    setSelectedIslands([]);
     if (onReset) {
       onReset();
     } else {
       setIsCategoryOpen(false);
       setIsDateOpen(false);
       setIsRegionOpen(false);
-      setSelectedIslands([]);
       setSelectedProvinceOptions([]);
       setFilterState(prev => ({
         ...prev,
@@ -381,22 +390,6 @@ const FilterSection: React.FC<FilterSectionProps> = ({
       )
     );
   }, [filterState.selectedProvinces, provinceOptions]);
-
-  const handleDateTypeToggle = (dateType: string) => {
-    setSelectedDates(prev => {
-      let newDates;
-      if (prev.includes(dateType)) {
-        newDates = prev.filter(d => d !== dateType);
-        setFilterState(prevState => ({
-          ...prevState,
-          dateRange: { start: null, end: null }
-        }));
-      } else {
-        newDates = [...prev, dateType];
-      }
-      return newDates;
-    });
-  };
 
   return (
     <div className="grid grid-cols-5 md:grid-cols-1 gap-4 mb-6">
@@ -468,8 +461,8 @@ const FilterSection: React.FC<FilterSectionProps> = ({
         <label className="text-sm font-medium text-secondary-foreground mb-1">Category:</label>
         <div className="relative">
           <button
-            onClick={() => setIsCategoryOpen(!isCategoryOpen)}
-            className="w-full bg-card border border-border rounded-md py-2 px-3 text-left flex justify-between items-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+            onClick={() => setIsCategoryOpen(!isCategoryOpen)} disabled
+            className="w-full bg-gray border cursor-not-allowed border-border rounded-md py-2 px-3 text-left flex justify-between items-center focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <span className="text-sm text-secondary-foreground">
               {selectedCategories.length > 0
@@ -576,10 +569,10 @@ const FilterSection: React.FC<FilterSectionProps> = ({
                   </div>
                 </div>
                 {/* Regions */}
-               <label className="block text-sm font-bold text-blue-700 mb-2">Regions</label>
+                <label className="block text-sm font-bold text-blue-700 mb-2">Regions</label>
                 <div
                   className="columns-4 gap-2 mb-4"
-                  style={{ columnCount: 4 }}       
+                  style={{ columnCount: 4 }}
                 >
                   {Object.keys(regionGroups).map(region => (
                     <label
@@ -596,7 +589,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({
                     </label>
                   ))}
                 </div>
-  
+
                 {/* Province (multi) */}
                 <div className="mb-2 relative z-50">
                   <label className="block text-sm font-bold text-blue-700 mb-1">Province</label>
@@ -670,18 +663,12 @@ const FilterSection: React.FC<FilterSectionProps> = ({
           </button>
           {isDateOpen && (
             <div className="w-[400px] absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-md shadow-lg z-10">
-              <div className="flex justify-between p-2 border-b border-gray-200">
-                <button
-                  onClick={selectAllDates}
-                  className="text-sm text-blue-600 hover:text-blue-800"
-                >
-                  Select All
-                </button>
+              <div className="flex justify-start p-2 border-b border-gray-200">
                 <button
                   onClick={deselectAllDates}
                   className="text-sm text-red-400 hover:text-red-800"
                 >
-                  Deselect All
+                  Deselect
                 </button>
               </div>
               <div className="max-h-[200px] overflow-y-auto">
@@ -692,7 +679,8 @@ const FilterSection: React.FC<FilterSectionProps> = ({
                   >
                     <div className="relative flex items-center">
                       <input
-                        type="checkbox"
+                        type="radio"
+                        name="date-range-radio"
                         checked={selectedDates.includes(date)}
                         onChange={() => handleDateTypeToggle(date)}
                         className="opacity-0 absolute h-4 w-4 cursor-pointer"
@@ -767,7 +755,6 @@ const FilterSection: React.FC<FilterSectionProps> = ({
           </DropdownMenu>
         </div>
       </div>
-
     </div>
   );
 };
