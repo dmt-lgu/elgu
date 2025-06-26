@@ -1,8 +1,13 @@
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import { regionKeyToCode } from "./mockData";
+import Swal from "sweetalert2";
 
-
+/**
+ * Export a large table report to PDF, supporting unlimited rows by chunking data into manageable pages.
+ * Shows a SweetAlert2 modal with a progress bar while processing.
+ * Stripes even table rows with #e4e4e7, excluding the grand total row and the region column.
+ */
 export async function exportTableReportToPDF({
   filteredResults,
   lguToRegion,
@@ -56,22 +61,24 @@ export async function exportTableReportToPDF({
     }
   });
 
-  // 3. Paginate: first page 8 rows, rest 10 per page
+  // 3. Paginate: Use a safe number of rows per page to avoid memory issues
+  const ROWS_FIRST_PAGE = 8;
+  const ROWS_PER_PAGE = 10;
+  const MAX_ROWS_PER_PAGE = 15; // Absolute max per page for safety
+
   const rowChunks: RowData[][] = [];
   let idx = 0;
   if (allRows.length > 0) {
-    rowChunks.push(allRows.slice(0, 8));
-    idx = 8;
+    const firstChunkSize = Math.min(ROWS_FIRST_PAGE, MAX_ROWS_PER_PAGE);
+    rowChunks.push(allRows.slice(0, firstChunkSize));
+    idx = firstChunkSize;
     while (idx < allRows.length) {
-      rowChunks.push(allRows.slice(idx, idx + 10));
-      idx += 10;
+      rowChunks.push(allRows.slice(idx, idx + ROWS_PER_PAGE));
+      idx += ROWS_PER_PAGE;
     }
   } else {
     rowChunks.push([]);
   }
-
-  // 4. Prepare PDF
-  const pdf = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
 
   // Helper for formatting month
   function formatMonthYear(monthStr: string): string {
@@ -103,17 +110,19 @@ export async function exportTableReportToPDF({
   ];
 
   // Helper for <td> with column width and font
-  function makeTd(val: any, opts: { bold?: boolean; align?: string; color?: string; bg?: string; fontSize?: string; width?: string } = {}) {
+  function makeTd(val: any, opts: { bold?: boolean; align?: string; color?: string; bg?: string; fontSize?: string; width?: string; striped?: boolean } = {}) {
     const td = document.createElement('td');
     td.textContent = val != null ? val : "0";
-    td.style.border = '1px solid #ccc';
+    td.style.border = '#e5e5e5 0.5px solid'; // Use 0.5px border
     td.style.textAlign = opts.align || 'center';
-    td.style.fontFamily = "'Rubik', sans-serif"; // Standardized
+    td.style.fontFamily = "'Rubik', sans-serif";
     if (opts.bold) td.style.fontWeight = 'bold';
     if (opts.color) td.style.color = opts.color;
     if (opts.bg) td.style.background = opts.bg;
     if (opts.fontSize) td.style.fontSize = opts.fontSize;
     if (opts.width) td.style.width = opts.width;
+    // Only apply striped background if requested
+    if (opts.striped) td.style.background = "#e4e4e7";
     return td;
   }
 
@@ -173,11 +182,11 @@ export async function exportTableReportToPDF({
     const wrapperDiv = document.createElement('div');
     wrapperDiv.style.width = '1200px';
     wrapperDiv.style.background = '#fff';
-    wrapperDiv.style.fontFamily = "'Rubik', sans-serif"; // Standardized
+    wrapperDiv.style.fontFamily = "'Rubik', sans-serif";
 
     // Table
     const tableChunk = document.createElement('table');
-    tableChunk.setAttribute('style', 'width: 100%; font-size: 10px; font-family: Rubik, sans-serif;'); // Standardized
+    tableChunk.setAttribute('style', 'width: 100%; font-size: 10px; font-family: Rubik, sans-serif;');
 
     // Header
     const thead = document.createElement('thead');
@@ -186,13 +195,13 @@ export async function exportTableReportToPDF({
     const th1 = document.createElement('th');
     th1.colSpan = 16;
     th1.textContent = dateRangeLabel || "Report";
-    th1.style.background = '#cbd5e1';
+    th1.style.background = '#9ec6f7';
     th1.style.fontWeight = 'bold';
     th1.style.fontSize = '20px';
     th1.style.textAlign = 'center';
-    th1.style.fontFamily = "'Rubik', sans-serif"; // Standardized
+    th1.style.fontFamily = "'Rubik', sans-serif";
     th1.style.padding = "12px";
-    th1.style.border = '1px solid #ccc';
+    th1.style.border = '#e5e5e5 0.5px solid';
     headerRow1.appendChild(th1);
     thead.appendChild(headerRow1);
 
@@ -208,12 +217,12 @@ export async function exportTableReportToPDF({
     ].forEach((col, idx) => {
       const th = document.createElement('th');
       th.textContent = col.label;
-      th.style.background = '#cbd5e1';
+      th.style.background = '#9ec6f7';
       th.style.fontWeight = 'bold';
-      th.style.border = '1px solid #ccc';
+      th.style.border = '#e5e5e5 0.5px solid';
       th.style.textAlign = 'center';
-      th.style.fontFamily = "'Rubik', sans-serif"; // Standardized
-      th.style.padding = "12px 12px"; 
+      th.style.fontFamily = "'Rubik', sans-serif";
+      th.style.padding = "12px 12px";
       if (col.rowSpan) th.rowSpan = col.rowSpan;
       if (col.colSpan) th.colSpan = col.colSpan;
       if (idx === 0) th.style.width = columnWidths[0] + "px";
@@ -234,11 +243,11 @@ export async function exportTableReportToPDF({
       th.innerHTML = label.includes("eGOVPay")
         ? `PAID <br /><span style="font-size:10px; display:block; text-align:center;">(Per OR Paid with eGOVPay)</span>`
         : label;
-      th.style.background = '#cbd5e1';
+      th.style.background = '#9ec6f7';
       th.style.fontWeight = 'bold';
-      th.style.border = '1px solid #ccc';
+      th.style.border = '#e5e5e5 0.5px solid';
       th.style.textAlign = 'center';
-      th.style.fontFamily = "'Rubik', sans-serif"; // Standardized
+      th.style.fontFamily = "'Rubik', sans-serif";
       th.style.padding = "12px 12px";
       th.style.width = columnWidths[idx + 2] + "px";
       headerRow3.appendChild(th);
@@ -260,15 +269,17 @@ export async function exportTableReportToPDF({
 
     rows.forEach((row, idx) => {
       const tr = document.createElement('tr');
-      // Region cell
+      // We'll apply striped background only to data cells (not region cell)
+      const isStriped = idx % 2 === 1;
+
+      // Region cell (never striped)
       if (idx === 0 || row.regionKey !== prevRegionKey) {
         const td = document.createElement('td');
         td.textContent = regionKeyToCode[row.regionKey] || row.regionKey;
-        td.style.border = '1px solid #ccc';
-        td.style.fontWeight = 'bold';
-        // td.style.background = '#ccc';
+        td.style.border = '#e5e5e5 1px solid';
         td.style.textAlign = 'center';
-        td.style.fontFamily = "'Rubik', sans-serif"; // Standardized
+        td.style.fontWeight = "bold";
+        td.style.fontFamily = "'Rubik', sans-serif";
         td.style.padding = "12px 12px";
         td.style.width = columnWidths[0] + "px";
         td.rowSpan = regionCounts[row.regionKey];
@@ -282,11 +293,12 @@ export async function exportTableReportToPDF({
 
       // LGU cell (with province and month info)
       const lguTd = document.createElement('td');
-      lguTd.style.border = '1px solid #ccc';
+      lguTd.style.border = '#e5e5e5 0.5px solid';
       lguTd.style.textAlign = 'left';
-      lguTd.style.fontFamily = "'Rubik', sans-serif"; // Standardized
+      lguTd.style.fontFamily = "'Rubik', sans-serif";
       lguTd.style.width = columnWidths[1] + "px";
-      lguTd.style.padding = "4px 2px"; 
+      lguTd.style.padding = "4px 2px";
+      if (isStriped) lguTd.style.background = "#e4e4e7";
 
       // Compose LGU and province (bold), month info (normal)
       let lguText = row.lgu.lgu || "";
@@ -303,24 +315,24 @@ export async function exportTableReportToPDF({
         }
       }
       // Determine font sizes based on date range type
-      let lguTextFontSize = "8px";
-      let monthInfoFontSize = "8px";
+      let lguTextFontSize = "10px";
+      let monthInfoFontSize = "7px";
       if (isDayMode) {
-        lguTextFontSize = "12px";
-        monthInfoFontSize = "10px";
+        lguTextFontSize = "10px";
+        monthInfoFontSize = "7px";
       }
 
       // Set innerHTML for bold LGU+province, normal month, with dynamic font size
       lguTd.innerHTML = `
         <span style="font-weight:bold; font-size:${lguTextFontSize}; font-family:'Rubik', sans-serif;">${lguText}</span>
-        <span style="font-weight:normal; font-size:${monthInfoFontSize}; font-family:'Rubik', sans-serif;">
+        <span style="font-weight:normal; color: #1d4ed8; font-size:${monthInfoFontSize}; font-family:'Rubik', sans-serif;">
             <br />
             ${monthInfo}
         </span>
         `;
       tr.appendChild(lguTd);
 
-      // Data columns
+      // Data columns (striped only if isStriped)
       let data;
       if (isDayMode && row.monthData) {
         data = row.monthData;
@@ -330,23 +342,23 @@ export async function exportTableReportToPDF({
         data = {};
       }
       // NEW
-      tr.appendChild(makeTd(data.newPaid, { width: columnWidths[2] + "px", fontSize: "10px" }));
-      tr.appendChild(makeTd(data.newPaidViaEgov, { width: columnWidths[3] + "px", fontSize: "10px" }));
-      tr.appendChild(makeTd(data.newPending, { width: columnWidths[4] + "px", fontSize: "10px" }));
-      tr.appendChild(makeTd((data.newPaid || 0) + (data.newPaidViaEgov || 0) + (data.newPending || 0), { width: columnWidths[5] + "px", fontSize: "10px", bg: "#e5e5e5" }));
+      tr.appendChild(makeTd(data.newPaid, { width: columnWidths[2] + "px", fontSize: "10px", striped: isStriped }));
+      tr.appendChild(makeTd(data.newPaidViaEgov, { width: columnWidths[3] + "px", fontSize: "10px", striped: isStriped }));
+      tr.appendChild(makeTd(data.newPending, { width: columnWidths[4] + "px", fontSize: "10px", striped: isStriped }));
+      tr.appendChild(makeTd((data.newPaid || 0) + (data.newPaidViaEgov || 0) + (data.newPending || 0), { width: columnWidths[5] + "px", fontSize: "10px", striped: isStriped }));
       // RENEWAL
-      tr.appendChild(makeTd(data.renewPaid, { width: columnWidths[6] + "px", fontSize: "10px" }));
-      tr.appendChild(makeTd(data.renewPaidViaEgov, { width: columnWidths[7] + "px", fontSize: "10px" }));
-      tr.appendChild(makeTd(data.renewPending, { width: columnWidths[8] + "px", fontSize: "10px" }));
-      tr.appendChild(makeTd((data.renewPaid || 0) + (data.renewPaidViaEgov || 0) + (data.renewPending || 0), { width: columnWidths[9] + "px", fontSize: "10px", bg: "#e5e5e5" }));
+      tr.appendChild(makeTd(data.renewPaid, { width: columnWidths[6] + "px", fontSize: "10px", striped: isStriped }));
+      tr.appendChild(makeTd(data.renewPaidViaEgov, { width: columnWidths[7] + "px", fontSize: "10px", striped: isStriped }));
+      tr.appendChild(makeTd(data.renewPending, { width: columnWidths[8] + "px", fontSize: "10px", striped: isStriped }));
+      tr.appendChild(makeTd((data.renewPaid || 0) + (data.renewPaidViaEgov || 0) + (data.renewPending || 0), { width: columnWidths[9] + "px", fontSize: "10px", striped: isStriped }));
       // MALE
-      tr.appendChild(makeTd(data.malePaid, { width: columnWidths[10] + "px", fontSize: "10px" }));
-      tr.appendChild(makeTd(data.malePending, { width: columnWidths[11] + "px", fontSize: "10px" }));
-      tr.appendChild(makeTd((data.malePaid || 0) + (data.malePending || 0), { width: columnWidths[12] + "px", fontSize: "10px", bg: "#e5e5e5" }));
+      tr.appendChild(makeTd(data.malePaid, { width: columnWidths[10] + "px", fontSize: "10px", striped: isStriped }));
+      tr.appendChild(makeTd(data.malePending, { width: columnWidths[11] + "px", fontSize: "10px", striped: isStriped }));
+      tr.appendChild(makeTd((data.malePaid || 0) + (data.malePending || 0), { width: columnWidths[12] + "px", fontSize: "10px", striped: isStriped }));
       // FEMALE
-      tr.appendChild(makeTd(data.femalePaid, { width: columnWidths[13] + "px", fontSize: "10px" }));
-      tr.appendChild(makeTd(data.femalePending, { width: columnWidths[14] + "px", fontSize: "10px" }));
-      tr.appendChild(makeTd((data.femalePaid || 0) + (data.femalePending || 0), { width: columnWidths[15] + "px", fontSize: "10px", bg: "#e5e5e5" }));
+      tr.appendChild(makeTd(data.femalePaid, { width: columnWidths[13] + "px", fontSize: "10px", striped: isStriped }));
+      tr.appendChild(makeTd(data.femalePending, { width: columnWidths[14] + "px", fontSize: "10px", striped: isStriped }));
+      tr.appendChild(makeTd((data.femalePaid || 0) + (data.femalePending || 0), { width: columnWidths[15] + "px", fontSize: "10px", striped: isStriped }));
 
       tbodyChunk.appendChild(tr);
     });
@@ -358,7 +370,7 @@ export async function exportTableReportToPDF({
       totalTr.style.background = "#4b5563";
       totalTr.style.color = "white";
       totalTr.style.fontWeight = "bold";
-      totalTr.style.fontFamily = "'Rubik', sans-serif"; // Standardized
+      totalTr.style.fontFamily = "'Rubik', sans-serif";
       // Grand total label cell
       const grandTotalCell = document.createElement('td');
       grandTotalCell.colSpan = 2;
@@ -376,13 +388,13 @@ export async function exportTableReportToPDF({
       grandTotalCell.style.fontSize = "12px";
       grandTotalCell.style.color = "#fff";
       grandTotalCell.style.textAlign = "start";
-      grandTotalCell.style.padding = "12px 8px"; 
-      grandTotalCell.style.fontFamily = "'Rubik', sans-serif"; // Standardized
+      grandTotalCell.style.padding = "12px 8px";
+      grandTotalCell.style.fontFamily = "'Rubik', sans-serif";
       grandTotalCell.style.width = (columnWidths[0] + columnWidths[1]) + "px";
-      grandTotalCell.style.border = '1px solid #ccc';
+      grandTotalCell.style.border = '#e5e5e5 0.5px solid';
 
       totalTr.appendChild(grandTotalCell);
-      // Data cells
+      // Data cells (no striped background)
       totalTr.appendChild(makeTd(grandTotals.newPaid, { color: "#fff", bg: "#4b5563", width: columnWidths[2] + "px" }));
       totalTr.appendChild(makeTd(grandTotals.newGeoPay, { color: "#fff", bg: "#4b5563", width: columnWidths[3] + "px" }));
       totalTr.appendChild(makeTd(grandTotals.newPending, { color: "#fff", bg: "#4b5563", width: columnWidths[4] + "px" }));
@@ -405,66 +417,134 @@ export async function exportTableReportToPDF({
     return wrapperDiv;
   };
 
-  // 6. Render each chunk to canvas and add to PDF
-  let yOffset = 20;
-  // Add logo (only on first page)
-  const img = new window.Image();
-  img.src = logoUrl;
-  await new Promise(resolve => {
-    img.onload = resolve;
-    img.onerror = resolve;
-  });
-  let logoHeight = 0;
-  if (img.complete) {
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const logoWidth = 250;
-    logoHeight = 70;
-    const logoMarginBottom = 30;
-    const x = (pageWidth - logoWidth) / 2;
-    pdf.addImage(img, "PNG", x, 20, logoWidth, logoHeight);
-    yOffset = 20 + logoHeight + logoMarginBottom;
-  } else {
-    yOffset = 20;
-  }
+  // --- SWEETALERT2 PROGRESS BAR ---
+  await Swal.fire({
+    title: "Generating PDF...",
+    html: `
+      <style>
+        .RadialProgress {
+          --hue: 220;
+          --holesize: 65%;
+          --track-bg: hsl(233 34% 92%);
+          --progress: 0%;
+          block-size: 120px;
+          inline-size: 120px;
+          min-inline-size: 100px;
+          min-block-size: 100px;
+          display: grid;
+          place-items: center;
+          position: relative;
+          font-weight: 700;
+          font-size: 1.4rem;
+          margin: 0 auto 10px auto;
+        }
+        .RadialProgress::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          bottom: 0;
+          left: 0;
+          right: 0;
+          border-radius: 50%;
+          z-index: -1;
+          background: conic-gradient(
+            hsl(var(--hue) 100% 70%),
+            hsl(var(--hue) 100% 40%),
+            hsl(var(--hue) 100% 70%) var(--progress, 0%),
+            var(--track-bg) var(--progress, 0%) 100%
+          );
+          mask-image: radial-gradient(
+            transparent var(--holesize),
+            black calc(var(--holesize) + 0.5px)
+          );
+        }
+        .RadialProgress-value {
+          z-index: 1;
+        }
+      </style>
+      <div class="RadialProgress" id="swal-radial-progress" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+        <span class="RadialProgress-value" id="swal-radial-label">0%</span>
+      </div>
+    `,
+    allowOutsideClick: false,
+    allowEscapeKey: false,
+    showConfirmButton: false,
+    didOpen: () => {
+      setTimeout(async () => {
+        const pdf = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+        let yOffset = 20;
+        // Add logo (only on first page)
+        const img = new window.Image();
+        img.src = logoUrl;
+        await new Promise(resolve => {
+          img.onload = resolve;
+          img.onerror = resolve;
+        });
+        let logoHeight = 0;
+        if (img.complete) {
+          const pageWidth = pdf.internal.pageSize.getWidth();
+          const logoWidth = 250;
+          logoHeight = 60;
+          const logoMarginBottom = 30;
+          const x = (pageWidth - logoWidth) / 2;
+          pdf.addImage(img, "PNG", x, 20, logoWidth, logoHeight);
+          yOffset = 20 + logoHeight + logoMarginBottom;
+        } else {
+          yOffset = 20;
+        }
 
-  for (let page = 0; page < rowChunks.length; page++) {
-    if (page > 0) {
-      pdf.addPage();
-      yOffset = 20; // No logo on subsequent pages
+        for (let page = 0; page < rowChunks.length; page++) {
+          if (page > 0) {
+            pdf.addPage();
+            yOffset = 20; // No logo on subsequent pages
+          }
+          const isLastPage = page === rowChunks.length - 1;
+
+          // Create table chunk for this page
+          const tableChunkDiv = createTableChunk(rowChunks[page], isLastPage);
+          // Render to hidden DOM for html2canvas
+          const hiddenDiv = document.createElement('div');
+          hiddenDiv.style.position = 'fixed';
+          hiddenDiv.style.left = '-99999px';
+          hiddenDiv.style.top = '0';
+          hiddenDiv.style.width = '1200px';
+          hiddenDiv.style.background = "#fff";
+          hiddenDiv.style.fontFamily = "'Rubik', sans-serif";
+          document.body.appendChild(hiddenDiv);
+          hiddenDiv.appendChild(tableChunkDiv);
+
+          // Wait for DOM to render
+          // eslint-disable-next-line no-await-in-loop
+          await new Promise(resolve => setTimeout(resolve, 50));
+
+          // Render table chunk to canvas (lower scale for memory safety)
+          // eslint-disable-next-line no-await-in-loop
+          const canvas = await html2canvas(tableChunkDiv, { scale: 1.2, useCORS: true, backgroundColor: "#fff" });
+          const imgData = canvas.toDataURL("image/png");
+          const pageWidth = pdf.internal.pageSize.getWidth();
+          const imgWidth = pageWidth - 40;
+          const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+          pdf.addImage(imgData, "PNG", 20, yOffset, imgWidth, imgHeight);
+
+          document.body.removeChild(hiddenDiv);
+
+          // --- UPDATE RADIAL PROGRESS BAR ---
+          const percent = Math.round(((page + 1) / rowChunks.length) * 100);
+          const radial = document.getElementById("swal-radial-progress");
+          const label = document.getElementById("swal-radial-label");
+          if (radial) {
+            radial.setAttribute("aria-valuenow", percent.toString());
+            (radial as HTMLElement).style.setProperty("--progress", `${percent}%`);
+          }
+          if (label) {
+            label.textContent = `${percent}%`;
+          }
+        }
+
+        pdf.save(`${fileLabel}.pdf`);
+        Swal.close();
+      }, 0);
     }
-    // Only include date label on first page
-    // Only include date label on first page
-    const isLastPage = page === rowChunks.length - 1;
-
-    // Create table chunk for this page
-    const tableChunkDiv = createTableChunk(rowChunks[page], isLastPage);
-    // Render to hidden DOM for html2canvas
-    const hiddenDiv = document.createElement('div');
-    hiddenDiv.style.position = 'fixed';
-    hiddenDiv.style.left = '-99999px';
-    hiddenDiv.style.top = '0';
-    hiddenDiv.style.width = '1200px';
-    hiddenDiv.style.background = "#fff";
-    hiddenDiv.style.fontFamily = "'Rubik', sans-serif"; // Standardized
-    document.body.appendChild(hiddenDiv);
-    hiddenDiv.appendChild(tableChunkDiv);
-
-    // Wait for DOM to render
-    // eslint-disable-next-line no-await-in-loop
-    await new Promise(resolve => setTimeout(resolve, 50));
-
-    // Render table chunk to canvas
-    // eslint-disable-next-line no-await-in-loop
-    const canvas = await html2canvas(tableChunkDiv, { scale: 2, useCORS: true, backgroundColor: "#fff" });
-    const imgData = canvas.toDataURL("image/png");
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const imgWidth = pageWidth - 40;
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-    pdf.addImage(imgData, "PNG", 20, yOffset, imgWidth, imgHeight);
-
-    document.body.removeChild(hiddenDiv);
-  }
-
-  pdf.save(`${fileLabel}.pdf`);
+  });
 }

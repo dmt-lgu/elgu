@@ -461,8 +461,8 @@ const FilterSection: React.FC<FilterSectionProps> = ({
         <label className="text-sm font-medium text-secondary-foreground mb-1">Category:</label>
         <div className="relative">
           <button
-            onClick={() => setIsCategoryOpen(!isCategoryOpen)}
-            className="w-full bg-card border border-border rounded-md py-2 px-3 text-left flex justify-between items-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+            onClick={() => setIsCategoryOpen(!isCategoryOpen)} disabled
+            className="w-full bg-gray border cursor-not-allowed border-border rounded-md py-2 px-3 text-left flex justify-between items-center focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <span className="text-sm text-secondary-foreground">
               {selectedCategories.length > 0

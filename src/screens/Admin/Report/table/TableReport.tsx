@@ -11,6 +11,8 @@ import { format, parse, startOfMonth, endOfMonth, isSameDay } from "date-fns";
 import Swal from "sweetalert2";
 import { getRegionCode } from "../utils/mockData";
 import dictImage from "./../../../../assets/logo/dict.png"
+import '../utils/loader.css'; // Ensure loader styles are global
+import { tableLoaderHTML } from '../utils/loader';
 
 interface TableReportProps {
   selectedRegions: string[];
@@ -146,6 +148,9 @@ function mergeLguProvinceSumAllMonths(
   return Object.values(merged);
 }
 
+// Loader SVG as HTML string for Swal
+
+
 const TableReport = forwardRef<HTMLDivElement, TableReportProps>(({
   selectedRegions,
   dateRange,
@@ -234,10 +239,8 @@ const TableReport = forwardRef<HTMLDivElement, TableReportProps>(({
     dateRangeLabel = `${format(dateRange.end, "MMM dd, yyyy")}`;
   }
 
-  // Calculate grand totals (only for filtered months)
   const grandTotals = useMemo(() => filteredResults.reduce(
     (totals: any, lgu: any) => {
-      // If sum exists, use it (Month/Year mode), else sum per row (Day mode)
       if (lgu.sum && Object.keys(lgu.sum).length > 0) {
         const sum = lgu.sum;
         totals.newPaid += sum.newPaid || 0;
@@ -281,7 +284,6 @@ const TableReport = forwardRef<HTMLDivElement, TableReportProps>(({
     }
   ), [filteredResults, dateRange?.start?.toISOString?.() ?? "", dateRange?.end?.toISOString?.() ?? ""]);
 
-  // Group results by region for rowSpan logic
   const regionGroups = useMemo(() => groupResultsByRegion(filteredResults, lguToRegion), [filteredResults, JSON.stringify(lguToRegion)]);
   const tableRowsReport = useMemo(() => {
     const rows: React.ReactNode[] = [];
@@ -307,7 +309,7 @@ const TableReport = forwardRef<HTMLDivElement, TableReportProps>(({
                   {lgu.province ? `(${lgu.province})` : ""}
                 </span>
                 <br />
-                <span className="text-[10px] font-normal">
+                <span className="text-[10px] font-normal text-blue-700">
                   {lgu.months && lgu.months.length > 0 && (
                     lgu.months.length === 1
                       ? `(${formatMonthYear(lgu.months[0])})`
@@ -351,7 +353,7 @@ const TableReport = forwardRef<HTMLDivElement, TableReportProps>(({
                     {lgu.province ? `(${lgu.province})` : ""}
                   </span>
                   <br />
-                  <span className="text-[10px] font-normal">
+                  <span className="text-[10px] font-normal text-blue-800">
                     ({formatMonthYear(month.month)})
                   </span>
                 </TableCell>
@@ -379,28 +381,26 @@ const TableReport = forwardRef<HTMLDivElement, TableReportProps>(({
     return rows;
   }, [regionGroups]);
 
-  // Swal loading and no results effect
+  // Swal no results effect only (loading modal removed)
   const noResultsAlertShown = useRef<boolean>(false);
-  // const title = useMemo(() => {
-  //   if (loading) return `Please wait...`;
-  // }, [loading]);
 
+  // Show TableLoader inside Swal when loading
   useEffect(() => {
-    if (loading) {
-      Swal.fire({
-        title: "Please wait...",
-        allowOutsideClick: false,
-        allowEscapeKey: false,
-        didOpen: () => {
-          Swal.showLoading();
-        }
-      });
-      noResultsAlertShown.current = false;
-    } else {
-      Swal.close();
-    }
-  }, [loading]);
-  
+  if (loading) {
+    Swal.fire({
+      html: tableLoaderHTML,
+      showConfirmButton: false,
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      didOpen: () => {},
+      // No title property here!
+    });
+    noResultsAlertShown.current = false;
+  } else {
+    Swal.close();
+  }
+  // eslint-disable-next-line
+}, [loading]);
 
   useEffect(() => {
     if (
@@ -429,10 +429,6 @@ const TableReport = forwardRef<HTMLDivElement, TableReportProps>(({
     dateRange?.end?.toISOString?.() ?? ""
   ]);
 
- 
-  console.log("Filtered Results:", filteredResults);
-
-
   return (
     <div ref={ref} className="bg-card p-4 rounded-md border text-secondary-foreground border-border shadow-sm mb-6">
       <div className="overflow-auto" ref={ref}>
@@ -445,43 +441,44 @@ const TableReport = forwardRef<HTMLDivElement, TableReportProps>(({
             <TableRow>
               <TableHead
                 colSpan={16}
-                className="bg-[#cbd5e1] text-black text-center font-bold text-base border sticky top-0"
+                className="bg-[#9ec6f7] text-black text-center font-bold text-base border sticky top-0"
               >
                 {dateRangeLabel || "Report"}
               </TableHead>
             </TableRow>
             <TableRow>
-              <TableHead rowSpan={2} className="bg-[#cbd5e1] text-black font-bold border px-2 py-1 text-center align-middle sticky top-[40px]">Region</TableHead>
-              <TableHead rowSpan={2} className="bg-[#cbd5e1] text-black font-bold border px-2 py-1 text-center align-middle sticky top-[40px]">LGU</TableHead>
-              <TableHead colSpan={4} className="bg-[#cbd5e1] text-black font-bold border px-2 py-1 text-center sticky top-[40px]">NEW</TableHead>
-              <TableHead colSpan={4} className="bg-[#cbd5e1] text-black font-bold border px-2 py-1 text-center sticky top-[40px]">RENEWAL</TableHead>
-              <TableHead colSpan={3} className="bg-[#cbd5e1] text-black font-bold border px-2 py-1 text-center sticky top-[40px]">MALE</TableHead>
-              <TableHead colSpan={3} className="bg-[#cbd5e1] text-black font-bold border px-2 py-1 text-center sticky top-[40px]">FEMALE</TableHead>
+              <TableHead rowSpan={2} className="bg-[#9ec6f7] text-black font-bold border px-2 py-1 text-center align-middle sticky top-[40px]">Region</TableHead>
+              <TableHead rowSpan={2} className="bg-[#9ec6f7] text-black font-bold border px-2 py-1 text-center align-middle sticky top-[40px]">LGU</TableHead>
+              <TableHead colSpan={4} className="bg-[#9ec6f7] text-black font-bold border px-2 py-1 text-center sticky top-[40px]">NEW</TableHead>
+              <TableHead colSpan={4} className="bg-[#9ec6f7] text-black font-bold border px-2 py-1 text-center sticky top-[40px]">RENEWAL</TableHead>
+              <TableHead colSpan={3} className="bg-[#9ec6f7] text-black font-bold border px-2 py-1 text-center sticky top-[40px]">MALE</TableHead>
+              <TableHead colSpan={3} className="bg-[#9ec6f7] text-black font-bold border px-2 py-1 text-center sticky top-[40px]">FEMALE</TableHead>
             </TableRow>
             <TableRow>
-              <TableHead className="bg-[#cbd5e1] text-black border px-2 py-1 sticky top-[74px]">PAID</TableHead>
-              <TableHead className="bg-[#cbd5e1] text-black border px-2 py-1 sticky top-[74px] text-center">PAID <br />
+              <TableHead className="bg-[#9ec6f7] text-black border px-2 py-1 sticky top-[74px]">PAID</TableHead>
+              <TableHead className="bg-[#9ec6f7] text-black border px-2 py-1 sticky top-[74px] text-center">PAID <br />
                 <span className='text-[10px]'>(Per OR Paid with eGOVPay)</span>
               </TableHead>
-              <TableHead className="bg-[#cbd5e1] text-black border px-2 py-1 sticky top-[74px]">PENDING</TableHead>
-              <TableHead className="bg-[#cbd5e1] text-black border px-2 py-1 sticky top-[74px] text-center">GRANDTOTAL PER LGU</TableHead>
-              <TableHead className="bg-[#cbd5e1] text-black border px-2 py-1 sticky top-[74px]">PAID</TableHead>
-              <TableHead className="bg-[#cbd5e1] text-black border px-2 py-1 sticky top-[74px] text-center">PAID <br />
+              <TableHead className="bg-[#9ec6f7] text-black border px-2 py-1 sticky top-[74px]">PENDING</TableHead>
+              <TableHead className="bg-[#9ec6f7] text-black border px-2 py-1 sticky top-[74px] text-center">GRANDTOTAL PER LGU</TableHead>
+              <TableHead className="bg-[#9ec6f7] text-black border px-2 py-1 sticky top-[74px]">PAID</TableHead>
+              <TableHead className="bg-[#9ec6f7] text-black border px-2 py-1 sticky top-[74px] text-center">PAID <br />
                 <span className='text-[10px]'>(Per OR Paid with eGOVPay)</span>
               </TableHead>
-              <TableHead className="bg-[#cbd5e1] text-black border px-2 py-1 sticky top-[74px]">PENDING</TableHead>
-              <TableHead className="bg-[#cbd5e1] text-black border px-2 py-1 sticky top-[74px] text-center">GRANDTOTAL PER LGU</TableHead>
-              <TableHead className="bg-[#cbd5e1] text-black border px-2 py-1 sticky top-[74px]">PAID</TableHead>
-              <TableHead className="bg-[#cbd5e1] text-black border px-2 py-1 sticky top-[74px]">PENDING</TableHead>
-              <TableHead className="bg-[#cbd5e1] text-black border px-2 py-1 sticky top-[74px] text-center">GRANDTOTAL PER LGU</TableHead>
-              <TableHead className="bg-[#cbd5e1] text-black border px-2 py-1 sticky top-[74px]">PAID</TableHead>
-              <TableHead className="bg-[#cbd5e1] text-black border px-2 py-1 sticky top-[74px]">PENDING</TableHead>
-              <TableHead className="bg-[#cbd5e1] text-black border px-2 py-1 sticky top-[74px] text-center">GRANDTOTAL PER LGU</TableHead>
+              <TableHead className="bg-[#9ec6f7] text-black border px-2 py-1 sticky top-[74px]">PENDING</TableHead>
+              <TableHead className="bg-[#9ec6f7] text-black border px-2 py-1 sticky top-[74px] text-center">GRANDTOTAL PER LGU</TableHead>
+              <TableHead className="bg-[#9ec6f7] text-black border px-2 py-1 sticky top-[74px]">PAID</TableHead>
+              <TableHead className="bg-[#9ec6f7] text-black border px-2 py-1 sticky top-[74px]">PENDING</TableHead>
+              <TableHead className="bg-[#9ec6f7] text-black border px-2 py-1 sticky top-[74px] text-center">GRANDTOTAL PER LGU</TableHead>
+              <TableHead className="bg-[#9ec6f7] text-black border px-2 py-1 sticky top-[74px]">PAID</TableHead>
+              <TableHead className="bg-[#9ec6f7] text-black border px-2 py-1 sticky top-[74px]">PENDING</TableHead>
+              <TableHead className="bg-[#9ec6f7] text-black border px-2 py-1 sticky top-[74px] text-center">GRANDTOTAL PER LGU</TableHead>
             </TableRow>
           </TableHeader>
          
-          <TableBody>
-            {!loading && (
+          <TableBody className="[&>tr:nth-child(even)]:bg-zinc-200">
+            {/* No TableLoader here, it's now inside Swal */}
+            {loading ? null : (
               filteredResults.length === 0 ? (
                 (selectedRegions.length > 0 || (dateRange?.start && dateRange?.end)) ? (
                   <TableRow>
@@ -504,7 +501,7 @@ const TableReport = forwardRef<HTMLDivElement, TableReportProps>(({
                 tableRowsReport
               )
             )}
-            <TableRow className="bg-[#4b5563] hover:bg-[#4b5563] font-bold text-white border">
+            <TableRow className="!bg-[#3a4554] hover:!bg-[#3a4554] font-bold text-white border">
               <TableCell className="border px-2 py-1" colSpan={2}>
                 GRAND TOTAL FOR <br />
                 <span className='text-[8px] font-normal text-gray-300'>
