@@ -1,4 +1,4 @@
-import React, { forwardRef, useEffect, useRef } from 'react';
+import React, { forwardRef, useEffect, useRef, useMemo } from 'react';
 import {
   Table,
   TableBody,
@@ -19,7 +19,7 @@ interface TableReportProps {
   loading: boolean;
   lguToRegion: Record<string, string>;
   selectedProvinces?: string[];
-  selectedCities?: string[]; // <-- Add this
+  selectedCities?: string[];
   lguProvinceFilter?: { lgu: string; province: string };
 }
 
@@ -109,6 +109,42 @@ function extractCity(lgu: any): string | undefined {
   return undefined;
 }
 
+// Helper: Merge duplicate LGU+province entries by summing their monthlyResults
+// function mergeDuplicateLguProvince(results: any[]) {
+//   const mergedMap: Record<string, any> = {};
+
+//   results.forEach(lgu => {
+//     const province = extractProvince(lgu) || "";
+//     const lguKey = `${lgu.lgu}||${province}`; // Unique key for LGU+province
+
+//     if (!mergedMap[lguKey]) {
+//       // Deep clone to avoid mutating original
+//       mergedMap[lguKey] = {
+//         ...lgu,
+//         monthlyResults: [],
+//       };
+//     }
+//     // Merge monthlyResults by month
+//     lgu.monthlyResults.forEach((month: any) => {
+//       const idx = mergedMap[lguKey].monthlyResults.findIndex((m: any) => m.month === month.month);
+//       if (idx > -1) {
+//         // Sum all numeric fields
+//         Object.keys(month).forEach(key => {
+//           if (typeof month[key] === "number") {
+//             mergedMap[lguKey].monthlyResults[idx][key] =
+//               (mergedMap[lguKey].monthlyResults[idx][key] || 0) + month[key];
+//           }
+//         });
+//       } else {
+//         mergedMap[lguKey].monthlyResults.push({ ...month });
+//       }
+//     });
+//   });
+
+//   // Return as array
+//   return Object.values(mergedMap);
+// }
+
 const TableReport = forwardRef<HTMLDivElement, TableReportProps>(({
   selectedRegions,
   dateRange,
@@ -116,54 +152,55 @@ const TableReport = forwardRef<HTMLDivElement, TableReportProps>(({
   loading,
   lguToRegion,
   selectedProvinces = [],
-  selectedCities = [], // <-- Add this
+  selectedCities = [],
 }, ref) => {
   // Always work with apiData?.results (array)
-  let results: any[] = Array.isArray(apiData?.results) ? apiData.results : [];
+  const filteredResults = useMemo(() => {
+    let filtered = Array.isArray(apiData?.results) ? apiData.results : [];
 
-  // Filter by region if any selected
-  if (selectedRegions.length > 0) {
-    results = results.filter((lgu: any) =>
-      selectedRegions.includes(lgu.region)
-      || selectedRegions.includes(lgu.regionCode)
-      || selectedRegions.includes(lguToRegion[lgu.lgu])
-    );
-  }
-
-  // Filter by province if any selected
-  if (selectedProvinces.length > 0) {
-    results = results.filter((lgu: any) => {
-      const province = extractProvince(lgu);
-      return (
-        province &&
-        selectedProvinces.some(
-          prov =>
-            prov.trim().toLowerCase() === province.trim().toLowerCase()
-        )
+    if (selectedRegions.length > 0) {
+      filtered = filtered.filter((lgu: any) =>
+        selectedRegions.includes(lgu.region)
+        || selectedRegions.includes(lgu.regionCode)
+        || selectedRegions.includes(lguToRegion[lgu.lgu])
       );
-    });
-  }
+    }
 
-  // Filter by city/municipality if any selected
-  if (selectedCities.length > 0) {
-    results = results.filter((lgu: any) => {
-      const city = extractCity(lgu);
-      return (
-        city &&
-        selectedCities.some(
-          c =>
-            c.trim().toLowerCase() === city.trim().toLowerCase()
-        )
-      );
-    });
-  }
+    if (selectedProvinces.length > 0) {
+      filtered = filtered.filter((lgu: any) => {
+        const province = extractProvince(lgu);
+        return (
+          province &&
+          selectedProvinces.some(
+            prov =>
+              prov.trim().toLowerCase() === province.trim().toLowerCase()
+          )
+        );
+      });
+    }
 
-  console.log("Selected Provinces:", selectedProvinces);
-  console.log("Selected Cities/Province:", selectedCities);
-  console.log("All provinces in results:", results.map(lgu => extractProvince(lgu)));
-  console.log("All cities in results:", results.map(lgu => extractCity(lgu)));
-  console.log("Filtered Results:", results.map(r => ({ lgu: r.lgu, province: extractProvince(r), city: extractCity(r) })));
+    if (selectedCities.length > 0) {
+      filtered = filtered.filter((lgu: any) => {
+        const city = extractCity(lgu);
+        return (
+          city &&
+          selectedCities.some(
+            c =>
+              c.trim().toLowerCase() === city.trim().toLowerCase()
+          )
+        );
+      });
+    }
 
+    // Merge duplicates here!
+    return mergeDuplicateLguProvince(filtered);
+  }, [
+    apiData?.results,
+    selectedRegions.join(","),
+    selectedProvinces.join(","),
+    selectedCities.join(","),
+    JSON.stringify(lguToRegion),
+  ]);
 
   // Format date range label
   let dateRangeLabel = "";
@@ -180,7 +217,7 @@ const TableReport = forwardRef<HTMLDivElement, TableReportProps>(({
   }
 
   // Calculate grand totals (only for filtered months)
-  const grandTotals = results.reduce(
+  const grandTotals = useMemo(() => filteredResults.reduce(
     (totals: any, lgu: any) => {
       const filteredMonthlyResults = lgu.monthlyResults.filter((month: any) =>
         isMonthInRange(month.month, dateRange || { start: null, end: null })
@@ -211,80 +248,73 @@ const TableReport = forwardRef<HTMLDivElement, TableReportProps>(({
       femalePaid: 0,
       femalePending: 0,
     }
-  );
+  ), [filteredResults, dateRange?.start?.toISOString?.() ?? "", dateRange?.end?.toISOString?.() ?? ""]);
 
   // Group results by region for rowSpan logic
-  const regionGroups = groupResultsByRegion(results, lguToRegion);
-
-  // Prepare rows with region rowSpan
-  const tableRows: React.ReactNode[] = [];
-  Object.entries(regionGroups).forEach(([region, lguList]) => {
-    // Count total rows for this region (sum of all filteredMonthlyResults for all LGUs in this region)
-    const regionRowCount = lguList.reduce(
-      (sum, lgu) =>
-        sum +
-        lgu.monthlyResults.filter((month: any) =>
-          isMonthInRange(month.month, dateRange || { start: null, end: null })
-        ).length,
-      0
-    );
-    let regionCellRendered = false;
-    lguList.forEach((lgu: any) => {
-      // Filter monthlyResults based on dateRange
-      const filteredMonthlyResults = lgu.monthlyResults.filter((month: any) =>
-        isMonthInRange(month.month, dateRange || { start: null, end: null })
+  const regionGroups = useMemo(() => groupResultsByRegion(filteredResults, lguToRegion), [filteredResults, JSON.stringify(lguToRegion)]);
+  const tableRows = useMemo(() => {
+    const rows: React.ReactNode[] = [];
+    Object.entries(regionGroups).forEach(([region, lguList]) => {
+      const regionRowCount = lguList.reduce(
+        (sum, lgu) =>
+          sum +
+          lgu.monthlyResults.filter((month: any) =>
+            isMonthInRange(month.month, dateRange || { start: null, end: null })
+          ).length,
+        0
       );
-      filteredMonthlyResults.forEach((month: any) => {
-        tableRows.push(
-          <TableRow key={`${region}-${lgu.lgu}-${month.month}`}>
-            {!regionCellRendered && (
-              <TableCell
-                className="border px-2 py-1 text-center font-bold align-middle border-b-2"
-                rowSpan={regionRowCount}
-              >
-                {getRegionCode(region)}
-              </TableCell>
-            )}
-            <TableCell className="border px-2 py-1 text-start font-bold">
-              {/* LGU Name */}
-              {lgu.lgu}
-              {/* Province display */}
-              <span className="text-xs font-normal text-gray-500">
-                {lgu.province ? `(${lgu.province})` : ""}
-              </span> <br />
-              {/* City/Municipality display */}
-              {/* {extractCity(lgu) && (
-                <span className="block text-[11px] font-normal text-blue-700">
-                  {extractCity(lgu)}
-                </span>
-              )} */}
-              <span className="text-[10px] font-normal">
-                ({formatMonthYear(month.month)})
-              </span>
-            </TableCell>
-            <TableCell className="border px-2 py-1 text-center">{month.newPaid}</TableCell>
-            <TableCell className="border px-2 py-1 text-center">{month.newPaidViaEgov}</TableCell>
-            <TableCell className="border px-2 py-1 text-center">{month.newPending}</TableCell>
-            <TableCell className="border px-2 py-1 text-center">{month.newPaid + month.newPaidViaEgov + month.newPending}</TableCell>
-            <TableCell className="border px-2 py-1 text-center">{month.renewPaid}</TableCell>
-            <TableCell className="border px-2 py-1 text-center">{month.renewPaidViaEgov}</TableCell>
-            <TableCell className="border px-2 py-1 text-center">{month.renewPending}</TableCell>
-            <TableCell className="border px-2 py-1 text-center">{month.renewPaid + month.renewPaidViaEgov + month.renewPending}</TableCell>
-            <TableCell className="border px-2 py-1 text-center">{month.malePaid}</TableCell>
-            <TableCell className="border px-2 py-1 text-center">{month.malePending}</TableCell>
-            <TableCell className="border px-2 py-1 text-center">{month.malePaid + month.malePending}</TableCell>
-            <TableCell className="border px-2 py-1 text-center">{month.femalePaid}</TableCell>
-            <TableCell className="border px-2 py-1 text-center">{month.femalePending}</TableCell>
-            <TableCell className="border px-2 py-1 text-center">{month.femalePaid + month.femalePending}</TableCell>
-          </TableRow>
+      let regionCellRendered = false;
+      lguList.forEach((lgu: any) => {
+        const filteredMonthlyResults = lgu.monthlyResults.filter((month: any) =>
+          isMonthInRange(month.month, dateRange || { start: null, end: null })
+
+        
         );
-        if (!regionCellRendered) regionCellRendered = true;
+        filteredMonthlyResults.forEach((month: any) => {
+          rows.push(
+            <TableRow key={`${region}-${lgu.lgu}-${month.month}`}>
+              {!regionCellRendered && (
+                <TableCell
+                  className="border px-2 py-1 text-center font-bold align-middle border-b-2"
+                  rowSpan={regionRowCount}
+                >
+                  {getRegionCode(region)}
+                </TableCell>
+              )}
+              <TableCell className="border px-2 py-1 text-start font-bold">
+                {lgu.lgu}
+                <span className="text-xs font-normal text-gray-500">
+                  {lgu.province ? `(${lgu.province})` : ""}
+                </span> <br />
+                <span className="text-[10px] font-normal">
+                  ({formatMonthYear(month.month)})
+                </span>
+              </TableCell>
+              <TableCell className="border px-2 py-1 text-center">{month.newPaid}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{month.newPaidViaEgov}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{month.newPending}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{month.newPaid + month.newPaidViaEgov + month.newPending}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{month.renewPaid}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{month.renewPaidViaEgov}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{month.renewPending}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{month.renewPaid + month.renewPaidViaEgov + month.renewPending}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{month.malePaid}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{month.malePending}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{month.malePaid + month.malePending}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{month.femalePaid}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{month.femalePending}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{month.femalePaid + month.femalePending}</TableCell>
+            </TableRow>
+          );
+          if (!regionCellRendered) regionCellRendered = true;
+        });
       });
     });
-  });
+    return rows;
+  }, [regionGroups, dateRange?.start?.toISOString?.() ?? "", dateRange?.end?.toISOString?.() ?? ""]);
 
   // Swal loading and no results effect
-  const prevResultsLength = useRef<number | null>(null);
+  const noResultsAlertShown = useRef<boolean>(false);
 
   useEffect(() => {
     if (loading) {
@@ -296,34 +326,82 @@ const TableReport = forwardRef<HTMLDivElement, TableReportProps>(({
           Swal.showLoading();
         }
       });
+      noResultsAlertShown.current = false;
     } else {
       Swal.close();
     }
   }, [loading]);
+  
 
   useEffect(() => {
     if (
       !loading &&
-      results.length === 0 &&
+      filteredResults.length === 0 &&
       (selectedRegions.length > 0 || (dateRange?.start && dateRange?.end))
     ) {
-      // Prevent multiple alerts
-      if (prevResultsLength.current !== 0) {
+      if (!noResultsAlertShown.current) {
         Swal.fire({
           title: "No results found!",
           text: "Please try again.",
           icon: "warning",
+          confirmButtonText: "OK",
+          confirmButtonColor: "#007bff",
         });
+        noResultsAlertShown.current = true;
       }
+    } else if (!loading && filteredResults.length > 0) {
+      noResultsAlertShown.current = false;
     }
-    prevResultsLength.current = results.length;
-  }, [loading, results.length, selectedRegions.length, dateRange?.start, dateRange?.end]);
+  }, [
+    loading,
+    filteredResults.length,
+    selectedRegions.join(","),
+    dateRange?.start?.toISOString?.() ?? "",
+    dateRange?.end?.toISOString?.() ?? ""
+  ]);
+
+  console.log("Table filtered results:", filteredResults);
+
+  function mergeDuplicateLguProvince(results: any[]) {
+  const mergedMap: Record<string, any> = {};
+
+  results.forEach(lgu => {
+    const province = extractProvince(lgu) || "";
+    const lguKey = `${lgu.lgu}||${province}`; // Unique key for LGU+province
+
+    if (!mergedMap[lguKey]) {
+      // Deep clone to avoid mutating original
+      mergedMap[lguKey] = {
+        ...lgu,
+        monthlyResults: [],
+      };
+    }
+    // Merge monthlyResults by month
+    lgu.monthlyResults.forEach((month: any) => {
+      const idx = mergedMap[lguKey].monthlyResults.findIndex((m: any) => m.month === month.month);
+      if (idx > -1) {
+        // Sum all numeric fields
+        Object.keys(month).forEach(key => {
+          if (typeof month[key] === "number") {
+            mergedMap[lguKey].monthlyResults[idx][key] =
+              (mergedMap[lguKey].monthlyResults[idx][key] || 0) + month[key];
+          }
+        });
+      } else {
+        mergedMap[lguKey].monthlyResults.push({ ...month });
+      }
+    });
+  });
+
+  // Return as array
+  return Object.values(mergedMap);
+}
 
   return (
     <div ref={ref} className="bg-card p-4 rounded-md border text-secondary-foreground border-border shadow-sm mb-6">
       <div className="overflow-auto" ref={ref}>
         <div className='flex justify-center mb-4 p-5'>
-          <img src={dictImage} alt="dict logo" className='w-80 h-full'/>
+          <img src={dictImage} alt="dict logo" className='w-96 h-full'/>
         </div>
         <Table className="w-full border-collapse text-[10px]">
           <TableHeader>
@@ -365,7 +443,7 @@ const TableReport = forwardRef<HTMLDivElement, TableReportProps>(({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {results.length === 0 ? (
+            {filteredResults.length === 0 ? (
               (selectedRegions.length > 0 || (dateRange?.start && dateRange?.end)) ? (
                 <TableRow>
                   <TableCell colSpan={16} className="text-center py-4 border">

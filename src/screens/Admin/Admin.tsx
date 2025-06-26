@@ -1,6 +1,6 @@
 import { UserCheck2Icon, LucideLayoutDashboard, BarChart3Icon } from "lucide-react";
 import { useLocation } from "react-router-dom";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 import eLGULogo from "./../../assets/logo/lgu-logo.png";
 import { Link, Outlet } from "react-router-dom";
@@ -11,7 +11,9 @@ import Swal from "sweetalert2";
 import { useSelector, useDispatch,} from 'react-redux';
 import { selectRegions, setRegions } from '@/redux/regionSlice';
 import { selectData } from "@/redux/dataSlice";
+import {  setLoad } from "@/redux/loadSlice";
 import { setCard } from "@/redux/cardSlice";
+import { setTransaction } from "@/redux/transactionSlice";
 
 
 // Update the region mapping
@@ -22,7 +24,7 @@ const regionMapping = [
   { id: "region4a", text: "IV-A", municipalities: [] },
   { id: "region5", text: "V", municipalities: [] },
   { id: "CAR", text: "CAR", municipalities: [] },
-  { id: "NCR", text: "NCR", municipalities: [] },
+  { id: "region4b", text: "IV-B", municipalities: [] },
   { id: "region7", text: "VII", municipalities: [] },
   { id: "region8", text: "VIII", municipalities: [] },
   { id: "region6", text: "VI", municipalities: [] },
@@ -124,11 +126,13 @@ function Admin() {
   const regionss = useSelector(selectRegions);
   const data = useSelector(selectData);
 
-
+  // Debounce ref
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
   function fetchRegions() {
+    dispatch(setLoad(true)); // Set loading to true
 
-    axios.get("lgu-list/")
+    axios.get(`${import.meta.env.VITE_URL}/api/bp/lgu-list/`)
       .then(response => {
         const updatedRegions = regionMapping.map((region:any) => {
           return  {
@@ -138,6 +142,7 @@ function Admin() {
           }
         });
         console.log("Updated regions:", regionss);
+        dispatch(setLoad(false));
         dispatch(setRegions(updatedRegions));
       }).catch(error => {
         console.error("Error fetching regions:", error);
@@ -151,7 +156,9 @@ function Admin() {
 
   // Update your GetTransaction function
   function GetTransaction() {
-    axios.post("transaction-count/", {
+
+    dispatch(setLoad(true));
+    axios.post(`${import.meta.env.VITE_URL}/api/bp/transaction-count/`, {
       "locationName": data.real,
       "startDate": data.startDate,
       "endDate": data.endDate
@@ -159,7 +166,8 @@ function Admin() {
       .then(response => {
         const totals = calculateTotals(response.data);
         dispatch(setCard(totals))
-
+        dispatch(setTransaction(response.data));
+        dispatch(setLoad(false)); // Set loading to false after fetching data
         console.log("Total results:", totals);
       })
       .catch(error => {
@@ -173,7 +181,23 @@ function Admin() {
   }
 
   useEffect(() => {
-    GetTransaction()
+    // Clear previous debounce if exists
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    // Set new debounce
+    debounceRef.current = setTimeout(() => {
+      if (data.locationName.length != 0) {
+
+        GetTransaction();
+        
+      }
+      
+    }, 1400); // 500ms debounce, adjust as needed
+
+    // Cleanup on unmount
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
   }, [data]);
 
 
@@ -225,10 +249,10 @@ fetchRegions()
         <div className="flex flex-col flex-1 overflow-hidden">
           <header className=" bg-card border-b h-[50px] border-border ">
             <div className="flex justify-end items-center h-full gap-4 mr-5 ">
-              <div className="flex items-center gap-2 text-secondary-foreground">
+              {/* <div className="flex items-center gap-2 text-secondary-foreground">
                 <UserCheck2Icon size={20} className=" text-secondary-foreground" />
                 <span className="text-sm">Hello, (Admin)</span>
-              </div>
+              </div> */}
               <ModeToggle />
             </div>
           </header>

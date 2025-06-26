@@ -3,20 +3,35 @@
 @tailwind components;
 @tailwind utilities;
 
-
+.chart-legend-grid .chartjs-legend ul {
+  display: grid !important;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
+  justify-items: start;
+  background: #00000000;
+   position: sticky;
+  top: 0;
+  z-index: 20;
+  background: white; /* or your card background */
+  padding-bottom: 0.5rem;
+}
 /* width */
 ::-webkit-scrollbar {
-  width: 7px;
+  width: 10px;
+  height: 5px;
   }
   
   /* Track */
   ::-webkit-scrollbar-track {
   background: #f1f1f1;
+  border-radius: 10px;
   }
   
   /* Handle */
   ::-webkit-scrollbar-thumb {
   background: #0041e6;
+    
+
   }
 
 

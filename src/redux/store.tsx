@@ -8,9 +8,9 @@ import projectReducer from './projectSlice';
 import dateReducer from './dateSlice';
 import dataReducer from './dataSlice';
 import cardReducer from './cardSlice';
-
-
-
+import transactionReducer from './transactionSlice';
+import loadReducer from './loadSlice';
+import statusReducer from './statusSlice';
 const persistConfig = {
   key: 'root',
   storage,
@@ -23,6 +23,9 @@ const rootReducer = combineReducers({
   dates: dateReducer,
   datas: dataReducer,
   card: cardReducer,
+  transaction: transactionReducer,
+  load: loadReducer,
+  status: statusReducer,
 });
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);

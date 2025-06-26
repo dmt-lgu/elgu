@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { Bar, Line, Pie } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -58,17 +58,22 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
 }) => {
   const [chartType, setChartType] = useState<'bar' | 'line' | 'pie'>('bar');
   const [hidden, setHidden] = useState<boolean[]>([false, false, false, false]);
-  const chartRef = useRef<any>(null);
   const labels = data.map(item => item.name);
 
-  // For Pie chart, aggregate all values
-  const pieLabels = ['Paid Male', 'Paid Female', 'Pending Male', 'Pending Female'];
-  const pieValues = [
-    data.reduce((sum, item) => sum + (item.paidMale ?? 0), 0),
-    data.reduce((sum, item) => sum + (item.paidFemale ?? 0), 0),
-    data.reduce((sum, item) => sum + (item.pendingMale ?? 0), 0),
-    data.reduce((sum, item) => sum + (item.pendingFemale ?? 0), 0),
+  // Pie chart labels and values
+  const allPieLabels = ['Paid', 'Pending', 'Paid with eGovPay', 'Paid with LinkBiz'];
+  const allPieValues = [
+    data.reduce((sum, item) => sum + (item.paid ?? 0), 0),
+    data.reduce((sum, item) => sum + (item.pending ?? 0), 0),
+    data.reduce((sum, item) => sum + (item.paideGov ?? 0), 0),
+    data.reduce((sum, item) => sum + (item.paidLinkBiz ?? 0), 0),
   ];
+  const allPieColors = ['#0047CC', '#FFD700', '#DC2626', '#38BDF8'];
+
+  // Filter pie data based on legend toggles
+  const pieLabels = allPieLabels.filter((_, idx) => !hidden[idx]);
+  const pieValues = allPieValues.filter((_, idx) => !hidden[idx]);
+  const pieColors = allPieColors.filter((_, idx) => !hidden[idx]);
   const pieTotal = pieValues.reduce((a, b) => a + b, 0);
 
   const pieData = {
@@ -76,41 +81,42 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
     datasets: [
       {
         data: pieValues,
-        backgroundColor: ['#0047CC', '#FFD700', '#DC2626', '#38BDF8'],
+        backgroundColor: pieColors,
       },
     ],
   };
 
+  // Update datasets to use hidden state
   const chartData = {
     labels,
     datasets: [
       {
-        label: 'Paid Male',
-        data: data.map(item => item.paidMale),
+        label: 'Paid',
+        data: data.map(item => item.paid),
         backgroundColor: '#0047CC',
         borderColor: '#0047CC',
         fill: false,
         hidden: hidden[0],
       },
       {
-        label: 'Paid Female',
-        data: data.map(item => item.paidFemale),
+        label: 'Pending',
+        data: data.map(item => item.pending),
         backgroundColor: '#FFD700',
         borderColor: '#FFD700',
         fill: false,
         hidden: hidden[1],
       },
       {
-        label: 'Pending Male',
-        data: data.map(item => item.pendingMale),
+        label: 'Paid with eGovPay',
+        data: data.map(item => item.paideGov),
         backgroundColor: '#DC2626',
         borderColor: '#DC2626',
         fill: false,
         hidden: hidden[2],
       },
       {
-        label: 'Pending Female',
-        data: data.map(item => item.pendingFemale),
+        label: 'Paid with LinkBiz',
+        data: data.map(item => item.paidLinkBiz),
         backgroundColor: '#38BDF8',
         borderColor: '#38BDF8',
         fill: false,
@@ -119,6 +125,7 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
     ],
   };
 
+  // Legend items for custom legend
   const legendItems = chartData.datasets.map((ds, idx) => ({
     label: ds.label,
     color: ds.backgroundColor,
@@ -126,6 +133,7 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
     idx,
   }));
 
+  // Toggle dataset visibility
   const handleLegendClick = (idx: number) => {
     setHidden(prev => {
       const updated = [...prev];
@@ -139,19 +147,29 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
     maintainAspectRatio: false,
     plugins: {
       legend: {
-        display: false, // Hide built-in legend
+        position: 'top' as const,
+        display: false,
+        labels: {
+          color: '#222',
+          maxWidth: 200,
+          font: {
+            weight: 'bold' as const,
+            size: 12,
+          },
+        },
+        align: 'start' as const,
+        padding: 24,
       },
       tooltip: {
         enabled: true,
         callbacks: {
-          // For pie chart, show value in tooltip
           label: function(context: any) {
             if (chartType === 'pie') {
               const label = context.label || '';
               const value = context.raw || 0;
-              return `${label}: ${value}`;
+              const percent = pieTotal > 0 ? ((value / pieTotal) * 100).toFixed(1) : '0.0';
+              return `${label}: ${value} (${percent}%)`;
             }
-            // Default for bar/line
             return `${context.dataset.label}: ${context.raw}`;
           }
         }
@@ -164,7 +182,6 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
           weight: 'bold' as const,
           size: 10,
         },
-        // Show percentage for pie, value for others
         formatter: (value: number, _context: any) => {
           if (chartType === 'pie') {
             if (pieTotal === 0) return '0%';
@@ -202,7 +219,9 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
   return (
     <div className="bg-card p-4 rounded-md border text-secondary-foreground border-border relative shadow-sm mb-6">
       {/* Custom clickable legend */}
-      
+      <div className="grid grid-cols-2 gap-2 mb-2 w-max">
+        
+      </div>
       {loading  && (
         <div className=" absolute left-0 top-0 w-full h-1 z-0 overflow-hidden rounded-t-md flex">
           <div className=' h-full w-[100%] ease-in-out animate-[moveLineTable_4s_linear_infinite] flex'>
@@ -227,8 +246,10 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
               background: '#0134b2'
             }}
           />
+            
           </div>
-          <style>
+          
+       <style>
             {`
               @keyframes moveLineTable {
                 0% { transform: translateX(-100%); }
@@ -258,8 +279,7 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
           </div>
           
         </div>
-
-        <div className="grid grid-cols-2 m-4 gap-2 mb-2 w-max">
+         <div className="grid grid-cols-4 lg:grid-cols-2 m-4 gap-2 mb-2 w-max">
         {legendItems.map(item => (
           <button
             key={item.label}
@@ -280,16 +300,16 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
           </button>
         ))}
       </div>
-        <div style={{ overflowX: chartType === 'pie' ? 'visible' : 'auto' }}>
-          <div className="mt-5 " style={{ minWidth: chartType === 'pie' ? 400 : minWidth, height: 400 }}>
+        <div className="relative chart-legend-sticky" style={{ overflowX: chartType === 'pie' ? 'visible' : 'auto' }}>
+          <div className="mt-5" style={{ minWidth: chartType === 'pie' ? 400 : minWidth, height: 400 }}>
             {chartType === 'bar' && (
-              <Bar ref={chartRef} data={chartData} options={options} plugins={[ChartDataLabels]} />
+              <Bar data={chartData} options={options} plugins={[ChartDataLabels]} />
             )}
             {chartType === 'line' && (
-              <Line ref={chartRef} data={chartData} options={options} plugins={[ChartDataLabels]} />
+              <Line data={chartData} options={options} plugins={[ChartDataLabels]} />
             )}
             {chartType === 'pie' && (
-              <Pie ref={chartRef} data={pieData} options={options} plugins={[ChartDataLabels]} />
+              <Pie data={pieData} options={options} plugins={[ChartDataLabels]} />
             )}
           </div>
         </div>

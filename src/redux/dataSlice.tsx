@@ -8,9 +8,11 @@ const initialState: DataState = {
   value: {
     
   "locationName": [],
+  "municipalities": [],
+  "province": [],
   "real":[],     // Can be a string or an array of strings
   "startDate": "",
-  "endDate": ""
+  "endDate": "",
 }, // Initial empty list of regions
 };
 

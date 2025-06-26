@@ -24,10 +24,10 @@ interface FormattedFilterState {
 }
 
 // Map group of islands to their regions
-const islandRegionMap = {
-  "Luzon": ["I", "II", "III", "IV-A", "V", "CAR", "NCR"],
+const islandRegionMap:any = {
+  "Luzon": ["I", "II", "III", "IV-A", "V", "CAR", "IV-B"],
   "Visayas": ["VI", "VII", "VIII"],
-  "Mindanao": ["IX", "X", "XI", "XII", "XIII", "BARMM1", "BARMM2"]
+  "Mindanao": ["IX", "X", "XI", "XII", "XIII", "BARMM I", "BARMM II"]
 };
 
 const FilterSection: React.FC = () => {
@@ -35,7 +35,74 @@ const FilterSection: React.FC = () => {
   const data = useSelector(selectData);
   const dispatch = useDispatch();
 
-  // Initialize filterState with data from Redux
+  // Province and municipality options
+  const [provinceOptions, setProvinceOptions] = useState<{ value: string; label: string }[]>([]);
+  const [cityOptions, setCityOptions] = useState<{ value: string; label: string }[]>([]);
+
+  // Always use Redux as the source of truth for selected provinces and municipalities
+  const selectedProvinces = data.province || [];
+  const selectedCityOptions = data.municipalities || [];
+
+  // Update province options when regions or selected regions change
+  useEffect(() => {
+    const selectedRegionData = regions.filter(r => (data.locationName || []).includes(r.text));
+    const allMunicipalities = selectedRegionData.flatMap(r => r.municipalities);
+
+    const provinceSet = new Set<string>();
+    allMunicipalities.forEach((m: string) => {
+      if (typeof m === 'string') {
+        const parts = m.split(',');
+        if (parts.length > 1) {
+          provinceSet.add(parts[1].trim());
+        }
+      }
+    });
+
+    const options = Array.from(provinceSet).map(prov => ({
+      value: prov,
+      label: prov,
+    }));
+
+    setProvinceOptions(options);
+  }, [data.locationName, regions]);
+
+  // Update city options when regions or provinces change
+  useEffect(() => {
+    const selectedRegionData = regions.filter(r => (data.locationName || []).includes(r.text));
+    const allMunicipalities = selectedRegionData.flatMap(r => r.municipalities);
+
+    let filtered = allMunicipalities;
+    if (selectedProvinces.length > 0) {
+      filtered = allMunicipalities.filter(city =>
+        selectedProvinces.some((prov: any) => city.endsWith(prov.value))
+      );
+    }
+    setCityOptions(
+      filtered.map(city => ({
+        value: city,
+        label: city,
+      }))
+    );
+  }, [data]);
+
+  // Province select handler (multi)
+  const handleProvinceChange = (options: any) => {
+    dispatch(setData({
+      ...data,
+      province: options || [],
+      // Optionally clear municipalities if province changes
+      municipalities: [],
+    }));
+  };
+
+  // City select handler (multi)
+  const handleCityChange = (options: any) => {
+    dispatch(setData({
+      ...data,
+      municipalities: options || [],
+    }));
+  };
+
   const [filterState, setFilterState] = useState<FilterState>({
     selectedModules: [modules[0]],
     selectedRegions: data?.locationName || [], // Initialize from Redux data
@@ -48,45 +115,47 @@ const FilterSection: React.FC = () => {
   const [isModuleOpen, setIsModuleOpen] = useState(false);
   const [isRegionOpen, setIsRegionOpen] = useState(false);
   const [selectedIslands, setSelectedIslands] = useState<string[]>([]);
-  const [selectedCityOptions, setSelectedCityOptions] = useState<{ value: string; label: string; }[]>([]);
 
   const moduleRef = useRef<HTMLDivElement>(null);
   const regionRef = useRef<HTMLDivElement>(null);
 
-  // Sync with Redux data changes
+  // Sync filterState.selectedRegions with Redux ONLY on mount or when Redux changes (not on every render)
   useEffect(() => {
-    if (data?.locationName) {
+    // Only update if different
+    if (
+      Array.isArray(data?.locationName) &&
+      JSON.stringify(filterState.selectedRegions) !== JSON.stringify(data.locationName)
+    ) {
       setFilterState(prev => ({
         ...prev,
-        selectedRegions: Array.isArray(data.locationName) ? data.locationName : [data.locationName]
+        selectedRegions: data.locationName
       }));
 
       // Update selected islands based on locationName
       const selectedIslandsList = groupOfIslands.filter(island => {
-        const islandRegions = islandRegionMap[island] || [];
-        return islandRegions.every(region => 
-          Array.isArray(data.locationName) 
-            ? data.locationName.includes(region)
-            : data.locationName === region
+        const islandRegions:any = islandRegionMap[island] || [];
+        return islandRegions.every((region:any) =>
+          data.locationName.includes(region)
         );
       });
       setSelectedIslands(selectedIslandsList);
     }
-  }, [data?.locationName]);
+  }, [data?.locationName]); // Only run when data.locationName changes
 
-  // Update Redux when filterState changes
+  // Update Redux when filterState.selectedRegions changes, but only if actually different
   useEffect(() => {
-
-    const formattedState = getFormattedState();
-    console.log("Formatted filter state:", formattedState);
-
-    if (JSON.stringify(data?.locationName) !== JSON.stringify(filterState.selectedRegions)) {
+    if (
+      Array.isArray(filterState.selectedRegions) &&
+      JSON.stringify(data?.locationName) !== JSON.stringify(filterState.selectedRegions)
+    ) {
+      const formattedState = getFormattedState();
       dispatch(setData({
         ...data,
-        locationName: filterState.selectedRegions,real:formattedState ? formattedState.selectedRegions : [],
+        locationName: filterState.selectedRegions,
+        real: formattedState ? formattedState.selectedRegions : [],
       }));
     }
-  }, [filterState.selectedRegions]);
+  }, [filterState.selectedRegions]); // Only run when selectedRegions changes
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -103,24 +172,7 @@ const FilterSection: React.FC = () => {
   }, []);
 
   // Get municipalities for selected regions
-  const getMunicipalitiesForRegions = (selectedRegionTexts: string[]) => {
-    const selectedRegionData = regions.filter(r => selectedRegionTexts.includes(r.text));
-    return selectedRegionData.flatMap(r => r.municipalities);
-  };
 
-  // City select handler (multi)
-  const handleCityChange = (options: any) => {
-    setSelectedCityOptions(options || []);
-  };
-
-  // Get city options based on selected regions
-  const getCityOptions = (selectedRegionTexts: string[]) => {
-    const municipalities = getMunicipalitiesForRegions(selectedRegionTexts);
-    return municipalities.map(city => ({
-      value: city,
-      label: city,
-    }));
-  };
 
   // --- Other handlers ---
   const toggleModule = (module: string) => {
@@ -165,14 +217,11 @@ const FilterSection: React.FC = () => {
       selectedRegions: [],
     }));
     setSelectedIslands([]);
-    setSelectedCityOptions([]);
+    setCityOptions([]);
   };
 
   // Helper: get all regions from selected islands
-  const getRegionsFromIslands = (islands: string[]) => {
-    const regionsList = islands.flatMap(island => islandRegionMap[island] || []);
-    return Array.from(new Set(regionsList));
-  };
+
 
   // When group of islands is toggled
   const toggleIsland = (island: string) => {
@@ -206,7 +255,7 @@ const FilterSection: React.FC = () => {
 
     // Reset city options if removing all regions
     if (selectedIslands.length === 1 && selectedIslands[0] === island) {
-      setSelectedCityOptions([]);
+      setCityOptions([]);
     }
   };
 
@@ -235,7 +284,7 @@ const FilterSection: React.FC = () => {
     // Update selected islands based on selected regions
     const selectedIslandsList = groupOfIslands.filter(island => {
       const islandRegions = islandRegionMap[island] || [];
-      return islandRegions.every(region => filterState.selectedRegions.includes(region));
+      return islandRegions.every((region:any) => filterState.selectedRegions.includes(region));
     });
     
     if (JSON.stringify(selectedIslandsList.sort()) !== JSON.stringify(selectedIslands.sort())) {
@@ -395,18 +444,38 @@ const FilterSection: React.FC = () => {
                     </div>
                   ))}
                 </div>
+                {/* Province */}
+                <div className="flex flex-col mb-4">
+                  <label className="block text-sm font-bold text-blue-700 mb-2">Province</label>
+                  <Select
+                    options={provinceOptions}
+                    value={selectedProvinces}
+                    onChange={handleProvinceChange}
+                    placeholder="Select province(s)"
+                    isClearable
+                    isMulti
+                    isDisabled={provinceOptions.length === 0}
+                    classNamePrefix="react-select"
+                    className="text-sm"
+                    menuPortalTarget={document.body}
+                    styles={{
+                      menuPortal: base => ({ ...base, zIndex: 9999 }),
+                      menu: base => ({ ...base, zIndex: 9999 }),
+                    }}
+                  />
+                </div>
                 {/* City/Municipality (multi) */}
                 <div className="relative z-50">
                   <label className="block text-sm font-bold text-blue-700 mb-1">City/Municipality</label>
                   <div className="relative">
                     <Select
-                      options={getCityOptions(filterState.selectedRegions)}
+                      options={cityOptions}
                       value={selectedCityOptions}
                       onChange={handleCityChange}
                       placeholder="Select city/municipality"
                       isClearable
                       isMulti
-                      isDisabled={filterState.selectedRegions.length === 0}
+                      isDisabled={cityOptions.length === 0}
                       classNamePrefix="react-select"
                       className="text-sm"
                       menuPortalTarget={document.body}

@@ -1,5 +1,7 @@
 import { StatisticData, ChartDataPoint } from './types';
 
+
+
 // Add this type for totals if not already present
 interface TotalResults {
   totalnewPending: number;
@@ -76,6 +78,44 @@ export const operationalLguChartData: ChartDataPoint[] = [
 
 ];
 
+export const mockTransactionChartData = [
+  {
+    name: 'CAR',
+    paidMale: 472,
+    paidFemale: 20,
+    pendingMale: 34,
+    pendingFemale: 1,
+  },
+  {
+    name: 'Region I',
+    paidMale:107,
+    paidFemale: 449,
+    pendingMale: 67,
+    pendingFemale: 1,
+  },
+  {
+    name: 'Region II',
+    paidMale: 1106,
+    paidFemale: 111,
+    pendingMale: 63,
+    pendingFemale: 6,
+  },
+  {
+    name: 'Region III',
+    paidMale: 971,
+    paidFemale: 125,
+    pendingMale: 0,
+    pendingFemale: 0,
+  },
+  {
+    name: 'Region IV-A',
+    paidMale: 800,
+    paidFemale: 300,
+    pendingMale: 2,
+    pendingFemale: 4,
+  },
+];
+
 export const transactionChartData = [
   {
     name: 'CAR',
@@ -132,16 +172,16 @@ export const modules = [
 ];
 
 export const regions = [
-  "I", "II", "III", "IV-A", "V","CAR", "NCR", "VII", "VIII", "NIR", "VI", "IX", "X", "XI", "XII", "BARMM1", "BARMM2", "XIII"
+  "I", "II", "III", "IV-A", "V","CAR", "IV-B", "VII", "VIII", "NIR", "VI", "IX", "X", "XI", "XII", "BARMM I", "BARMM II", "XIII"
 ];
 
 
 export const groupOfIslands = ["Luzon", "Visayas", "Mindanao"];
 export const regionGroups = [
   ["I", "II", "III", "IV-A", "V"],
-  ["CAR", "NCR", "VII", "VIII"],
+  ["CAR", "IV-B", "VII", "VIII"],
   ["VI", "IX", "X", "XI", "XII"],
-  ["BARMM1","BARMM2",, "XIII"]
+  [ "BARMM I", "BARMM II", "XIII"]
 ];
 
 // Complete data for provinces and cities
@@ -153,7 +193,7 @@ export const provinces = [
   "Albay", "Camarines Norte", "Camarines Sur", "Catanduanes", "Masbate", "Sorsogon", // Region V
   "Cagayan", "Isabela", "Nueva Vizcaya", "Quirino", // Region II
   "Abra", "Apayao", "Benguet", "Ifugao", "Kalinga", "Mountain Province", // CAR
-  "Metro Manila", // NCR
+  "Metro Manila", // IV-B
   
   // Visayas provinces
   "Aklan", "Antique", "Capiz", "Guimaras", "Iloilo", "Negros Occidental", // Region VI
@@ -240,9 +280,9 @@ export const cities:any = {
 };
 
 export const islandRegionMap: Record<string, string[]> = {
-  "Luzon": ["I", "II", "III", "IV-A", "V", "CAR", "NCR"],
+  "Luzon": ["I", "II", "III", "IV-A", "V", "CAR", "IV-B"],
   "Visayas": ["VI", "VII", "VIII", "NIR"],
-  "Mindanao": ["IX", "X", "XI", "XII", "XIII", "BARMM"],
+  "Mindanao": ["IX", "X", "XI", "XII", "XIII", "BARMM I", "BARMM II"],
 };
 
 // Complete map of regions to provinces
