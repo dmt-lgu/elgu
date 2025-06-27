@@ -1,38 +1,36 @@
-.loading {
-  width: 2.5em;
-  height: 2.5em;
-  transform-origin: center;
-  animation: rotate4 2s linear infinite;
+#wave {
+  margin-top: 5vh;
+  text-align: center;
 }
 
-.loading-circle {
-  fill: none;
-  stroke: hsl(214, 97%, 59%);
-  stroke-width: 2;
-  stroke-dasharray: 1, 200;
-  stroke-dashoffset: 0;
-  stroke-linecap: round;
-  animation: dash4 1.5s ease-in-out infinite;
+.dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 3px;
+  animation: wave 1.3s linear infinite;
 }
 
-@keyframes rotate4 {
-  100% {
-    transform: rotate(360deg);
-  }
+/* Individual colors */
+.dot.blue {
+  background-color: blue;
+}
+.dot.red {
+  background-color: red;
+  animation-delay: -1.1s;
+}
+.dot.yellow {
+  background-color: yellow;
+  animation-delay: -0.9s;
 }
 
-@keyframes dash4 {
-  0% {
-    stroke-dasharray: 1, 200;
-    stroke-dashoffset: 0;
+/* Animation */
+@keyframes wave {
+  0%, 60%, 100% {
+    transform: initial;
   }
-
-  50% {
-    stroke-dasharray: 90, 200;
-    stroke-dashoffset: -35px;
-  }
-
-  100% {
-    stroke-dashoffset: -125px;
+  30% {
+    transform: translateY(-15px);
   }
 }

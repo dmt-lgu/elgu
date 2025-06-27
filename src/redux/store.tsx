@@ -11,6 +11,8 @@ import cardReducer from './cardSlice';
 import transactionReducer from './transactionSlice';
 import loadReducer from './loadSlice';
 import statusReducer from './statusSlice';
+import reportFilterReducer from '../screens/Admin/Report/components/reportFilterSlice'
+
 const persistConfig = {
   key: 'root',
   storage,
@@ -18,14 +20,15 @@ const persistConfig = {
 
 const rootReducer = combineReducers({
   region: regionReducer,
-  charts:chartReducer,
-  project:projectReducer,
+  charts: chartReducer,
+  project: projectReducer,
   dates: dateReducer,
   datas: dataReducer,
   card: cardReducer,
   transaction: transactionReducer,
   load: loadReducer,
   status: statusReducer,
+  reportFilter: reportFilterReducer, 
 });
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);

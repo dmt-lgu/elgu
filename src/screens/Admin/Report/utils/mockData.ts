@@ -77,7 +77,7 @@ export const regionMapping: Record<string, string> = {
 
 export const groupOfIslands = ["Luzon", "Visayas", "Mindanao"];
 export const regionGroups: Record<string, string> = {
-  "I": "region1",
+   "I": "region1",
   "II": "region2",
   "III": "region3",
   "IV-A": "region4a",
@@ -92,36 +92,39 @@ export const regionGroups: Record<string, string> = {
   "XII": "region12",
   "XIII": "region13",
   "CAR": "CAR",
+  "BARMM I": "BARMM1",
+  "BARMM II": "BARMM2",
+};
+
+export const regionCodeToKey: Record<string, string> = {
+  "R1": "region1",
+  "R2": "region2",
+  "R3": "region3",
+  "R4-A": "region4a",
+  "R4-B": "region4b",
+  "R5": "region5",
+  "R6": "region6",
+  "R7": "region7",
+  "R8": "region8",
+  "R9": "region9",
+  "R10": "region10",
+  "R11": "region11",
+  "R12": "region12",
+  "R13": "region13",
+  "CAR": "CAR",
   "BARMM1": "BARMM1",
   "BARMM2": "BARMM2",
 };
 
-export const regionKeyToCode: Record<string, string> = {
-  region1: "R1",
-  region2: "R2",
-  region3: "R3",
-  region4a: "R4A",
-  region4b: "R4B",
-  region5: "R5",
-  region6: "R6",
-  region7: "R7",
-  region8: "R8",
-  region9: "R9",
-  region10: "R10",
-  region11: "R11",
-  region12: "R12",
-  region13: "R13",
-  CAR: "CAR",
-  BARMM1: "BARMM I",
-  BARMM2: "BARMM II",
-};
+export const regionKeyToCode: Record<string, string> = Object.fromEntries(
+  Object.entries(regionCodeToKey).map(([code, key]) => [key.toLowerCase(), code])
+);
 
-export function getRegionCode(regionKey: string): string {
-  return regionKeyToCode[regionKey] || regionKey;
-}
 
 // export const provinces = [ ... ];
-
+export function getRegionCode(regionKey: string): string {
+  return regionKeyToCode[regionKey.toLowerCase()] || regionKey;
+}
 
 export async function fetchProvinces(): Promise<string[]> {
   const res = await axios.get("municipality-list");
@@ -194,20 +197,20 @@ export const islandRegionMap: Record<string, string[]> = {
 
 export const regionProvinceMap: Record<string, string[]> = {
   "CAR": ["Abra", "Apayao", "Benguet", "Ifugao", "Kalinga", "Mountain Province"],
-  "I": ["Ilocos Norte", "Ilocos Sur", "La Union", "Pangasinan"],
-  "II": ["Batanes", "Cagayan", "Isabela", "Nueva Vizcaya", "Quirino"],
-  "III": ["Aurora", "Bataan", "Bulacan", "Nueva Ecija", "Pampanga", "Tarlac", "Zambales"],
-  "IV-A": ["Batangas", "Cavite", "Laguna", "Quezon", "Rizal"],
-  "IV-B": ["Marinduque", "Occidental Mindoro", "Oriental Mindoro", "Palawan", "Romblon"],
-  "V": ["Albay", "Camarines Norte", "Camarines Sur", "Catanduanes", "Masbate", "Sorsogon"],
-  "VI": ["Aklan", "Antique", "Capiz", "Guimaras", "Iloilo", "Negros Occidental"],
-  "VII": ["Bohol", "Cebu", "Negros Oriental", "Siquijor"],
-  "VIII": ["Biliran", "Eastern Samar", "Leyte", "Northern Samar", "Samar", "Southern Leyte"],
-  "IX": ["Basilan", "Zamboanga del Norte", "Zamboanga del Sur", "Zamboanga Sibugay"],
-  "X": ["Bukidnon", "Camiguin", "Lanao del Norte", "Misamis Occidental", "Misamis Oriental"],
-  "XI": ["Davao de Oro", "Davao del Norte", "Davao del Sur", "Davao Oriental"],
-  "XII": ["Cotabato", "Sarangani", "South Cotabato", "Sultan Kudarat"],
-  "XIII": ["Agusan del Norte", "Agusan del Sur", "Dinagat Islands", "Surigao del Norte", "Surigao del Sur"],
+  "region1": ["Ilocos Norte", "Ilocos Sur", "La Union", "Pangasinan"],
+  "region2": ["Batanes", "Cagayan", "Isabela", "Nueva Vizcaya", "Quirino"],
+  "region3": ["Aurora", "Bataan", "Bulacan", "Nueva Ecija", "Pampanga", "Tarlac", "Zambales"],
+  "region4a": ["Batangas", "Cavite", "Laguna", "Quezon", "Rizal"],
+  "region4b": ["Marinduque", "Occidental Mindoro", "Oriental Mindoro", "Palawan", "Romblon"],
+  "region5": ["Albay", "Camarines Norte", "Camarines Sur", "Catanduanes", "Masbate", "Sorsogon"],
+  "region6": ["Aklan", "Antique", "Capiz", "Guimaras", "Iloilo", "Negros Occidental"],
+  "region7": ["Bohol", "Cebu", "Negros Oriental", "Siquijor"],
+  "region8": ["Biliran", "Eastern Samar", "Leyte", "Northern Samar", "Samar", "Southern Leyte"],
+  "region9": ["Basilan", "Zamboanga del Norte", "Zamboanga del Sur", "Zamboanga Sibugay"],
+  "region10": ["Bukidnon", "Camiguin", "Lanao del Norte", "Misamis Occidental", "Misamis Oriental"],
+  "region11": ["Davao de Oro", "Davao del Norte", "Davao del Sur", "Davao Oriental"],
+  "region12": ["Cotabato", "Sarangani", "South Cotabato", "Sultan Kudarat"],
+  "region13": ["Agusan del Norte", "Agusan del Sur", "Dinagat Islands", "Surigao del Norte", "Surigao del Sur"],
   "BARMM1": ["Basilan", "Sulu", "Tawi-tawi"],
   "BARMM2": ["Maguindanao del Norte", "Maguindanao del Sur"]
 };

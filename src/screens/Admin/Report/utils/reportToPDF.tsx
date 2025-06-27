@@ -4,10 +4,31 @@ import { regionKeyToCode } from "./mockData";
 import Swal from "sweetalert2";
 
 /**
- * Export a large table report to PDF, supporting unlimited rows by chunking data into manageable pages.
- * Shows a SweetAlert2 modal with a progress bar while processing.
- * Stripes even table rows with #e4e4e7, excluding the grand total row and the region column.
+ * Helper to format a month string (yyyy-MM or yyyy-MM-dd) to "Month YYYY"
  */
+function formatMonthYear(monthStr: string): string {
+  if (!monthStr) return "";
+  // Accept both "yyyy-MM" and "yyyy-MM-dd"
+  const parts = monthStr.split("-");
+  if (parts.length < 2) return monthStr;
+  const year = Number(parts[0]);
+  const month = Number(parts[1]) - 1;
+  if (isNaN(year) || isNaN(month)) return monthStr;
+  const date = new Date(year, month, 1);
+  return date.toLocaleString('default', { month: 'long', year: 'numeric' });
+}
+
+/**
+ * Helper to get a month range label for an array of months
+ */
+function getMonthRangeLabel(months: string[] | undefined): string {
+  if (!months || months.length === 0) return "";
+  if (months.length === 1) {
+    return `(${formatMonthYear(months[0])})`;
+  }
+  return `(${formatMonthYear(months[0])} - ${formatMonthYear(months[months.length - 1])})`;
+}
+
 export async function exportTableReportToPDF({
   filteredResults,
   lguToRegion,
@@ -78,15 +99,6 @@ export async function exportTableReportToPDF({
     }
   } else {
     rowChunks.push([]);
-  }
-
-  // Helper for formatting month
-  function formatMonthYear(monthStr: string): string {
-    if (!monthStr) return "";
-    const [year, month] = monthStr.split("-");
-    if (!year || !month) return monthStr;
-    const date = new Date(Number(year), Number(month) - 1, 1);
-    return date.toLocaleString('default', { month: 'long', year: 'numeric' });
   }
 
   // Define column widths (in px, adjust as needed)
@@ -305,27 +317,17 @@ export async function exportTableReportToPDF({
       if (row.lgu.province) lguText += ` (${row.lgu.province})`;
 
       let monthInfo = "";
+      // Always show month/year info for each row, matching the UI
       if (isDayMode && row.month) {
         monthInfo = ` (${formatMonthYear(row.month)})`;
       } else if (!isDayMode && row.lgu.months && row.lgu.months.length > 0) {
-        if (row.lgu.months.length === 1) {
-          monthInfo = ` (${formatMonthYear(row.lgu.months[0])})`;
-        } else {
-          monthInfo = ` (${formatMonthYear(row.lgu.months[0])} - ${formatMonthYear(row.lgu.months[row.lgu.months.length - 1])})`;
-        }
-      }
-      // Determine font sizes based on date range type
-      let lguTextFontSize = "10px";
-      let monthInfoFontSize = "7px";
-      if (isDayMode) {
-        lguTextFontSize = "10px";
-        monthInfoFontSize = "7px";
+        monthInfo = ` ${getMonthRangeLabel(row.lgu.months)}`;
       }
 
       // Set innerHTML for bold LGU+province, normal month, with dynamic font size
       lguTd.innerHTML = `
-        <span style="font-weight:bold; font-size:${lguTextFontSize}; font-family:'Rubik', sans-serif;">${lguText}</span>
-        <span style="font-weight:normal; color: #1d4ed8; font-size:${monthInfoFontSize}; font-family:'Rubik', sans-serif;">
+        <span style="font-weight:bold; font-size:10px; font-family:'Rubik', sans-serif;">${lguText}</span>
+        <span style="font-weight:normal; color: #1d4ed8; font-size:7px; font-family:'Rubik', sans-serif;">
             <br />
             ${monthInfo}
         </span>
@@ -484,7 +486,7 @@ export async function exportTableReportToPDF({
         if (img.complete) {
           const pageWidth = pdf.internal.pageSize.getWidth();
           const logoWidth = 250;
-          logoHeight = 60;
+          logoHeight = 55;
           const logoMarginBottom = 30;
           const x = (pageWidth - logoWidth) / 2;
           pdf.addImage(img, "PNG", x, 20, logoWidth, logoHeight);

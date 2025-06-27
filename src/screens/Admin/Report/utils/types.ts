@@ -24,11 +24,10 @@ export interface FilterState {
   selectedModules: string[];
   selectedRegions: string[];
   selectedProvinces: string[];
-  selectedCities?: string[];
-  dateRange: {
-    start: Date | null;
-    end: Date | null;
-  };
+  selectedCities: string[];
+  dateRange: { start: Date | null; end: Date | null };
+  selectedDateType?: string; // "Day" | "Month" | "Year" | ""
+  // ...other properties
 }
 
 export interface RegionData {

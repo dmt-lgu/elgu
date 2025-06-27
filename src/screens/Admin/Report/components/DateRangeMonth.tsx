@@ -21,9 +21,20 @@ function getMonthLabel(month: number, year: number) {
 
 const months = Array.from({ length: 12 }, (_, i) => i);
 
+// --- Utility: Normalize a date value to Date or null ---
+function ensureDate(d: Date | string | null | undefined): Date | null {
+  if (!d) return null;
+  if (d instanceof Date) return d;
+  if (typeof d === 'string') {
+    const dt = new Date(d);
+    return isNaN(dt.getTime()) ? null : dt;
+  }
+  return null;
+}
+
 interface DateRangeMonthProps {
   className?: string;
-  value?: { start: Date | null; end: Date | null };
+  value?: { start: Date | string | null; end: Date | string | null };
   onChange?: (range: { start: Date | null; end: Date | null }) => void;
 }
 
@@ -39,20 +50,22 @@ function DateRangeMonth({
   const [from, setFrom] = React.useState<MonthYear | null>(null);
   const [to, setTo] = React.useState<MonthYear | null>(null);
 
-  // Sync with value prop
+  // --- Always normalize value.start and value.end before using date methods ---
   React.useEffect(() => {
-    if (value?.start) {
-      setFrom({ month: value.start.getMonth(), year: value.start.getFullYear() });
+    const start = ensureDate(value?.start);
+    const end = ensureDate(value?.end);
+
+    if (start) {
+      setFrom({ month: start.getMonth(), year: start.getFullYear() });
     } else {
       setFrom(null);
     }
-    if (value?.end) {
-      setTo({ month: value.end.getMonth(), year: value.end.getFullYear() });
+    if (end) {
+      setTo({ month: end.getMonth(), year: end.getFullYear() });
     } else {
       setTo(null);
     }
   }, [value?.start, value?.end]);
-
 
   // Generate years for dropdown (e.g., currentYear-10 to currentYear+1)
   const years = Array.from({ length: 15 }, (_, i) => currentYear - 10 + i);
