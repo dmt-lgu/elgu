@@ -328,15 +328,22 @@ const FilterSection: React.FC<{
 
   // --- UPDATED: Map region codes to internal keys before search ---
   const handleSearchClick = () => {
-    onSearch({
-      selectedRegions: filterState.selectedRegions,
-      selectedProvinces: filterState.selectedProvinces,
-      selectedCities: filterState.selectedCities,
-      dateRange: filterState.dateRange,
-      selectedDateType: filterState.selectedDateType,
-      selectedIslands: filterState.selectedIslands,
-    });
-  };
+  // Check if all regions are selected
+  const allRegionInternalKeys = Object.values(regionMapping);
+  const allRegionsSelected =
+    filterState.selectedRegions.length === allRegionInternalKeys.length &&
+    allRegionInternalKeys.every(key => filterState.selectedRegions.includes(key));
+
+  onSearch({
+    selectedRegions: allRegionsSelected ? [] : filterState.selectedRegions,
+    selectedProvinces: filterState.selectedProvinces,
+    selectedCities: filterState.selectedCities,
+    dateRange: filterState.dateRange,
+    selectedDateType: filterState.selectedDateType,
+    selectedIslands: filterState.selectedIslands,
+    allRegionsSelected, // Pass this flag if needed
+  });
+};
 
   const handleReset = () => {
     setSelectedCategories([]);
