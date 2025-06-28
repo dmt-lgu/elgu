@@ -28,7 +28,7 @@ import axios from '../../../../plugin/axios';
 // Redux imports
 import { useSelector, useDispatch } from 'react-redux';
 import { updateFilterField } from './reportFilterSlice';
-import { AppDispatch, RootState } from '@/redux/store';
+import { AppDispatch } from '@/redux/store';
 
 // --- City/Province API Integration ---
 
@@ -127,18 +127,24 @@ const getCityOptions = (
   return Array.from(new Map(cityList.map(item => [item.value, item])).values());
 };
 
-const FilterSection: React.FC<{
+interface FilterSectionProps {
   onSearch: (filters: any) => void;
   onDownload?: (type: "pdf" | "excel") => void;
   onReset?: () => void;
-}> = ({
+  hasTableData?: boolean;
+  loading?: boolean;
+}
+
+const FilterSection: React.FC<FilterSectionProps> = ({
   onSearch,
   onDownload,
   onReset,
+  hasTableData = false,
+  loading = false,
 }) => {
   // Redux
   const dispatch = useDispatch<AppDispatch>();
-  const filterState = useSelector((state: RootState) => state.reportFilter);
+  const filterState = useSelector((state: any) => state.reportFilter);
 
   // --- Local UI state ---
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
@@ -220,8 +226,16 @@ const FilterSection: React.FC<{
   const selectAllCategories = () => setSelectedCategories([...category]);
   const deselectAllCategories = () => setSelectedCategories([]);
 
+  const isSearchDisabled =
+    filterState.selectedRegions.length === 0 ||
+    !filterState.dateRange.start ||
+    !filterState.dateRange.end;
+
+  const isDownloadDisabled = isSearchDisabled || !hasTableData;
+
   // --- Region Logic ---
   const selectAllRegions = () => {
+    // Only update filter state, do NOT trigger API call here!
     const allRegionInternalKeys = Object.values(regionMapping);
     dispatch(updateFilterField({ key: 'selectedRegions', value: allRegionInternalKeys }));
     dispatch(updateFilterField({ key: 'selectedIslands', value: [...groupOfIslands] }));
@@ -236,7 +250,7 @@ const FilterSection: React.FC<{
     dispatch(updateFilterField({ key: 'selectedCities', value: [] }));
   };
 
-    const handleDateRangeChange = (range: { start: Date | null; end: Date | null }) => {
+  const handleDateRangeChange = (range: { start: Date | null; end: Date | null }) => {
     dispatch(
       updateFilterField({
         key: 'dateRange',
@@ -264,7 +278,7 @@ const FilterSection: React.FC<{
   const toggleIsland = (island: string) => {
     let newIslands: string[];
     if (selectedIslands.includes(island)) {
-      newIslands = selectedIslands.filter(i => i !== island);
+      newIslands = selectedIslands.filter((i: string) => i !== island);
     } else {
       newIslands = [...selectedIslands, island];
     }
@@ -328,22 +342,23 @@ const FilterSection: React.FC<{
 
   // --- UPDATED: Map region codes to internal keys before search ---
   const handleSearchClick = () => {
-  // Check if all regions are selected
-  const allRegionInternalKeys = Object.values(regionMapping);
-  const allRegionsSelected =
-    filterState.selectedRegions.length === allRegionInternalKeys.length &&
-    allRegionInternalKeys.every(key => filterState.selectedRegions.includes(key));
+    // Check if all regions are selected
+    const allRegionInternalKeys = Object.values(regionMapping);
+    const allRegionsSelected =
+      filterState.selectedRegions.length === allRegionInternalKeys.length &&
+      allRegionInternalKeys.every(key => filterState.selectedRegions.includes(key));
 
-  onSearch({
-    selectedRegions: allRegionsSelected ? [] : filterState.selectedRegions,
-    selectedProvinces: filterState.selectedProvinces,
-    selectedCities: filterState.selectedCities,
-    dateRange: filterState.dateRange,
-    selectedDateType: filterState.selectedDateType,
-    selectedIslands: filterState.selectedIslands,
-    allRegionsSelected, // Pass this flag if needed
-  });
-};
+    onSearch({
+      // FIX: Always send all region keys if all are selected
+      selectedRegions: allRegionsSelected ? allRegionInternalKeys : filterState.selectedRegions,
+      selectedProvinces: filterState.selectedProvinces,
+      selectedCities: filterState.selectedCities,
+      dateRange: filterState.dateRange,
+      selectedDateType: filterState.selectedDateType,
+      selectedIslands: filterState.selectedIslands,
+      allRegionsSelected,
+    });
+  };
 
   const handleReset = () => {
     setSelectedCategories([]);
@@ -750,46 +765,52 @@ const FilterSection: React.FC<{
       </div>
 
       {/* Action button */}
-<div className="flex flex-col ">
-  <div className="grid grid-cols-3 gap-2 mt-[25px] md:mt-0">
-    <Button
-      className="bg-[#CB371C] hover:bg-[#CB371C] h-9 text-[12px]"
-      onClick={handleReset}
-      
-    >
-      Reset
-    </Button>
-    <Button
-      className="bg-primary h-9 text-[12px]"
-      onClick={handleSearchClick}
-    >
-      Search
-    </Button>
-    <DropdownMenu>
-      <DropdownMenuTrigger>
-        <Button className="bg-[#8411DD] hover:bg-[#8411DD] max-w-full text-[10px] h-9 md:w-full">
-          Download
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent>
-        <DropdownMenuLabel>Download Options</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          onClick={() => onDownload?.("pdf")}
-          className='cursor-pointer hover:bg-primary hover:text-white'
-        >
-          PDF
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onClick={() => onDownload?.("excel")}
-          className='cursor-pointer'
-        >
-          Excel
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  </div>
-</div>
+    <div className="flex flex-col ">
+        <div className="grid grid-cols-3 gap-2 mt-[25px] md:mt-0">
+          <Button
+            className="bg-[#CB371C] hover:bg-[#CB371C] h-9 text-[12px]"
+            onClick={handleReset}
+            disabled={loading}
+          >
+            Reset
+          </Button>
+          <Button
+            className="bg-primary h-9 text-[12px]"
+            onClick={handleSearchClick}
+            disabled={isSearchDisabled || loading}
+          >
+            Search
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger>
+              <Button
+                disabled={isDownloadDisabled || loading}
+                className="bg-[#8411DD] hover:bg-[#8411DD] max-w-full text-[10px] h-9 md:w-full"
+              >
+                Download
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuLabel>Download Options</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => !isDownloadDisabled && !loading && onDownload?.("pdf")}
+                className={`cursor-pointer hover:bg-primary hover:text-white ${isDownloadDisabled || loading ? 'opacity-50 pointer-events-none' : ''}`}
+                disabled={isDownloadDisabled || loading}
+              >
+                PDF
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => !isDownloadDisabled && !loading && onDownload?.("excel")}
+                className={`cursor-pointer ${isDownloadDisabled || loading ? 'opacity-50 pointer-events-none' : ''}`}
+                disabled={isDownloadDisabled || loading}
+              >
+                Excel
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
     </div>
   );
 };

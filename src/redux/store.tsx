@@ -11,7 +11,8 @@ import cardReducer from './cardSlice';
 import transactionReducer from './transactionSlice';
 import loadReducer from './loadSlice';
 import statusReducer from './statusSlice';
-import reportFilterReducer from '../screens/Admin/Report/components/reportFilterSlice'
+import reportFilterReducer from '../screens/Admin/Report/components/reportFilterSlice';
+import tableReportDataReducer from '../screens/Admin/Report/components/tableDataSlice'; // <-- ADD THIS LINE
 
 const persistConfig = {
   key: 'root',
@@ -28,7 +29,8 @@ const rootReducer = combineReducers({
   transaction: transactionReducer,
   load: loadReducer,
   status: statusReducer,
-  reportFilter: reportFilterReducer, 
+  reportFilter: reportFilterReducer,
+  tableReport: tableReportDataReducer, 
 });
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);

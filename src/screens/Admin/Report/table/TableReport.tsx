@@ -298,6 +298,8 @@ export function getDateRangeLabel(
 }
 
 
+
+
 const TableReport = forwardRef<HTMLDivElement, TableReportProps>(({
   selectedRegions,
   dateRange,
@@ -409,11 +411,10 @@ const TableReport = forwardRef<HTMLDivElement, TableReportProps>(({
 
   // Notify parent if table has data (for enabling Download button)
   useEffect(() => {
-    if (onTableDataChange) {
-      onTableDataChange(filteredResults.length > 0);
-    }
-    // eslint-disable-next-line
-  }, [filteredResults.length, onTableDataChange]);
+  if (onTableDataChange) {
+    onTableDataChange(filteredResults.length > 0);
+  }
+}, [filteredResults.length, onTableDataChange]);
 
   // Format date range label
   let dateRangeLabel = "";

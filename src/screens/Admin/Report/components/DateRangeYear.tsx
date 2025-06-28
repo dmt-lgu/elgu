@@ -25,15 +25,27 @@ function DateRangeYear({
   const [from, setFrom] = React.useState<YearOnly | null>(null);
   const [to, setTo] = React.useState<YearOnly | null>(null);
 
-  // Sync with value prop
+  // Sync with value prop (robust to string or Date)
   React.useEffect(() => {
+    let startDate: Date | null = null;
+    let endDate: Date | null = null;
     if (value?.start) {
-      setFrom({ year: value.start.getFullYear() });
+      startDate = value.start instanceof Date ? value.start : new Date(value.start);
+      if (!isNaN(startDate.getTime())) {
+        setFrom({ year: startDate.getFullYear() });
+      } else {
+        setFrom(null);
+      }
     } else {
       setFrom(null);
     }
     if (value?.end) {
-      setTo({ year: value.end.getFullYear() });
+      endDate = value.end instanceof Date ? value.end : new Date(value.end);
+      if (!isNaN(endDate.getTime())) {
+        setTo({ year: endDate.getFullYear() });
+      } else {
+        setTo(null);
+      }
     } else {
       setTo(null);
     }

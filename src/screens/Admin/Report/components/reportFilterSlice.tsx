@@ -15,7 +15,7 @@ export interface FilterState {
   selectedDateType: string;
 }
 
-// --- Utility: Normalize a date value to Date or null ---
+// --- Utility: Parse a date value to Date or null ---
 function parseDate(d: any): Date | null {
   if (!d) return null;
   if (d instanceof Date) return d;
@@ -34,7 +34,7 @@ function normalizeDateRange(dr: any): DateRange {
   };
 }
 
-// --- Utility: Normalize the whole filter state (for setFilterState, etc.) ---
+// --- Utility: Normalize the whole filter state ---
 function normalizeFilterState(state: Partial<FilterState>): FilterState {
   return {
     selectedModules: state.selectedModules || [],
@@ -47,7 +47,7 @@ function normalizeFilterState(state: Partial<FilterState>): FilterState {
   };
 }
 
-// Load from localStorage and revive dates
+// --- Load from localStorage and revive dates ---
 function loadInitialState(): FilterState {
   try {
     const persisted = localStorage.getItem('reportFilter');
@@ -74,7 +74,6 @@ const reportFilterSlice = createSlice({
   initialState,
   reducers: {
     setFilterState(state, action: PayloadAction<FilterState>) {
-      // Always normalize dates when setting the whole filter state
       const normalized = normalizeFilterState(action.payload);
       Object.assign(state, normalized);
     },
@@ -82,7 +81,6 @@ const reportFilterSlice = createSlice({
       state: FilterState,
       action: PayloadAction<{ key: K; value: FilterState[K] }>
     ) {
-      // If updating dateRange, always normalize it
       if (action.payload.key === 'dateRange') {
         state.dateRange = normalizeDateRange(action.payload.value);
       } else {
@@ -120,8 +118,6 @@ export const reportFilterPersistence =
           start: state.dateRange.start ? state.dateRange.start.toISOString() : null,
           end: state.dateRange.end ? state.dateRange.end.toISOString() : null,
         },
-        selectedDateType: state.selectedDateType ?? "",
-        selectedIslands: state.selectedIslands || [],
       };
       localStorage.setItem('reportFilter', JSON.stringify(toSave));
     }
