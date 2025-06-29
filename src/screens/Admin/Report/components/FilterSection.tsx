@@ -6,7 +6,7 @@ import DateRangeMonth from './DateRangeMonth';
 import DateRangeYear from './DateRangeYear';
 import {
   modules,
-  category,
+  // category,
   groupOfIslands,
   dateRange,
   regionMapping,
@@ -27,7 +27,7 @@ import axios from '../../../../plugin/axios';
 
 // Redux imports
 import { useSelector, useDispatch } from 'react-redux';
-import { updateFilterField } from './reportFilterSlice';
+import { updateFilterField } from '../../../../redux/reportFilterSlice';
 import { AppDispatch } from '@/redux/store';
 
 // --- City/Province API Integration ---
@@ -147,8 +147,8 @@ const FilterSection: React.FC<FilterSectionProps> = ({
   const filterState = useSelector((state: any) => state.reportFilter);
 
   // --- Local UI state ---
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [isCategoryOpen, setIsCategoryOpen] = useState(false);
+  // const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  // const [isCategoryOpen, setIsCategoryOpen] = useState(false);
   const [isDateOpen, setIsDateOpen] = useState(false);
 
   const [isModuleOpen, setIsModuleOpen] = useState(false);
@@ -162,7 +162,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({
 
   const moduleRef = useRef<HTMLDivElement>(null);
   const regionRef = useRef<HTMLDivElement>(null);
-  const categoryRef = useRef<HTMLDivElement>(null);
+  // const categoryRef = useRef<HTMLDivElement>(null);
   const dateRef = useRef<HTMLDivElement>(null);
 
   // --- Fetch cities and provinces from API ---
@@ -215,16 +215,16 @@ const FilterSection: React.FC<FilterSectionProps> = ({
   };
 
   // --- Category Logic (local only, not persisted) ---
-  const toggleCategory = (cat: string) => {
-    setSelectedCategories(prev =>
-      prev.includes(cat)
-        ? prev.filter(c => c !== cat)
-        : [...prev, cat]
-    );
-  };
+  // const toggleCategory = (cat: string) => {
+  //   setSelectedCategories(prev =>
+  //     prev.includes(cat)
+  //       ? prev.filter(c => c !== cat)
+  //       : [...prev, cat]
+  //   );
+  // };
 
-  const selectAllCategories = () => setSelectedCategories([...category]);
-  const deselectAllCategories = () => setSelectedCategories([]);
+  // const selectAllCategories = () => setSelectedCategories([...category]);
+  // const deselectAllCategories = () => setSelectedCategories([]);
 
   const isSearchDisabled =
     filterState.selectedRegions.length === 0 ||
@@ -361,7 +361,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({
   };
 
   const handleReset = () => {
-    setSelectedCategories([]);
+    // setSelectedCategories([]);
     setSelectedCityOptions([]);
     setSelectedProvinceOptions([]);
     dispatch(updateFilterField({ key: 'selectedRegions', value: [] }));
@@ -374,7 +374,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({
     if (onReset) {
       onReset();
     }
-    setIsCategoryOpen(false);
+    // setIsCategoryOpen(false);
     setIsDateOpen(false);
     setIsRegionOpen(false);
   };
@@ -393,7 +393,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({
   }, [filterState.selectedProvinces, filterState.selectedCities, provinceOptions, cities]);
 
   return (
-    <div className="grid grid-cols-5 md:grid-cols-1 gap-4 mb-6">
+    <div className="grid grid-cols-4 md:grid-cols-1 gap-4 mb-6">
       {/* Module */}
       <div className="flex flex-col" ref={moduleRef}>
         <label className="text-sm font-medium text-secondary-foreground mb-1">Module:</label>
@@ -458,7 +458,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({
       </div>
 
       {/* Category */}
-      <div className="flex flex-col" ref={categoryRef}>
+      {/* <div className="flex flex-col" ref={categoryRef}>
         <label className="text-sm font-medium text-secondary-foreground mb-1">Category:</label>
         <div className="relative">
           <button
@@ -518,7 +518,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({
             </div>
           )}
         </div>
-      </div>
+      </div> */}
 
       {/* Region, Group of Islands, Province, City/Municipality */}
       <div className="flex flex-col" ref={regionRef}>

@@ -11,9 +11,9 @@ import { exportTableReportToPDF } from './utils/reportToPDF';
 import { exportTableReportToExcel } from './utils/reportToExcel';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState, AppDispatch } from '@/redux/store';
-import { updateFilterField } from './components/reportFilterSlice';
-import { setTableData, setAppliedFilter } from './components/tableDataSlice';
-// import ScrollToTopButton from './table/ScrollToTopButton';
+import { updateFilterField } from '../../../redux/reportFilterSlice';
+import { setTableData, setAppliedFilter } from '../../../redux/tableDataSlice';
+import ScrollToTopButton from './table/ScrollToTopButton';
 
 // --- Utility: Normalize a date value to Date or null ---
 function ensureDate(val: Date | string | null | undefined): Date | null {
@@ -256,7 +256,17 @@ const Reports: React.FC = () => {
 
   // --- Render ---
   return (
-    <div ref={tableContainerRef} className='p-6 max-w-[1200px] mx-auto bg-background'>
+    <div
+        ref={tableContainerRef}
+        style={{
+          maxHeight: 700,
+          overflowY: "auto",
+          position: "relative",
+          marginTop: 24,
+          marginBottom: 0,
+        }}
+      >
+    <div className='p-6 max-w-[1200px] mx-auto bg-background'>
       <FilterSection
         onSearch={handleSearch}
         onDownload={handleDownload}
@@ -264,9 +274,7 @@ const Reports: React.FC = () => {
         hasTableData={hasTableData}
         loading={loading}
       />
-      <div
-        
-      >
+      
         <TableReport
           selectedRegions={appliedFilter.selectedRegions}
           dateRange={appliedFilter.dateRange}
@@ -280,8 +288,8 @@ const Reports: React.FC = () => {
           hasSearched={hasSearched}
           onTableDataChange={setHasTableData}
         />
+        <ScrollToTopButton scrollTargetRef={tableContainerRef} />
       </div>
-      {/* <ScrollToTopButton scrollTargetRef={tableContainerRef} /> */}
     </div>
   );
 };

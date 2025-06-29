@@ -668,7 +668,7 @@ useEffect(() => {
               </TableRow>
             ) : (
               filteredResults.length === 0 ? (
-                hasSearched ? ( // <-- only show after search
+                hasSearched ? ( 
                   (selectedRegions.length > 0 || (normalizedDateRange?.start && normalizedDateRange?.end)) ? (
                     <TableRow>
                       <TableCell colSpan={16} className="text-center py-4 border">

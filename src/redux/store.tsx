@@ -11,8 +11,8 @@ import cardReducer from './cardSlice';
 import transactionReducer from './transactionSlice';
 import loadReducer from './loadSlice';
 import statusReducer from './statusSlice';
-import reportFilterReducer from '../screens/Admin/Report/components/reportFilterSlice';
-import tableReportDataReducer from '../screens/Admin/Report/components/tableDataSlice'; // <-- ADD THIS LINE
+import reportFilterReducer from './reportFilterSlice';
+import tableReportDataReducer from './tableDataSlice'; 
 
 const persistConfig = {
   key: 'root',
