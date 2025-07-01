@@ -41,6 +41,16 @@ type AppliedFilter = {
   selectedIslands: string[];
 };
 
+// --- Helper: Format date as YYYY-MM-DD in local time ---
+function formatLocalDate(date: Date | null): string | null {
+  if (!date) return null;
+  // Use local time, not UTC
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 const Reports: React.FC = () => {
   // Redux
   const dispatch = useDispatch<AppDispatch>();
@@ -133,11 +143,12 @@ const Reports: React.FC = () => {
           locationName: appliedFilter.selectedRegions,
           provinces: appliedFilter.selectedProvinces,
           cities: appliedFilter.selectedCities,
+          // FIX: Use local date formatting to avoid off-by-one year bug
           startDate: normalizedDateRange.start
-            ? normalizedDateRange.start.toISOString().slice(0, 10)
+            ? formatLocalDate(normalizedDateRange.start)
             : null,
           endDate: normalizedDateRange.end
-            ? normalizedDateRange.end.toISOString().slice(0, 10)
+            ? formatLocalDate(normalizedDateRange.end)
             : null,
           // If your backend supports islands, add:
           // islands: appliedFilter.selectedIslands,
