@@ -282,7 +282,7 @@ export async function exportTableReportToPDF({
     rows.forEach((row, idx) => {
       const tr = document.createElement('tr');
       // We'll apply striped background only to data cells (not region cell)
-      const isStriped = idx % 2 === 1;
+      const isStriped = idx % 2 === 0;
 
       // Region cell (never striped)
       if (idx === 0 || row.regionKey !== prevRegionKey) {

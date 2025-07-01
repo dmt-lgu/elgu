@@ -13,7 +13,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { RootState, AppDispatch } from '@/redux/store';
 import { updateFilterField } from '../../../redux/reportFilterSlice';
 import { setTableData, setAppliedFilter } from '../../../redux/tableDataSlice';
-import ScrollToTopButton from './table/ScrollToTopButton';
+import ScrollToTopButton from './components/ScrollToTopButton';
 
 // --- Utility: Normalize a date value to Date or null ---
 function ensureDate(val: Date | string | null | undefined): Date | null {
@@ -256,25 +256,23 @@ const Reports: React.FC = () => {
 
   // --- Render ---
   return (
-    <div
-        ref={tableContainerRef}
+    <div ref={tableContainerRef}
         style={{
-          maxHeight: 700,
-          overflowY: "auto",
           position: "relative",
           marginTop: 24,
           marginBottom: 0,
+          height: "88vh",
+          overflow: "auto",
         }}
       >
-    <div className='p-6 max-w-[1200px] mx-auto bg-background'>
-      <FilterSection
-        onSearch={handleSearch}
-        onDownload={handleDownload}
-        onReset={handleReset}
-        hasTableData={hasTableData}
-        loading={loading}
-      />
-      
+      <div className='p-6 max-w-[1200px] mx-auto bg-background'>
+        <FilterSection
+          onSearch={handleSearch}
+          onDownload={handleDownload}
+          onReset={handleReset}
+          hasTableData={hasTableData}
+          loading={loading}
+        />
         <TableReport
           selectedRegions={appliedFilter.selectedRegions}
           dateRange={appliedFilter.dateRange}

@@ -611,13 +611,13 @@ useEffect(() => {
 
   return (
     
-    <div ref={ref} className="bg-card p-4 rounded-md border text-secondary-foreground border-border shadow-sm mb-6">
+    <div ref={ref} className="bg-card p-4 rounded-md border text-secondary-foreground border-border shadow-sm">
       {loading && (
         <Loading />
       )}
-      <div className="overflow-auto" ref={ref}>
+      <div ref={ref}>
         <div className='flex justify-center mb-4 p-5'>
-          <img src={dictImage} alt="dict logo" className='w-96 h-full'/>
+          <img src={dictImage} alt="dict logo" className='w-80 h-full'/>
         </div>
         <Table className="w-full border-collapse text-[10px]">
           <TableHeader>
@@ -659,7 +659,7 @@ useEffect(() => {
             </TableRow>
           </TableHeader>
          
-          <TableBody className="[&>tr:nth-child(even)]:bg-zinc-200">
+          <TableBody className="[&>tr:nth-child(odd)]:bg-zinc-200">
             {loading ? (
               <TableRow>
                 <TableCell colSpan={16} className="text-center py-4 border">
