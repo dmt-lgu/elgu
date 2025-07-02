@@ -155,6 +155,8 @@ const DashboardPage = () => {
   // --- Add these totals ---
   const totalOperational = bpChartData?.current.reduce((sum:any, item:any) => sum + (item.operational ?? 0), 0);
   const totalDevelopmental = bpChartData?.current.reduce((sum:any, item:any) => sum + (item.developmental ?? 0), 0);
+  const totalWithdraw = bpChartData?.current.reduce((sum:any, item:any) => sum + (item.withdraw ?? 0), 0);
+
 
   const chartData = useMemo(() => {
     if (!transactionData || !transactionData.results) return [];
@@ -409,14 +411,16 @@ function mapRegion(region: string): string {
           value={
             (filteredCard?.totalnewPending ?? 0) +
             (filteredCard?.totalnewPaid ?? 0) +
-            (filteredCard?.totalnewPaidViaEgov ?? 0) +
+            
             (filteredCard?.totalrenewPending ?? 0) +
-            (filteredCard?.totalrenewPaid ?? 0) +
-            (filteredCard?.totalrenewPaidViaEgov ?? 0)
+            (filteredCard?.totalrenewPaid ?? 0) 
           }
           showInfo={`total no. of transaction on Business Permit as of ${data.startDate} - ${data.endDate}`}
         />
-        <StatisticCard 
+
+        <div className=' gap-4 grid col-span-2 grid-cols-3 '>
+
+            <StatisticCard 
           title="No. of LGU Operational"
           value={totalOperational}
           showInfo={`No. of LGU that has Operational Status on Business Permit as of ${data.startDate} - ${data.endDate}`}
@@ -426,6 +430,14 @@ function mapRegion(region: string): string {
           value={totalDevelopmental}
           showInfo={`No. of LGU that has Developmental Status on Business Permit as of ${data.startDate} - ${data.endDate}`}
         />
+        <StatisticCard 
+          title="No. of LGU Withdraw"
+          value={totalWithdraw}
+          showInfo={`No. of LGU that has Withdrawn Status on Business Permit as of ${data.startDate} - ${data.endDate}`}
+        />
+
+        </div>
+      
       </div>
       
       {/* Gender statistics */}
@@ -458,7 +470,7 @@ function mapRegion(region: string): string {
       <StatusChartComponent 
         data={bpChartData?.current || []}
         raw={bpChartData?.breakdown || []}
-        title="Operational vs. Developmental vs. Withdrawal (BP)"
+        title="Operational vs. Developmental vs. Withdrawal (BPLS)"
         period={`${data.startDate} - ${data.endDate}`}
       />
       

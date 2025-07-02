@@ -31,13 +31,13 @@ ChartJS.register(
 );
 
 // Mock data
-const mockTransactionChartData = [
-  { name: 'CAR', paidMale: 472, paidFemale: 20, pendingMale: 0, pendingFemale: 1 },
-  { name: 'Region I', paidMale: 1007, paidFemale: 449, pendingMale: 1, pendingFemale: 0 },
-  { name: 'Region II', paidMale: 1106, paidFemale: 111, pendingMale: 3, pendingFemale: 6 },
-  { name: 'Region III', paidMale: 971, paidFemale: 125, pendingMale: 3, pendingFemale: 3 },
-  { name: 'Region IV-A', paidMale: 528, paidFemale: 46, pendingMale: 1, pendingFemale: 3 },
-];
+// const mockTransactionChartData = [
+//   { name: 'CAR', paidMale: 472, paidFemale: 20, pendingMale: 0, pendingFemale: 1 },
+//   { name: 'Region I', paidMale: 1007, paidFemale: 449, pendingMale: 1, pendingFemale: 0 },
+//   { name: 'Region II', paidMale: 1106, paidFemale: 111, pendingMale: 3, pendingFemale: 6 },
+//   { name: 'Region III', paidMale: 971, paidFemale: 125, pendingMale: 3, pendingFemale: 3 },
+//   { name: 'Region IV-A', paidMale: 528, paidFemale: 46, pendingMale: 1, pendingFemale: 3 },
+// ];
 
 interface TransactionChartProps {
   data?: any[];
@@ -59,7 +59,7 @@ const typeOptions = [
 
 const TransactionChart: React.FC<TransactionChartProps> = ({
   data = [],
-  title,
+  
   period
 }) => {
   const [chartType, setChartType] = useState<'bar' | 'line' | 'pie'>('bar');
