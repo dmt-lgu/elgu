@@ -210,7 +210,7 @@ fetchRegions()
 
 
   return (
-    <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
+    <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme">
       <div className="flex h-screen">
         <aside className=" w-[300px] bg-card border-r border-border flex flex-col">
           <div className=" flex  justify-center items-center mt-5 border-border">
@@ -222,9 +222,9 @@ fetchRegions()
           </div>
           <nav className="flex flex-col mt-10 gap-6 ml-10">
             <Link
-              to="/react-vite-supreme/admin/dashboard"
+              to="/elgu/admin/dashboard"
               className={`flex items-center gap-2 ${
-                location.pathname === "/react-vite-supreme/admin/dashboard"
+                location.pathname === "/elgu/admin/dashboard"
                   ? "text-primary"
                   : "text-secondary-foreground"
               }`}
@@ -234,9 +234,9 @@ fetchRegions()
             </Link>
 
             <Link
-              to="/react-vite-supreme/admin/report"
+              to="/elgu/admin/report"
               className={`flex items-center gap-2 ${
-                location.pathname === "/react-vite-supreme/admin/report"
+                location.pathname === "/elgu/admin/report"
                   ? "text-primary"
                   : "text-secondary-foreground"
               }`}

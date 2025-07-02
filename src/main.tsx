@@ -25,20 +25,17 @@ const DashboardPage= lazy(() =>
 const Report = lazy(() =>
   wait(1300).then(() => import("./screens/Admin/Report/Reports.tsx")));
 
-const Page2= lazy(() =>
-  wait(1300).then(() => import("./screens/page2.tsx"))
-);
 
 const router = createBrowserRouter([
 
   {
-    path: "/react-vite-supreme/",
-    element: <Navigate to="/react-vite-supreme/login" />,
+    path: "/elgu/",
+    element: <Navigate to="/elgu/login" />,
   }
 ,
 
 {
-    path: "/react-vite-supreme/login",
+    path: "/elgu/login",
     element: 
     <Suspense fallback={<Loader />}>
 
@@ -47,7 +44,7 @@ const router = createBrowserRouter([
   },
 
   {
-    path: "/react-vite-supreme/admin",
+    path: "/elgu/admin",
     element: 
     <Suspense fallback={<Loader />}>
       <Admin/>
@@ -56,11 +53,11 @@ const router = createBrowserRouter([
     
     children: [
       {
-        path: "/react-vite-supreme/admin", 
-        element: <Navigate to="/react-vite-supreme/admin/dashboard" />, 
+        path: "/elgu/admin", 
+        element: <Navigate to="/elgu/admin/dashboard" />, 
       },
       {
-        path: "/react-vite-supreme/admin/dashboard",
+        path: "/elgu/admin/dashboard",
         element: <>
         <Suspense fallback={<Loader2 />}>
           <DashboardPage/>
@@ -68,7 +65,7 @@ const router = createBrowserRouter([
       </>,
       },
       {
-        path: "/react-vite-supreme/admin/report",
+        path: "/elgu/admin/report",
         element: <>
         <Suspense fallback={<Loader2 />}>
           <Report />

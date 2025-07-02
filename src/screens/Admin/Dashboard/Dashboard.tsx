@@ -155,6 +155,8 @@ const DashboardPage = () => {
   // --- Add these totals ---
   const totalOperational = bpChartData?.current.reduce((sum:any, item:any) => sum + (item.operational ?? 0), 0);
   const totalDevelopmental = bpChartData?.current.reduce((sum:any, item:any) => sum + (item.developmental ?? 0), 0);
+  const totalWithdraw = bpChartData?.current.reduce((sum:any, item:any) => sum + (item.withdraw ?? 0), 0);
+
 
   const chartData = useMemo(() => {
     if (!transactionData || !transactionData.results) return [];
@@ -183,33 +185,42 @@ const DashboardPage = () => {
     });
   }, [data, transactionData]);
 
-  const chartData3 = useMemo(() => {
-    if (!transactionData || !transactionData.results) return [];
-    // Filter or group results
-    const filteredResults = filterAndGroupResults(
-      transactionData.results,
-      data.municipalities,
-      data.province
-    );
+const chartData3 = useMemo(() => {
+  if (!transactionData || !transactionData.results) return [];
+  // Filter or group results
+  const filteredResults = filterAndGroupResults(
+    transactionData.results,
+    data.municipalities,
+    data.province
+  );
 
-    return filteredResults.map((lgu: any) => {
-      let paid = 0, pending = 0, paideGov = 0, paidLinkBiz = 0;
-      lgu.monthlyResults.forEach((m: any) => {
-        paid += (m.newPaid + m.renewPaid);
-        pending += (m.newPending + m.renewPending);
-        paideGov +=  (m.newPaidViaEgov + m.renewPaidViaEgov);
-        paidLinkBiz += (m.newPaidViaLinkBiz + m.renewPaidViaLinkBiz) || 0;
-      });
-
-      return {
-        name: lgu.lgu,
-        paid,
-        pending,
-        paideGov,
-        paidLinkBiz,
-      };
+  return filteredResults.map((lgu: any) => {
+    let newPaid = 0, newPending = 0, newPaidViaEgov = 0, newPaidLinkBiz = 0;
+    let renewPaid = 0, renewPending = 0, renewPaidViaEgov = 0, renewPaidLinkBiz = 0;
+    lgu.monthlyResults.forEach((m: any) => {
+      newPaid += m.newPaid ?? 0;
+      newPending += m.newPending ?? 0;
+      newPaidViaEgov += m.newPaidViaEgov ?? 0;
+      newPaidLinkBiz += m.newPaidViaLinkBiz ?? 0;
+      renewPaid += m.renewPaid ?? 0;
+      renewPending += m.renewPending ?? 0;
+      renewPaidViaEgov += m.renewPaidViaEgov ?? 0;
+      renewPaidLinkBiz += m.renewPaidViaLinkBiz ?? 0;
     });
-  }, [data, transactionData]);
+
+    return {
+      name: lgu.lgu,
+      newPaid,
+      newPending,
+      newPaidViaEgov,
+      newPaidLinkBiz,
+      renewPaid,
+      renewPending,
+      renewPaidViaEgov,
+      renewPaidLinkBiz,
+    };
+  });
+}, [data, transactionData]);
 
 
   // Filter card statistics by data.municipalities or data.province if present
@@ -400,14 +411,16 @@ function mapRegion(region: string): string {
           value={
             (filteredCard?.totalnewPending ?? 0) +
             (filteredCard?.totalnewPaid ?? 0) +
-            (filteredCard?.totalnewPaidViaEgov ?? 0) +
+            
             (filteredCard?.totalrenewPending ?? 0) +
-            (filteredCard?.totalrenewPaid ?? 0) +
-            (filteredCard?.totalrenewPaidViaEgov ?? 0)
+            (filteredCard?.totalrenewPaid ?? 0) 
           }
           showInfo={`total no. of transaction on Business Permit as of ${data.startDate} - ${data.endDate}`}
         />
-        <StatisticCard 
+
+        <div className=' gap-4 grid col-span-2 grid-cols-3 '>
+
+            <StatisticCard 
           title="No. of LGU Operational"
           value={totalOperational}
           showInfo={`No. of LGU that has Operational Status on Business Permit as of ${data.startDate} - ${data.endDate}`}
@@ -417,6 +430,14 @@ function mapRegion(region: string): string {
           value={totalDevelopmental}
           showInfo={`No. of LGU that has Developmental Status on Business Permit as of ${data.startDate} - ${data.endDate}`}
         />
+        <StatisticCard 
+          title="No. of LGU Withdraw"
+          value={totalWithdraw}
+          showInfo={`No. of LGU that has Withdrawn Status on Business Permit as of ${data.startDate} - ${data.endDate}`}
+        />
+
+        </div>
+      
       </div>
       
       {/* Gender statistics */}
@@ -449,7 +470,7 @@ function mapRegion(region: string): string {
       <StatusChartComponent 
         data={bpChartData?.current || []}
         raw={bpChartData?.breakdown || []}
-        title="Operational vs. Developmental vs. Withdrawal (BP)"
+        title="Operational vs. Developmental vs. Withdrawal (BPLS)"
         period={`${data.startDate} - ${data.endDate}`}
       />
       
