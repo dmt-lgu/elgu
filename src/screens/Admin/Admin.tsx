@@ -210,7 +210,7 @@ fetchRegions()
 
 
   return (
-    <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
+    <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme">
       <div className="flex h-screen">
         <aside className=" w-[300px] bg-card border-r border-border flex flex-col">
           <div className=" flex  justify-center items-center mt-5 border-border">
