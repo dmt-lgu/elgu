@@ -87,7 +87,7 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({ onChange }) => {
 
   return (
     <div className="relative w-full">
-      <div className="flex border border-border rounded-md overflow-hidden">
+      <div className="flex border border-border text-sm rounded-md overflow-hidden">
         <input
           type="date"
           value={format(startDate, 'yyyy-MM-dd')}
