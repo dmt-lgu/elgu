@@ -127,63 +127,60 @@ const Reports: React.FC = () => {
   useEffect(() => {
     // Only fetch if Search has been clicked and filters are complete
     if (
-    !hasSearched ||
-    (!appliedFilter.selectedRegions.length && !appliedFilter.selectedIslands.length) ||
-    !normalizedDateRange.start ||
-    !normalizedDateRange.end
-  ) {
-    setTableDataState(null);
-    setHasTableData(false);
-    return;
-  }
+      !hasSearched ||
+      (!appliedFilter.selectedRegions.length && !appliedFilter.selectedIslands.length) ||
+      !normalizedDateRange.start ||
+      !normalizedDateRange.end
+    ) {
+      setTableDataState(null);
+      setHasTableData(false);
+      return;
+    }
 
     const fetchTableData = async () => {
       setLoading(true);
       try {
         const payload: any = {
-        locationName: appliedFilter.selectedRegions,
-        provinces: appliedFilter.selectedProvinces,
-        cities: appliedFilter.selectedCities,
-        startDate: normalizedDateRange.start
-          ? formatLocalDate(normalizedDateRange.start)
-          : null,
-        endDate: normalizedDateRange.end
-          ? formatLocalDate(normalizedDateRange.end)
-          : null,
-        // If your backend supports islands, add:
-        // islands: appliedFilter.selectedIslands,
-      };
+          locationName: appliedFilter.selectedRegions,
+          provinces: appliedFilter.selectedProvinces,
+          cities: appliedFilter.selectedCities,
+          // FIX: Use local date formatting to avoid off-by-one year bug
+          startDate: normalizedDateRange.start
+            ? formatLocalDate(normalizedDateRange.start)
+            : null,
+          endDate: normalizedDateRange.end
+            ? formatLocalDate(normalizedDateRange.end)
+            : null,
+          // If your backend supports islands, add:
+          // islands: appliedFilter.selectedIslands,
+        };
         // Remove empty arrays/fields
         Object.keys(payload).forEach(
-        (key) =>
-          (Array.isArray(payload[key]) && payload[key].length === 0) ||
-          payload[key] === null
-            ? delete payload[key]
-            : null
-      );
-       const response = await axios.post(`${import.meta.env.VITE_URL}/api/bp/transaction-count`, payload);
-      setTableDataState(response.data);
-      // Persist to Redux/localStorage
-      dispatch(setTableData(response.data));
-      dispatch(setAppliedFilter(appliedFilter));
-    } catch (error: any) {
-      setTableDataState(null);
-      dispatch(setTableData(null));
-      // --- Swal Alert for API Error ---
+          (key) =>
+            (Array.isArray(payload[key]) && payload[key].length === 0) ||
+            payload[key] === null
+              ? delete payload[key]
+              : null
+        );
+        const response = await axios.post(`${import.meta.env.VITE_URL}/api/bp/transaction-count`, payload);
+        setTableDataState(response.data);
+        // Persist to Redux/localStorage
+        dispatch(setTableData(response.data));
+        dispatch(setAppliedFilter(appliedFilter));
+      } catch {
+        setTableDataState(null);
+        dispatch(setTableData(null));
+        // ...inside your catch block in fetchTableData:
       Swal.fire({
         icon: "error",
         title: "Request Failed",
+        text: "Gateway Timeout: The server took too long to respond. Please try again later.",
         confirmButtonText: "OK",
-        text:
-          error?.response?.status === 504
-            ? "Gateway Timeout: The server took too long to respond. Please try again later."
-            : "An error occurred while fetching the report. Please try again.",
-        timer: 3000,
-        showConfirmButton: false,
+        confirmButtonColor: "#3b82f6",
       });
-    } finally {
-      setLoading(false);
-    }
+      } finally {
+        setLoading(false);
+      }
     };
 
     fetchTableData();
