@@ -442,7 +442,7 @@ const TableReport = forwardRef<HTMLDivElement, TableReportProps>(({
               {/* Only render the Region cell for the first LGU in the region, with rowSpan */}
               {idx === 0 && (
                 <TableCell
-                  className="border px-2 py-1 text-center font-bold bg-white sticky left-0 z-10 align-middle"
+                  className="border px-2 py-1 text-center font-bold bg-white left-0 z-10 align-middle"
                   rowSpan={lguList.length}
                 >
                   {getRegionCode(region)}
@@ -703,7 +703,7 @@ useEffect(() => {
               <TableCell className="border px-2 py-1" colSpan={2}>
                 GRAND TOTAL FOR <br />
                 <span className='text-[8px] font-normal text-gray-300'>
-                  ({dateRangeLabel})
+                  ({ dateRangeLabel })
                 </span>
               </TableCell>
               <TableCell className="border px-2 py-1 text-center">{loading ? 0 : grandTotals.newPaid}</TableCell>
