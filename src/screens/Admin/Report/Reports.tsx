@@ -14,6 +14,7 @@ import { RootState, AppDispatch } from '@/redux/store';
 import { updateFilterField } from '../../../redux/reportFilterSlice';
 import { setTableData, setAppliedFilter } from '../../../redux/tableDataSlice';
 import ScrollToTopButton from './components/ScrollToTopButton';
+import Swal from 'sweetalert2';
 
 // --- Utility: Normalize a date value to Date or null ---
 function ensureDate(val: Date | string | null | undefined): Date | null {
@@ -40,6 +41,16 @@ type AppliedFilter = {
   selectedDateType: string;
   selectedIslands: string[];
 };
+
+// --- Helper: Format date as YYYY-MM-DD in local time ---
+function formatLocalDate(date: Date | null): string | null {
+  if (!date) return null;
+  // Use local time, not UTC
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
 
 const Reports: React.FC = () => {
   // Redux
@@ -133,11 +144,12 @@ const Reports: React.FC = () => {
           locationName: appliedFilter.selectedRegions,
           provinces: appliedFilter.selectedProvinces,
           cities: appliedFilter.selectedCities,
+          // FIX: Use local date formatting to avoid off-by-one year bug
           startDate: normalizedDateRange.start
-            ? normalizedDateRange.start.toISOString().slice(0, 10)
+            ? formatLocalDate(normalizedDateRange.start)
             : null,
           endDate: normalizedDateRange.end
-            ? normalizedDateRange.end.toISOString().slice(0, 10)
+            ? formatLocalDate(normalizedDateRange.end)
             : null,
           // If your backend supports islands, add:
           // islands: appliedFilter.selectedIslands,
@@ -158,6 +170,14 @@ const Reports: React.FC = () => {
       } catch {
         setTableDataState(null);
         dispatch(setTableData(null));
+        // ...inside your catch block in fetchTableData:
+      Swal.fire({
+        icon: "error",
+        title: "Request Failed",
+        text: "Gateway Timeout: The server took too long to respond. Please try again later.",
+        confirmButtonText: "OK",
+        confirmButtonColor: "#3b82f6",
+      });
       } finally {
         setLoading(false);
       }
