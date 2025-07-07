@@ -74,7 +74,7 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
 }) => {
   const charts = useSelector(selectCharts);
 
-  console.log(raw, 'data in status chart component');
+
   let reduxChartType: 'bar' | 'line' | 'pie' = 'bar';
   if (charts.includes('Pie Graph')) reduxChartType = 'pie';
   else if (charts.includes('Line Graph')) reduxChartType = 'line';
