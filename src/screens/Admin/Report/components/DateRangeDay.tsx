@@ -40,15 +40,15 @@ const DateRangeDay: React.FC<DateRangePickerProps> = ({ value, onChange }) => {
           type="date"
           value={startDate ? format(startDate, 'yyyy-MM-dd') : ''}
           onChange={handleStartDateChange}
-          className="w-32 flex-1 py-2 px-3 text-secondary-foreground bg-card focus:outline-none"
+          className="w-32 flex-1 py-2 px-3 text-accent-foreground bg-card focus:outline-none"
           placeholder="Start date"
         />
-        <div className="bg-border px-2 flex items-center text-secondary-foreground">to</div>
+        <div className="bg-border px-2 flex items-center text-accent-foreground">to</div>
         <input
           type="date"
           value={endDate ? format(endDate, 'yyyy-MM-dd') : ''}
           onChange={handleEndDateChange}
-          className="w-32 flex-1 py-2 px-3 text-secondary-foreground bg-card focus:outline-none"
+          className="w-32 flex-1 py-2 px-3 text-accent-foreground bg-card focus:outline-none"
           placeholder="End date"
         />
       </div>

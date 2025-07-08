@@ -126,7 +126,7 @@ function DateRangeYear({
   };
 
   return (
-    <div className={cn("grid gap-2", className)}>
+    <div className={cn("grid gap-2 text-accent-foreground", className)}>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
@@ -134,7 +134,7 @@ function DateRangeYear({
             variant="outline"
             className={cn(
               "w-[350px] justify-start text-left font-normal",
-              !dateRange.from && "text-black"
+              !dateRange.from && "text-accent-foreground"
             )}
           >
             <CalendarIcon className="mr-2 h-4 w-4" />
@@ -146,7 +146,7 @@ function DateRangeYear({
             <div>
               <div className="font-semibold mb-1">Start Year</div>
               <select
-                className="border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="border text-black rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 value={from ? from.year : ""}
                 onChange={e => handleFromYear(Number(e.target.value))}
               >
@@ -159,7 +159,7 @@ function DateRangeYear({
             <div>
               <div className="font-semibold mb-1">End Year</div>
               <select
-                className="border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="border text-black rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 value={to ? to.year : ""}
                 onChange={e => handleToYear(Number(e.target.value))}
                 disabled={!from}

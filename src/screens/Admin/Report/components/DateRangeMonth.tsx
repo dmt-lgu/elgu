@@ -107,7 +107,7 @@ function DateRangeMonth({
   };
 
   return (
-    <div className={cn("grid gap-2", className)}>
+    <div className={cn("grid gap-2 text-accent-foreground", className)}>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
@@ -115,7 +115,7 @@ function DateRangeMonth({
             variant="outline"
             className={cn(
               "w-[350px] justify-start text-left font-normal",
-              !from && "text-black"
+              !from && "text-accent-foreground",
             )}
           >
             <CalendarIcon className="mr-2 h-4 w-4" />
@@ -138,7 +138,7 @@ function DateRangeMonth({
               <div className="font-semibold mb-1">Start Month</div>
               <div className="flex gap-2">
                 <select
-                  className="border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="border rounded px-2 py-1 text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
                   value={from ? from.month : ""}
                   onChange={e => {
                     const month = Number(e.target.value);
@@ -151,7 +151,7 @@ function DateRangeMonth({
                   ))}
                 </select>
                 <select
-                  className="border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                  className="border rounded text-black px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500" 
                   value={from ? from.year : ""}
                   onChange={e => {
                     const year = Number(e.target.value);
@@ -169,7 +169,7 @@ function DateRangeMonth({
               <div className="font-semibold mb-1">End Month</div>
               <div className="flex gap-2">
                 <select
-                  className="border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="border rounded text-black px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   value={to ? to.month : ""}
                   onChange={e => {
                     const month = Number(e.target.value);
@@ -183,7 +183,7 @@ function DateRangeMonth({
                   ))}
                 </select>
                 <select
-                  className="border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="border rounded text-black px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   value={to ? to.year : ""}
                   onChange={e => {
                     const year = Number(e.target.value);

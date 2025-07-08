@@ -1,8 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import TableReport, {
-  filterTableResults,
-  getDateRangeLabel,
-} from './table/TableReport';
+import BusinessPermitReport, { filterTableResults, getDateRangeLabel } from './table/BusinessPermitReport';
 import FilterSection from './components/FilterSection';
 import axios from '../../../plugin/axios';
 import { regionMapping } from '../../../screens/Admin/Report/utils/mockData';
@@ -15,8 +12,10 @@ import { updateFilterField } from '../../../redux/reportFilterSlice';
 import { setTableData, setAppliedFilter } from '../../../redux/tableDataSlice';
 import ScrollToTopButton from './components/ScrollToTopButton';
 import Swal from 'sweetalert2';
+import WorkingPermitReport from './table/WorkingPermitReport';
+import { Bp } from './utils/types';
+import BrgyClearanceReport from './table/BrgyClearanceReport';
 
-// --- Utility: Normalize a date value to Date or null ---
 function ensureDate(val: Date | string | null | undefined): Date | null {
   if (!val) return null;
   if (val instanceof Date) return val;
@@ -42,28 +41,27 @@ type AppliedFilter = {
   selectedIslands: string[];
 };
 
-// --- Helper: Format date as YYYY-MM-DD in local time ---
 function formatLocalDate(date: Date | null): string | null {
   if (!date) return null;
-  // Use local time, not UTC
   const yyyy = date.getFullYear();
   const mm = String(date.getMonth() + 1).padStart(2, '0');
   const dd = String(date.getDate()).padStart(2, '0');
   return `${yyyy}-${mm}-${dd}`;
 }
 
+const WP = "Working Permit";
+const BC = "Barangay Clearance";
+
 const Reports: React.FC = () => {
-  // Redux
   const dispatch = useDispatch<AppDispatch>();
 
-  // Get persisted filter and table data from Redux (hydrated from localStorage)
   const persistedTableData = useSelector((state: RootState) => state.tableReport.tableData);
   const persistedAppliedFilter = useSelector((state: RootState) => state.tableReport.appliedFilter);
-
+  const selectedModules = useSelector((state: RootState) => state.reportFilter.selectedModules);
   const [hasSearched, setHasSearched] = useState(false);
 
-  // --- Applied Filter State (typed!) ---
-  // Only update this when Search is clicked!
+   const searchAbortController = useRef<AbortController | null>(null);
+
   const [appliedFilter, setAppliedFilterState] = useState<AppliedFilter>({
     selectedRegions: [],
     selectedProvinces: [],
@@ -73,16 +71,17 @@ const Reports: React.FC = () => {
     selectedIslands: [],
   });
 
-  // Local state for table data and LGU mapping
-  const [tableData, setTableDataState] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
+  const [tableData, setTableDataState] = useState<any>(null); // Business Permit data
+  const [wpTableData, setWpTableDataState] = useState<any>(null); // Working Permit data
+  const [bcTableData, setBcTableDataState] = useState<any>(null); // Barangay Clearance data
+  const [loading, setLoading] = useState(false); // Business Permit loading
+  const [wpLoading, setWpLoading] = useState(false); // Working Permit loading
+  const [bcLoading, setBcLoading] = useState(false); // Barangay Clearance loading
   const [lguToRegion, setLguToRegion] = useState<Record<string, string>>({});
   const [lguRegionLoading, setLguRegionLoading] = useState(true);
 
-  // Track if table has data for enabling Download button
   const [hasTableData, setHasTableData] = useState(false);
 
-  // --- Restore persisted filter and table data on mount ---
   useEffect(() => {
     if (persistedAppliedFilter) {
       setAppliedFilterState(persistedAppliedFilter);
@@ -91,16 +90,13 @@ const Reports: React.FC = () => {
     if (persistedTableData) {
       setTableDataState(persistedTableData);
     }
-  // eslint-disable-next-line
   }, []);
 
-  // --- Always normalize dateRange for all checks and usage ---
   const normalizedDateRange = useMemo(
     () => normalizeDateRange(appliedFilter.dateRange),
     [appliedFilter.dateRange?.start, appliedFilter.dateRange?.end]
   );
 
-  // --- Fetch LGU to Region Mapping ---
   useEffect(() => {
     const fetchLguToRegion = async () => {
       setLguRegionLoading(true);
@@ -123,9 +119,7 @@ const Reports: React.FC = () => {
     fetchLguToRegion();
   }, []);
 
-  // --- Fetch Table Data on Filter Change (send all filters to API) ---
   useEffect(() => {
-    // Only fetch if Search has been clicked and filters are complete
     if (
       !hasSearched ||
       (!appliedFilter.selectedRegions.length && !appliedFilter.selectedIslands.length) ||
@@ -144,17 +138,13 @@ const Reports: React.FC = () => {
           locationName: appliedFilter.selectedRegions,
           provinces: appliedFilter.selectedProvinces,
           cities: appliedFilter.selectedCities,
-          // FIX: Use local date formatting to avoid off-by-one year bug
           startDate: normalizedDateRange.start
             ? formatLocalDate(normalizedDateRange.start)
             : null,
           endDate: normalizedDateRange.end
             ? formatLocalDate(normalizedDateRange.end)
             : null,
-          // If your backend supports islands, add:
-          // islands: appliedFilter.selectedIslands,
         };
-        // Remove empty arrays/fields
         Object.keys(payload).forEach(
           (key) =>
             (Array.isArray(payload[key]) && payload[key].length === 0) ||
@@ -164,20 +154,18 @@ const Reports: React.FC = () => {
         );
         const response = await axios.post(`${import.meta.env.VITE_URL}/api/bp/transaction-count`, payload);
         setTableDataState(response.data);
-        // Persist to Redux/localStorage
         dispatch(setTableData(response.data));
         dispatch(setAppliedFilter(appliedFilter));
       } catch {
         setTableDataState(null);
         dispatch(setTableData(null));
-        // ...inside your catch block in fetchTableData:
-      Swal.fire({
-        icon: "error",
-        title: "Request Failed",
-        text: "Gateway Timeout: The server took too long to respond. Please try again later.",
-        confirmButtonText: "OK",
-        confirmButtonColor: "#3b82f6",
-      });
+        Swal.fire({
+          icon: "error",
+          title: "Request Failed",
+          text: "Gateway Timeout: The server took too long to respond. Please try again later.",
+          confirmButtonText: "OK",
+          confirmButtonColor: "#3b82f6",
+        });
       } finally {
         setLoading(false);
       }
@@ -191,70 +179,263 @@ const Reports: React.FC = () => {
     appliedFilter.selectedCities,
     normalizedDateRange.start,
     normalizedDateRange.end,
-    // appliedFilter.selectedIslands, // Uncomment if backend supports
+  ]);
+
+  useEffect(() => {
+    if (
+      !hasSearched ||
+      (!appliedFilter.selectedRegions.length && !appliedFilter.selectedIslands.length) ||
+      !normalizedDateRange.start ||
+      !normalizedDateRange.end
+    ) {
+      setWpTableDataState(null);
+      return;
+    }
+
+    const fetchWpTableData = async () => {
+      setWpLoading(true);
+      try {
+        const payload: any = {
+          locationName: appliedFilter.selectedRegions,
+          provinces: appliedFilter.selectedProvinces,
+          cities: appliedFilter.selectedCities,
+          startDate: normalizedDateRange.start
+            ? formatLocalDate(normalizedDateRange.start)
+            : null,
+          endDate: normalizedDateRange.end
+            ? formatLocalDate(normalizedDateRange.end)
+            : null,
+        };
+        Object.keys(payload).forEach(
+          (key) =>
+            (Array.isArray(payload[key]) && payload[key].length === 0) ||
+            payload[key] === null
+              ? delete payload[key]
+              : null
+        );
+        const response = await axios.post(`${import.meta.env.VITE_URL}/api/wp/transaction-count`, payload);
+        setWpTableDataState(response.data);
+      } catch {
+        setWpTableDataState(null);
+      } finally {
+        setWpLoading(false);
+      }
+    };
+
+    fetchWpTableData();
+  }, [
+    hasSearched,
+    appliedFilter.selectedRegions,
+    appliedFilter.selectedProvinces,
+    appliedFilter.selectedCities,
+    normalizedDateRange.start,
+    normalizedDateRange.end,
+  ]);
+
+  useEffect(() => {
+    if (
+      !hasSearched ||
+      (!appliedFilter.selectedRegions.length && !appliedFilter.selectedIslands.length) ||
+      !normalizedDateRange.start ||
+      !normalizedDateRange.end
+    ) {
+      setBcTableDataState(null);
+      return;
+    }
+
+    const fetchBcTableData = async () => {
+      setBcLoading(true);
+      try {
+        const payload: any = {
+          locationName: appliedFilter.selectedRegions,
+          provinces: appliedFilter.selectedProvinces,
+          cities: appliedFilter.selectedCities,
+          startDate: normalizedDateRange.start
+            ? formatLocalDate(normalizedDateRange.start)
+            : null,
+          endDate: normalizedDateRange.end
+            ? formatLocalDate(normalizedDateRange.end)
+            : null,
+        };
+        Object.keys(payload).forEach(
+          (key) =>
+            (Array.isArray(payload[key]) && payload[key].length === 0) ||
+            payload[key] === null
+              ? delete payload[key]
+              : null
+        );
+        const response = await axios.post(`${import.meta.env.VITE_URL}/api/bc/transaction-count`, payload);
+        setBcTableDataState(response.data);
+      } catch {
+        setBcTableDataState(null);
+      } finally {
+        setBcLoading(false);
+      }
+    };
+
+    fetchBcTableData();
+  }, [
+    hasSearched,
+    appliedFilter.selectedRegions,
+    appliedFilter.selectedProvinces,
+    appliedFilter.selectedCities,
+    normalizedDateRange.start,
+    normalizedDateRange.end,
   ]);
 
   // --- PDF/Excel Export Handler ---
   const handleDownload = async (type: "pdf" | "excel") => {
-    // 1. Compute filteredResults using the same logic as TableReport
-    const filteredResults = filterTableResults({
-      apiData: tableData,
-      selectedRegions: appliedFilter.selectedRegions,
-      selectedProvinces: appliedFilter.selectedProvinces,
-      selectedCities: appliedFilter.selectedCities,
-      selectedDates: appliedFilter.selectedDateType ? [appliedFilter.selectedDateType] : [],
-      selectedIslands: appliedFilter.selectedIslands,
-      lguToRegion,
-      dateRange: appliedFilter.dateRange,
-    });
+    const moduleLabels: string[] = [];
+    if (selectedModules.includes(Bp)) moduleLabels.push("Business Permit");
+    if (selectedModules.includes(WP)) moduleLabels.push("Working Permit");
+    if (selectedModules.includes(BC)) moduleLabels.push("Barangay Clearance");
+    const combinedModuleLabel = moduleLabels.join(", ");
 
-    // 2. Compute dateRangeLabel using the same logic as TableReport
-    const dateRangeLabel = getDateRangeLabel(
-      normalizedDateRange.start,
-      normalizedDateRange.end,
-      appliedFilter.selectedDateType
-    );
-
-    if (type === "pdf") {
-      exportTableReportToPDF({
-        filteredResults,
+    // Business Permit
+    if (selectedModules.includes(Bp) && tableData) {
+      const filteredResults = filterTableResults({
+        apiData: tableData,
+        selectedRegions: appliedFilter.selectedRegions,
+        selectedProvinces: appliedFilter.selectedProvinces,
+        selectedCities: appliedFilter.selectedCities,
+        selectedDates: [], // <-- Always show all data, do not filter by date type
+        selectedIslands: appliedFilter.selectedIslands,
         lguToRegion,
-        dateRangeLabel,
-        logoUrl: dictImage,
-        fileLabel: "report",
-        isDayMode: appliedFilter.selectedDateType === "Day",
+        dateRange: appliedFilter.dateRange,
       });
+
+      const dateRangeLabel = getDateRangeLabel(
+        normalizedDateRange.start,
+        normalizedDateRange.end,
+        appliedFilter.selectedDateType
+      );
+
+      if (type === "pdf") {
+        await exportTableReportToPDF({
+          filteredResults,
+          lguToRegion,
+          dateRangeLabel,
+          logoUrl: dictImage,
+          fileLabel: "business-permit-report",
+          isDayMode: false, // <-- Always false to show all data, not per-day
+          isBarangayClearance: false,
+          moduleLabel: combinedModuleLabel,
+        });
+      }
+      if (type === "excel") {
+        exportTableReportToExcel({
+          filteredResults,
+          lguToRegion,
+          dateRangeLabel,
+          fileLabel: "business-permit-report",
+          isDayMode: false, // <-- Always false
+        });
+      }
     }
 
-    if (type === "excel") {
-      exportTableReportToExcel({
-        filteredResults,
+    // Working Permit
+    if (selectedModules.includes(WP) && wpTableData) {
+      const filteredResults = filterTableResults({
+        apiData: wpTableData,
+        selectedRegions: appliedFilter.selectedRegions,
+        selectedProvinces: appliedFilter.selectedProvinces,
+        selectedCities: appliedFilter.selectedCities,
+        selectedDates: [], // <-- Always show all data
+        selectedIslands: appliedFilter.selectedIslands,
         lguToRegion,
-        dateRangeLabel,
-        fileLabel: "report",
-        isDayMode: appliedFilter.selectedDateType === "Day",
+        dateRange: appliedFilter.dateRange,
       });
-      return;
+
+      const dateRangeLabel = getDateRangeLabel(
+        normalizedDateRange.start,
+        normalizedDateRange.end,
+        appliedFilter.selectedDateType
+      );
+
+      if (type === "pdf") {
+        await exportTableReportToPDF({
+          filteredResults,
+          lguToRegion,
+          dateRangeLabel,
+          logoUrl: dictImage,
+          fileLabel: "working-permit-report",
+          isDayMode: false, // <-- Always false
+          isBarangayClearance: false,
+          moduleLabel: combinedModuleLabel,
+        });
+      }
+      if (type === "excel") {
+        exportTableReportToExcel({
+          filteredResults,
+          lguToRegion,
+          dateRangeLabel,
+          fileLabel: "working-permit-report",
+          isDayMode: false, // <-- Always false
+        });
+      }
+    }
+
+    // Barangay Clearance
+    if (selectedModules.includes(BC) && bcTableData) {
+      const filteredResults = filterTableResults({
+        apiData: bcTableData,
+        selectedRegions: appliedFilter.selectedRegions,
+        selectedProvinces: appliedFilter.selectedProvinces,
+        selectedCities: appliedFilter.selectedCities,
+        selectedDates: [], // <-- Always show all data
+        selectedIslands: appliedFilter.selectedIslands,
+        lguToRegion,
+        dateRange: appliedFilter.dateRange,
+      });
+
+      const dateRangeLabel = getDateRangeLabel(
+        normalizedDateRange.start,
+        normalizedDateRange.end,
+        appliedFilter.selectedDateType
+      );
+
+      if (type === "pdf") {
+        await exportTableReportToPDF({
+          filteredResults,
+          lguToRegion,
+          dateRangeLabel,
+          logoUrl: dictImage,
+          fileLabel: "barangay-clearance-report",
+          isDayMode: false, // <-- Always false
+          moduleLabel: combinedModuleLabel,
+        });
+      }
+      if (type === "excel") {
+        exportTableReportToExcel({
+          filteredResults,
+          lguToRegion,
+          dateRangeLabel,
+          fileLabel: "barangay-clearance-report",
+          isDayMode: false, // <-- Always false
+        });
+      }
     }
   };
 
-  // --- Filter Handlers ---
   const handleSearch = (filters: any) => {
     setAppliedFilterState(filters);
-    setHasSearched(true); // Mark that search was clicked
-    // Persist filter immediately
+    setHasSearched(true);
     dispatch(setAppliedFilter(filters));
+    // Reset abort controller for new search
+    if (searchAbortController.current) {
+      searchAbortController.current.abort();
+    }
+    searchAbortController.current = new AbortController();
   };
 
-  // --- UPDATED RESET HANDLER: Exclude Module ---
   const handleReset = () => {
-    // Only reset the fields you want, not modules
     dispatch(updateFilterField({ key: 'selectedRegions', value: [] }));
     dispatch(updateFilterField({ key: 'selectedProvinces', value: [] }));
     dispatch(updateFilterField({ key: 'selectedCities', value: [] }));
     dispatch(updateFilterField({ key: 'dateRange', value: { start: null, end: null } }));
     dispatch(updateFilterField({ key: 'selectedDateType', value: "" }));
     dispatch(updateFilterField({ key: 'selectedIslands', value: [] }));
+    dispatch(updateFilterField({ key: 'selectedModules', value: [] }));
     setHasSearched(false);
     setAppliedFilterState({
       selectedRegions: [],
@@ -265,47 +446,110 @@ const Reports: React.FC = () => {
       selectedIslands: [],
     });
     setTableDataState(null);
+    setWpTableDataState(null);
+    setBcTableDataState(null);
     setHasTableData(false);
-    // Clear persisted data
     dispatch(setTableData(null));
     dispatch(setAppliedFilter(null));
   };
 
-  // Ref for the scrollable table area
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
-  // --- Render ---
+  const handleCancelSearch = () => {
+    if (searchAbortController.current) {
+      searchAbortController.current.abort();
+      searchAbortController.current = null;
+    }
+    setLoading(false);
+    setWpLoading(false);
+    setBcLoading(false);
+    // Optionally, show a toast or Swal to inform user
+    Swal.fire({
+      icon: "info",
+      title: "Search Cancelled",
+      text: "The search request was cancelled.",
+      timer: 1200,
+      showConfirmButton: false,
+    });
+  };
+
   return (
-    <div ref={tableContainerRef}
-        style={{
-          position: "relative",
-          marginTop: 24,
-          marginBottom: 0,
-          height: "88vh",
-          overflow: "auto",
-        }}
-      >
-      <div className='p-6 max-w-[1200px] mx-auto bg-background'>
+    <div
+      ref={tableContainerRef}
+      style={{
+        position: "relative",
+        marginTop: 24,
+        marginBottom: 0,
+        height: "88vh",
+        overflow: "auto",
+      }}
+    >
+      <div className='p-6 max-w-[1200px] mx-auto bg-background flex flex-col gap-6'>
         <FilterSection
           onSearch={handleSearch}
           onDownload={handleDownload}
           onReset={handleReset}
           hasTableData={hasTableData}
-          loading={loading}
+          loading={loading || wpLoading || bcLoading}
+          onCancel={handleCancelSearch}
         />
-        <TableReport
-          selectedRegions={appliedFilter.selectedRegions}
-          dateRange={appliedFilter.dateRange}
-          selectedProvinces={appliedFilter.selectedProvinces}
-          selectedCities={appliedFilter.selectedCities}
-          selectedDates={appliedFilter.selectedDateType ? [appliedFilter.selectedDateType] : []}
-          selectedIslands={appliedFilter.selectedIslands}
-          apiData={tableData}
-          loading={loading || lguRegionLoading}
-          lguToRegion={lguToRegion}
-          hasSearched={hasSearched}
-          onTableDataChange={setHasTableData}
-        />
+
+        {selectedModules.includes(Bp) && (
+          <BusinessPermitReport
+            selectedRegions={appliedFilter.selectedRegions}
+            dateRange={appliedFilter.dateRange}
+            selectedProvinces={appliedFilter.selectedProvinces}
+            selectedCities={appliedFilter.selectedCities}
+            selectedDates={appliedFilter.selectedDateType ? [appliedFilter.selectedDateType] : []}
+            selectedIslands={appliedFilter.selectedIslands}
+            apiData={tableData}
+            loading={loading || lguRegionLoading}
+            lguToRegion={lguToRegion}
+            hasSearched={hasSearched}
+            onTableDataChange={setHasTableData}
+          />
+        )}
+
+        {selectedModules.includes(WP) && (
+          <WorkingPermitReport
+            selectedRegions={appliedFilter.selectedRegions}
+            dateRange={appliedFilter.dateRange}
+            selectedProvinces={appliedFilter.selectedProvinces}
+            selectedCities={appliedFilter.selectedCities}
+            selectedDates={appliedFilter.selectedDateType ? [appliedFilter.selectedDateType] : []}
+            selectedIslands={appliedFilter.selectedIslands}
+            apiData={wpTableData}
+            loading={wpLoading || lguRegionLoading}
+            lguToRegion={lguToRegion}
+            hasSearched={hasSearched}
+            onTableDataChange={setHasTableData}
+          />
+        )}
+
+        {selectedModules.includes(BC) && (
+          <BrgyClearanceReport
+            selectedRegions={appliedFilter.selectedRegions}
+            dateRange={appliedFilter.dateRange}
+            selectedProvinces={appliedFilter.selectedProvinces}
+            selectedCities={appliedFilter.selectedCities}
+            selectedDates={appliedFilter.selectedDateType ? [appliedFilter.selectedDateType] : []}
+            selectedIslands={appliedFilter.selectedIslands}
+            apiData={bcTableData}
+            loading={bcLoading || lguRegionLoading}
+            lguToRegion={lguToRegion}
+            hasSearched={hasSearched}
+            onTableDataChange={setHasTableData}
+          />
+        )}
+
+        {selectedModules.length === 0 && (
+          <div className="text-center bg-card p-6 rounded-md border text-secondary-foreground border-border shadow-sm">
+            <span className="font-bold text-lg text-accent-foreground">
+              Please select <span className="text-blue-700">Module</span>, <span className="text-blue-700">Region</span>, and <span className="text-blue-700">Date Range</span> for transaction.
+            </span>
+          </div>
+        )}
+
         <ScrollToTopButton scrollTargetRef={tableContainerRef} />
       </div>
     </div>

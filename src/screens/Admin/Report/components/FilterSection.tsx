@@ -6,14 +6,12 @@ import DateRangeMonth from './DateRangeMonth';
 import DateRangeYear from './DateRangeYear';
 import {
   modules,
-  // category,
   groupOfIslands,
   dateRange,
   regionMapping,
   islandRegionMap,
   regionProvinceMap,
 } from '../utils/mockData';
-import { Bp } from '../utils/types';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -29,8 +27,7 @@ import axios from '../../../../plugin/axios';
 import { useSelector, useDispatch } from 'react-redux';
 import { updateFilterField } from '../../../../redux/reportFilterSlice';
 import { AppDispatch } from '@/redux/store';
-
-// --- City/Province API Integration ---
+import Swal from 'sweetalert2';
 
 function displayCityName(name: string) {
   if (/^City of /i.test(name.trim())) return name;
@@ -108,8 +105,6 @@ function useProvinces() {
   return { provinces, loading, error };
 }
 
-// --- End of city/province API integration ---
-
 const getCityOptions = (
   selectedProvinces: string[],
   cities: Record<string, string[]>
@@ -129,10 +124,11 @@ const getCityOptions = (
 
 interface FilterSectionProps {
   onSearch: (filters: any) => void;
-  onDownload?: (type: "pdf" | "excel") => void;
+  onDownload?: (type: "pdf" | "excel", permitTypes?: ("business" | "working" | "barangay")[]) => void;
   onReset?: () => void;
   hasTableData?: boolean;
   loading?: boolean;
+  onCancel?: () => void;
 }
 
 const FilterSection: React.FC<FilterSectionProps> = ({
@@ -141,16 +137,14 @@ const FilterSection: React.FC<FilterSectionProps> = ({
   onReset,
   hasTableData = false,
   loading = false,
+  onCancel,
 }) => {
   // Redux
   const dispatch = useDispatch<AppDispatch>();
   const filterState = useSelector((state: any) => state.reportFilter);
 
   // --- Local UI state ---
-  // const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  // const [isCategoryOpen, setIsCategoryOpen] = useState(false);
   const [isDateOpen, setIsDateOpen] = useState(false);
-
   const [isModuleOpen, setIsModuleOpen] = useState(false);
   const [isRegionOpen, setIsRegionOpen] = useState(false);
 
@@ -162,7 +156,6 @@ const FilterSection: React.FC<FilterSectionProps> = ({
 
   const moduleRef = useRef<HTMLDivElement>(null);
   const regionRef = useRef<HTMLDivElement>(null);
-  // const categoryRef = useRef<HTMLDivElement>(null);
   const dateRef = useRef<HTMLDivElement>(null);
 
   // --- Fetch cities and provinces from API ---
@@ -175,14 +168,6 @@ const FilterSection: React.FC<FilterSectionProps> = ({
       value: province,
       label: province,
     })), [provinces]);
-
-  // Ensure BP is always selected
-  useEffect(() => {
-    if (!filterState.selectedModules.includes(Bp)) {
-      dispatch(updateFilterField({ key: 'selectedModules', value: [Bp, ...filterState.selectedModules.filter((m: string) => m !== Bp)] }));
-    }
-    // eslint-disable-next-line
-  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -214,28 +199,146 @@ const FilterSection: React.FC<FilterSectionProps> = ({
     dispatch(updateFilterField({ key: 'selectedModules', value: [] }));
   };
 
-  // --- Category Logic (local only, not persisted) ---
-  // const toggleCategory = (cat: string) => {
-  //   setSelectedCategories(prev =>
-  //     prev.includes(cat)
-  //       ? prev.filter(c => c !== cat)
-  //       : [...prev, cat]
-  //   );
-  // };
+  // --- Province Logic ---
+  const selectAllProvinces = () => {
+    setSelectedProvinceOptions([...filteredProvinceOptions]);
+    dispatch(updateFilterField({ key: 'selectedProvinces', value: filteredProvinceOptions.map(opt => opt.value) }));
+    setSelectedCityOptions([]); // Reset cities when provinces change
+    dispatch(updateFilterField({ key: 'selectedCities', value: [] }));
+  };
 
-  // const selectAllCategories = () => setSelectedCategories([...category]);
-  // const deselectAllCategories = () => setSelectedCategories([]);
+  const deselectAllProvinces = () => {
+    setSelectedProvinceOptions([]);
+    dispatch(updateFilterField({ key: 'selectedProvinces', value: [] }));
+    setSelectedCityOptions([]);
+    dispatch(updateFilterField({ key: 'selectedCities', value: [] }));
+  };
+
+  // --- City Logic ---
+  const selectAllCities = () => {
+    const allCityOptions = getCityOptions(selectedProvinceOptions.map(opt => opt.value), cities);
+    setSelectedCityOptions(allCityOptions);
+    dispatch(updateFilterField({ key: 'selectedCities', value: allCityOptions.map(opt => opt.value) }));
+  };
+
+  const deselectAllCities = () => {
+    setSelectedCityOptions([]);
+    dispatch(updateFilterField({ key: 'selectedCities', value: [] }));
+  };
 
   const isSearchDisabled =
     filterState.selectedRegions.length === 0 ||
+    filterState.selectedModules.length === 0 ||
     !filterState.dateRange.start ||
     !filterState.dateRange.end;
 
   const isDownloadDisabled = isSearchDisabled || !hasTableData;
 
+  // --- Download Handler with Permit Choice ---
+ const handleDownloadWithPermitChoice = async (type: "pdf" | "excel") => {
+  if (isDownloadDisabled || loading) return;
+
+  // Dynamically build checkboxes based on selected modules
+  const selectedModules = filterState.selectedModules || [];
+  const checkboxOptions: { id: string; value: string; label: string }[] = [];
+  if (selectedModules.includes("Business Permit")) {
+    checkboxOptions.push({ id: "swal-bp", value: "business", label: "Business Permit" });
+  }
+  if (selectedModules.includes("Working Permit")) {
+    checkboxOptions.push({ id: "swal-wp", value: "working", label: "Working Permit" });
+  }
+  if (selectedModules.includes("Barangay Clearance")) {
+    checkboxOptions.push({ id: "swal-bc", value: "barangay", label: "Barangay Clearance" });
+  }
+
+  if (checkboxOptions.length === 0) return;
+
+  // If only one permit type, download automatically
+  if (checkboxOptions.length === 1) {
+    if (onDownload) {
+      onDownload(type, [checkboxOptions[0].value as "business" | "working" | "barangay"]);
+    }
+    return;
+  }
+
+  // Build HTML for checkboxes with Select All
+  const html = `
+    <div style="display: flex; flex-direction: column; align-items: flex-start;">
+      <label style="margin-bottom: 8px; font-weight: bold;">
+        <input type="checkbox" id="swal-select-all" />
+        Select All
+      </label>
+      ${checkboxOptions
+        .map(
+          (opt) => `
+        <label style="margin-bottom: 8px;">
+          <input type="checkbox" id="${opt.id}" value="${opt.value}" />
+          ${opt.label}
+        </label>
+      `
+        )
+        .join("")}
+    </div>
+  `;
+
+  await Swal.fire({
+    title: "Choose Permit Type(s)",
+    html,
+    focusConfirm: false,
+    didOpen: () => {
+      // --- Select All logic ---
+      const selectAllBox = document.getElementById("swal-select-all") as HTMLInputElement;
+      const checkboxes = checkboxOptions.map(opt => document.getElementById(opt.id) as HTMLInputElement);
+
+      // Check all by default when modal opens
+      checkboxes.forEach(cb => { cb.checked = true; });
+      selectAllBox.checked = true;
+
+      // When Select All is clicked, check/uncheck all
+      selectAllBox.addEventListener("change", () => {
+        checkboxes.forEach(cb => {
+          cb.checked = selectAllBox.checked;
+        });
+      });
+
+      // When any individual checkbox is changed, update Select All
+      checkboxes.forEach(cb => {
+        cb.addEventListener("change", () => {
+          const allChecked = checkboxes.every(c => c.checked);
+          selectAllBox.checked = allChecked;
+        });
+      });
+    },
+    preConfirm: () => {
+  const checked = checkboxOptions.filter(
+    (opt) => (document.getElementById(opt.id) as HTMLInputElement)?.checked
+  );
+  if (checked.length === 0) {
+    Swal.showValidationMessage("Please select at least one permit type!");
+    return false;
+  }
+  return checked.map((opt) => opt.value);
+},
+
+    confirmButtonText: "Download",
+    showCancelButton: true,
+    cancelButtonText: "Cancel",
+    customClass: {
+      popup: "swal2-popup-custom-width",
+    },
+    confirmButtonColor: "#3b82f6",
+    cancelButtonColor: "#ef4444",
+  }).then((result) => {
+  if (result.isConfirmed && Array.isArray(result.value)) {
+    if (onDownload) {
+      onDownload(type, result.value as ("business" | "working" | "barangay")[]);
+    }
+  }
+});
+};
+
   // --- Region Logic ---
   const selectAllRegions = () => {
-    // Only update filter state, do NOT trigger API call here!
     const allRegionInternalKeys = Object.values(regionMapping);
     dispatch(updateFilterField({ key: 'selectedRegions', value: allRegionInternalKeys }));
     dispatch(updateFilterField({ key: 'selectedIslands', value: [...groupOfIslands] }));
@@ -342,14 +445,12 @@ const FilterSection: React.FC<FilterSectionProps> = ({
 
   // --- UPDATED: Map region codes to internal keys before search ---
   const handleSearchClick = () => {
-    // Check if all regions are selected
     const allRegionInternalKeys = Object.values(regionMapping);
     const allRegionsSelected =
       filterState.selectedRegions.length === allRegionInternalKeys.length &&
       allRegionInternalKeys.every(key => filterState.selectedRegions.includes(key));
 
     onSearch({
-      // FIX: Always send all region keys if all are selected
       selectedRegions: allRegionsSelected ? allRegionInternalKeys : filterState.selectedRegions,
       selectedProvinces: filterState.selectedProvinces,
       selectedCities: filterState.selectedCities,
@@ -361,7 +462,6 @@ const FilterSection: React.FC<FilterSectionProps> = ({
   };
 
   const handleReset = () => {
-    // setSelectedCategories([]);
     setSelectedCityOptions([]);
     setSelectedProvinceOptions([]);
     dispatch(updateFilterField({ key: 'selectedRegions', value: [] }));
@@ -370,18 +470,17 @@ const FilterSection: React.FC<FilterSectionProps> = ({
     dispatch(updateFilterField({ key: 'dateRange', value: { start: null, end: null } }));
     dispatch(updateFilterField({ key: 'selectedDateType', value: "" }));
     dispatch(updateFilterField({ key: 'selectedIslands', value: [] }));
-    // Do NOT reset selectedModules!
+    dispatch(updateFilterField({ key: 'selectedModules', value: [] }));
     if (onReset) {
       onReset();
     }
-    // setIsCategoryOpen(false);
     setIsDateOpen(false);
     setIsRegionOpen(false);
   };
 
   useEffect(() => {
     setSelectedProvinceOptions(
-      provinceOptions.filter(opt =>
+      filteredProvinceOptions.filter(opt =>
         filterState.selectedProvinces?.includes(opt.value)
       )
     );
@@ -390,7 +489,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({
         (filterState.selectedCities || []).includes(opt.value)
       )
     );
-  }, [filterState.selectedProvinces, filterState.selectedCities, provinceOptions, cities]);
+  }, [filterState.selectedProvinces, filterState.selectedCities, filteredProvinceOptions, cities]);
 
   return (
     <div className="grid grid-cols-4 md:grid-cols-1 gap-4 mb-6">
@@ -429,7 +528,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({
                 {modules.map((module, index) => (
                   <label
                     key={`module-${index}`}
-                    className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer"
+                    className="flex items-center px-3 py-2 hover:bg-blue-200 cursor-pointer"
                   >
                     <div className="relative flex items-center">
                       <input
@@ -441,7 +540,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({
                       <div className={`border h-4 w-4 rounded flex items-center justify-center ${
                         filterState.selectedModules.includes(module)
                           ? 'bg-blue-600 border-blue-600'
-                          : 'border-gray-300'
+                          : 'border-gray-400'
                       }`}>
                         {filterState.selectedModules.includes(module) && (
                           <Check size={12} className="text-white" />
@@ -456,69 +555,6 @@ const FilterSection: React.FC<FilterSectionProps> = ({
           )}
         </div>
       </div>
-
-      {/* Category */}
-      {/* <div className="flex flex-col" ref={categoryRef}>
-        <label className="text-sm font-medium text-secondary-foreground mb-1">Category:</label>
-        <div className="relative">
-          <button
-            onClick={() => setIsCategoryOpen(!isCategoryOpen)} disabled
-            className="w-full bg-gray border cursor-not-allowed border-border rounded-md py-2 px-3 text-left flex justify-between items-center focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <span className="text-sm text-secondary-foreground">
-              {selectedCategories.length > 0
-                ? `${selectedCategories.length} selected`
-                : 'Select categories'}
-            </span>
-            <ChevronDown size={18} className={`text-secondary-foreground  transition-transform ${isCategoryOpen ? 'transform rotate-180' : ''}`} />
-          </button>
-          {isCategoryOpen && (
-            <div className="w-[250px] absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-md shadow-lg z-10">
-              <div className="flex justify-between p-2 border-b border-gray-200">
-                <button
-                  onClick={selectAllCategories}
-                  className="text-sm text-blue-600 hover:text-blue-800"
-                >
-                  Select All
-                </button>
-                <button
-                  onClick={deselectAllCategories}
-                  className="text-sm text-red-400 hover:text-red-800"
-                >
-                  Deselect All
-                </button>
-              </div>
-              <div className="max-h-[200px] overflow-y-auto">
-                {category.map((cat, index) => (
-                  <label
-                    key={`category-${index}`}
-                    className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer"
-                  >
-                    <div className="relative flex items-center">
-                      <input
-                        type="checkbox"
-                        checked={selectedCategories.includes(cat)}
-                        onChange={() => toggleCategory(cat)}
-                        className="opacity-0 absolute h-4 w-4 cursor-pointer"
-                      />
-                      <div className={`border h-4 w-4 rounded flex items-center justify-center ${
-                        selectedCategories.includes(cat)
-                          ? 'bg-blue-600 border-blue-600'
-                          : 'border-gray-300'
-                      }`}>
-                        {selectedCategories.includes(cat) && (
-                          <Check size={12} className="text-white" />
-                        )}
-                      </div>
-                      <span className="ml-2 text-sm text-secondary-foreground">{cat}</span>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </div> */}
 
       {/* Region, Group of Islands, Province, City/Municipality */}
       <div className="flex flex-col" ref={regionRef}>
@@ -619,6 +655,24 @@ const FilterSection: React.FC<FilterSectionProps> = ({
                   <label className="block text-sm font-bold text-blue-700 mb-1">
                     Province
                   </label>
+                  <div className="flex justify-between mb-1">
+                    <button
+                      type="button"
+                      className="text-xs text-blue-600 hover:text-blue-800"
+                      onClick={selectAllProvinces}
+                      disabled={filteredProvinceOptions.length === 0}
+                    >
+                      Select All
+                    </button>
+                    <button
+                      type="button"
+                      className="text-xs text-red-400 hover:text-red-800"
+                      onClick={deselectAllProvinces}
+                      disabled={filteredProvinceOptions.length === 0}
+                    >
+                      Deselect All
+                    </button>
+                  </div>
                   <div className="relative">
                     <Select
                       options={filteredProvinceOptions}
@@ -645,6 +699,24 @@ const FilterSection: React.FC<FilterSectionProps> = ({
                   <label className="block text-sm font-bold text-blue-700 mb-1">
                     City/Municipality
                   </label>
+                  <div className="flex justify-between mb-1">
+                    <button
+                      type="button"
+                      className="text-xs text-blue-600 hover:text-blue-800"
+                      onClick={selectAllCities}
+                      disabled={selectedProvinceOptions.length === 0}
+                    >
+                      Select All
+                    </button>
+                    <button
+                      type="button"
+                      className="text-xs text-red-400 hover:text-red-800"
+                      onClick={deselectAllCities}
+                      disabled={selectedProvinceOptions.length === 0}
+                    >
+                      Deselect All
+                    </button>
+                  </div>
                   <div className="relative">
                     {citiesLoading ? (
                       <div className="text-xs text-muted-foreground py-2 px-2">
@@ -713,7 +785,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({
                 {dateRange.map((date, index) => (
                   <label
                     key={`Date-${index}`}
-                    className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer"
+                    className="flex items-center px-3 py-2 hover:bg-blue-200  cursor-pointer  text-accent-foreground"
                   >
                     <div className="relative flex items-center">
                       <input
@@ -721,18 +793,18 @@ const FilterSection: React.FC<FilterSectionProps> = ({
                         name="date-range-radio"
                         checked={selectedDateType === date}
                         onChange={() => handleDateTypeToggle(date)}
-                        className="opacity-0 absolute h-4 w-4 cursor-pointer"
+                        className="opacity-0 absolute h-4 w-4 cursor-pointer hover:text-white"
                       />
                       <div className={`border h-4 w-4 rounded flex items-center justify-center ${
                         selectedDateType === date
                           ? 'bg-blue-600 border-blue-600'
-                          : 'border-gray-300'
+                          : 'border-gray-400'
                       }`}>
                         {selectedDateType === date && (
-                          <Check size={12} className="text-white" />
+                          <Check size={12} className="text-accent" />
                         )}
                       </div>
-                      <span className="ml-2 text-sm text-secondary-foreground">{date}</span>
+                      <span className="ml-2 text-sm text-accent-foreground">{date}</span>
                     </div>
                   </label>
                 ))}
@@ -765,27 +837,39 @@ const FilterSection: React.FC<FilterSectionProps> = ({
       </div>
 
       {/* Action button */}
-    <div className="flex flex-col ">
+      <div className="flex flex-col ">
         <div className="grid grid-cols-3 gap-2 mt-[25px] md:mt-0">
           <Button
-            className="bg-[#CB371C] hover:bg-[#CB371C] h-9 text-[12px]"
+            className="bg-[#CB371C] hover:bg-[#CB371C] h-9 text-[12px] text-white"
             onClick={handleReset}
             disabled={loading}
           >
             Reset
           </Button>
-          <Button
-            className="bg-primary h-9 text-[12px]"
-            onClick={handleSearchClick}
-            disabled={isSearchDisabled || loading}
-          >
-            Search
-          </Button>
+          {/* Search/Cancel Button */}
+          {!loading ? (
+            <Button
+              className="bg-primary h-9 text-[12px] text-white"
+              onClick={handleSearchClick}
+              disabled={isSearchDisabled || loading}
+            >
+              Search
+            </Button>
+          ) : (
+            <Button
+              className="bg-red-500 hover:bg-red-600 h-9 text-[12px]"
+              onClick={onCancel}
+              disabled={!loading}
+              type="button"
+            >
+              Cancel
+            </Button>
+          )}
           <DropdownMenu>
             <DropdownMenuTrigger>
               <Button
                 disabled={isDownloadDisabled || loading}
-                className="bg-[#8411DD] hover:bg-[#8411DD] max-w-full text-[10px] h-9 md:w-full"
+                className="bg-[#8411DD] hover:bg-[#8411DD] text-white max-w-full text-[10px] h-9 md:w-full"
               >
                 Download
               </Button>
@@ -794,14 +878,14 @@ const FilterSection: React.FC<FilterSectionProps> = ({
               <DropdownMenuLabel>Download Options</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                onClick={() => !isDownloadDisabled && !loading && onDownload?.("pdf")}
+                onClick={() => handleDownloadWithPermitChoice("pdf")}
                 className={`cursor-pointer hover:bg-primary hover:text-white ${isDownloadDisabled || loading ? 'opacity-50 pointer-events-none' : ''}`}
                 disabled={isDownloadDisabled || loading}
               >
                 PDF
               </DropdownMenuItem>
               <DropdownMenuItem
-                onClick={() => !isDownloadDisabled && !loading && onDownload?.("excel")}
+                onClick={() => handleDownloadWithPermitChoice("excel")}
                 className={`cursor-pointer ${isDownloadDisabled || loading ? 'opacity-50 pointer-events-none' : ''}`}
                 disabled={isDownloadDisabled || loading}
               >
