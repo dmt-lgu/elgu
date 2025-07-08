@@ -7,7 +7,7 @@ import Select from "react-select";
 const months = Array.from({ length: 12 }, (_, i) => i);
 
 function getFirstDay(month: number, year: number) {
-  return new Date(year, month, 1);
+  return new Date(year, month+1);
 }
 
 function getLastDay(month: number, year: number) {
@@ -94,10 +94,14 @@ function DateRangeMonth({
       fromYear !== undefined &&
       onChange
     ) {
+      // Debug log
+      console.log("Apply start:", fromYear, fromMonth); // Should be 0-based
       const start = getFirstDay(fromMonth, fromYear);
 
       let end: Date | null = null;
       if (toMonth !== undefined && toYear !== undefined) {
+        // Debug log
+        console.log("Apply end:", toYear, toMonth); // Should be 0-based
         end = getLastDay(toMonth, toYear);
       }
 

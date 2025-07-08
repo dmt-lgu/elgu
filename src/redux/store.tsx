@@ -37,6 +37,12 @@ const persistedReducer = persistReducer(persistConfig, rootReducer);
 
 export const store = configureStore({
   reducer: persistedReducer,
+   middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware({
+      immutableCheck: false, // <-- disables the check
+      // Or, to increase the threshold:
+      // immutableCheck: { warnAfter: 200 }
+    }),
 });
 
 export const persistor = persistStore(store);

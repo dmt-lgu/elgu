@@ -94,7 +94,7 @@ const DashboardPage = () => {
     return Object.values(grouped);
   };
 
-  const bpChartData:any = useMemo(() => {
+  const bpChartData: any = useMemo(() => {
   const bpArr = status?.BP;
   if (!bpArr || !Array.isArray(bpArr) || bpArr.length === 0) return { current: [], breakdown: [] };
 
@@ -102,6 +102,8 @@ const DashboardPage = () => {
   const startDate = data.startDate ? parseISO(data.startDate) : null;
   const endDate = data.endDate ? parseISO(data.endDate) : null;
   const selectedRegions = Array.isArray(data.real) ? data.real : data.real ? [data.real] : [];
+  const selectedProvinces = Array.isArray(data.province) ? data.province : [];
+  const selectedMunicipalities = Array.isArray(data.municipalities) ? data.municipalities : [];
 
   // Filter BP array by date range
   const filteredBPArr = bpArr.filter((bp: any) => {
@@ -113,44 +115,99 @@ const DashboardPage = () => {
     return dateOk;
   });
 
+  // Helper to group and sum by key
+  function groupAndSum(arr: any[], key: string) {
+    const grouped: Record<string, any> = {};
+    arr.forEach(item => {
+      const groupKey = item[key];
+      if (!groupKey) return;
+      if (!grouped[groupKey]) {
+        grouped[groupKey] = {
+          name: groupKey,
+          operational: 0,
+          developmental: 0,
+          withdraw: 0,
+        };
+      }
+      grouped[groupKey].operational += item.operational ?? 0;
+      grouped[groupKey].developmental += item.developmental ?? 0;
+      grouped[groupKey].withdraw += item.withdraw ?? 0;
+    });
+    return Object.values(grouped);
+  }
+
   // --- 1. Current: latest by date ---
   let current: any[] = [];
   if (filteredBPArr.length > 0) {
     const sorted = [...filteredBPArr].sort((a, b) => (a.date > b.date ? -1 : 1));
     const latest = sorted[0];
     if (latest && latest.data) {
-      const regionDataArr = selectedRegions.length > 0
-        ? latest.data.filter((regionData: any) => selectedRegions.includes(regionData.region))
-        : latest.data;
-      current = regionDataArr.map((regionData: any) => ({
-        name: regionData.region,
-        operational: regionData.operational,
-        developmental: regionData.developmental,
-        withdraw: regionData.withdraw,
-      }));
+      let filteredData = latest.data;
+
+      // Municipality filter (use lgu)
+      if (selectedMunicipalities.length > 0) {
+        const selectedLGUs = selectedMunicipalities.map((m: any) => m.value);
+        filteredData = filteredData.filter((item: any) => selectedLGUs.includes(item.lgu));
+        current = groupAndSum(filteredData, "lgu");
+      }
+      // Province filter
+      else if (selectedProvinces.length > 0) {
+        const selectedProv = selectedProvinces.map((p: any) => p.value);
+        filteredData = filteredData.filter((item: any) => selectedProv.includes(item.province));
+        current = groupAndSum(filteredData, "province");
+      }
+      // Region filter
+      else if (selectedRegions.length > 0) {
+        filteredData = filteredData.filter((item: any) => selectedRegions.includes(item.region));
+        current = groupAndSum(filteredData, "region");
+      } else {
+        current = groupAndSum(filteredData, "region");
+      }
     }
   }
 
   // --- 2. Breakdown: group by date, each with data:[] ---
-  // [{ date, data: [...] }, ...]
   let breakdown: any[] = [];
   filteredBPArr.forEach((bp: any) => {
-    const regionDataArr = selectedRegions.length > 0
-      ? bp.data.filter((regionData: any) => selectedRegions.includes(regionData.region))
-      : bp.data;
-    breakdown.push({
-      date: bp.date,
-      data: regionDataArr.map((regionData: any) => ({
-        name: regionData.region,
-        operational: regionData.operational,
-        developmental: regionData.developmental,
-        withdraw: regionData.withdraw,
-      }))
-    });
+    let filteredData = bp.data;
+
+    if (selectedMunicipalities.length > 0) {
+      const selectedLGUs = selectedMunicipalities.map((m: any) => m.value);
+      filteredData = filteredData.filter((item: any) => selectedLGUs.includes(item.lgu));
+      breakdown.push({
+        date: bp.date,
+        data: groupAndSum(filteredData, "lgu"),
+      });
+    } else if (selectedProvinces.length > 0) {
+      const selectedProv = selectedProvinces.map((p: any) => p.value);
+      filteredData = filteredData.filter((item: any) => selectedProv.includes(item.province));
+      breakdown.push({
+        date: bp.date,
+        data: groupAndSum(filteredData, "province"),
+      });
+    } else if (selectedRegions.length > 0) {
+      filteredData = filteredData.filter((item: any) => selectedRegions.includes(item.region));
+      breakdown.push({
+        date: bp.date,
+        data: groupAndSum(filteredData, "region"),
+      });
+    } else {
+      breakdown.push({
+        date: bp.date,
+        data: groupAndSum(filteredData, "region"),
+      });
+    }
   });
 
   return { current, breakdown };
-}, [status, data.startDate, data.endDate, data.real]);
+}, [
+  status,
+  data.startDate,
+  data.endDate,
+  data.real,
+  data.province,
+  data.municipalities,
+]);
 
   // --- Add these totals ---
   const totalOperational = bpChartData?.current.reduce((sum:any, item:any) => sum + (item.operational ?? 0), 0);
@@ -307,7 +364,7 @@ function mapRegion(region: string): string {
 
 
 
-  function getBP() {
+  function getBPLS() {
     axios.get('18kaPQlN0_kA9i7YAD-DftbdVPZX35Qf33sVMkw_TcWc/values/BP1 UR Input', {
       headers: {
         Authorization: `Token ${import.meta.env.VITE_TOKEN}`,
@@ -319,6 +376,9 @@ function mapRegion(region: string): string {
       // Map column indexes for easier maintenance
       const idx = {
         period: 1,
+        lgu:4,
+        name:13,
+        province:14,
         dictRo: 19, // Use dictRo as region
         status: 10, // e.g. "Operational", "Developmental", "Training", "Withdraw"
       };
@@ -329,15 +389,22 @@ function mapRegion(region: string): string {
       records.forEach((row: any) => {
         
         const period = row[idx.period];
-        const region = mapRegion(row[idx.dictRo]); // Use dictRo here
+        const lgu = row[idx.lgu]; // Use dictRo here
+        const region = mapRegion(row[idx.dictRo]);
+        const name = row[idx.name];
+        const province = row[idx.province];
         const status = (row[idx.status] || '').toLowerCase();
 
-        if (!period || !region) return;
+        if (!period || !lgu) return;
 
         if (!groupedByMonth[period]) groupedByMonth[period] = {};
-        if (!groupedByMonth[period][region]) {
-          groupedByMonth[period][region] = {
+        if (!groupedByMonth[period][lgu]) {
+          groupedByMonth[period][lgu] = {
+            lgu,
+            period,
             region,
+            name,
+            province,
             operational: 0,
             developmental: 0,
             training: 0,
@@ -345,16 +412,16 @@ function mapRegion(region: string): string {
           };
         }
 
-        if (status.includes('operational')) groupedByMonth[period][region].operational += 1;
-        else if (status.includes('developmental')) groupedByMonth[period][region].developmental += 1;
-        else if (status.includes('training')) groupedByMonth[period][region].training += 1;
-        else if (status.includes('withdraw')) groupedByMonth[period][region].withdraw += 1;
+        if (status.includes('operational')) groupedByMonth[period][lgu].operational += 1;
+        else if (status.includes('developmental')) groupedByMonth[period][lgu].developmental += 1;
+        else if (status.includes('training')) groupedByMonth[period][lgu].training += 1;
+        else if (status.includes('withdraw')) groupedByMonth[period][lgu].withdraw += 1;
       });
 
       // Format result as requested
-      const BP = Object.entries(groupedByMonth).map(([date, regions]) => ({
+      const BP = Object.entries(groupedByMonth).map(([date, lgus]) => ({
         date,
-        data: Object.values(regions),
+        data: Object.values(lgus),
       }));
 
       const result = { BP };
@@ -373,11 +440,20 @@ function mapRegion(region: string): string {
     
   }
 
+  // function getBPBC(){
+
+  //  axios.get( `${import.meta.env.VITE_URL}/api/bc/`,).then((response)=>{
+
+  //     console.log("BPBC response", response.data);
+  //   })
+      
+  // }
+
 
 
 
   useEffect(() => {
-    getBP();
+    getBPLS();
   }, []);
 
 
