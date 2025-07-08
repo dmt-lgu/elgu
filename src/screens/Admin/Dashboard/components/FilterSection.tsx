@@ -2,7 +2,10 @@ import React, { useState, useRef, useEffect } from 'react';
 import Select from 'react-select';
 import { Check, ChevronDown } from 'lucide-react';
 import { useSelector, useDispatch } from 'react-redux';
-import DateRangePicker from './DateRangePicker';
+
+import DateRangeDay from './DateRangeDay';
+import DateRangeMonth from './DateRangeMonth';
+import DateRangeYear from './DateRangeYear';
 import { modules, groupOfIslands, regionGroups } from '../utils/mockData';
 import { FilterState } from '../utils/types';
 import { selectRegions } from '@/redux/regionSlice';
@@ -29,6 +32,8 @@ const islandRegionMap:any = {
   "Visayas": ["VI", "VII", "VIII"],
   "Mindanao": ["IX", "X", "XI", "XII", "XIII", "BARMM I", "BARMM II"]
 };
+
+const dateTypes = ['Day', 'Month', 'Year'];
 
 const FilterSection: React.FC = () => {
   const regions = useSelector(selectRegions);
@@ -273,10 +278,54 @@ const FilterSection: React.FC = () => {
     });
   };
 
+  // Date Range dropdown state and ref
+  const [isDateOpen, setIsDateOpen] = useState(false);
+  const dateRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      // If click is inside the date picker popup, do nothing
+      if (
+        dateRef.current &&
+        !dateRef.current.contains(event.target as Node) &&
+        !(event.target as HTMLElement).closest('.date-picker-popup')
+      ) {
+        setIsDateOpen(false);
+      }
+    }
+    if (isDateOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isDateOpen]);
+
+  // Redux state for date range
+  const selectedDateType = data.selectedDateType || "";
+  const startDate = data.startDate ? new Date(data.startDate) : null;
+  const endDate = data.endDate ? new Date(data.endDate) : null;
+
+  const handleDateTypeToggle = (dateType: string) => {
+    dispatch(setData({
+      ...data,
+      selectedDateType: dateType
+    }));
+  };
+
   const handleDateRangeChange = (range: { start: Date | null; end: Date | null }) => {
-    setFilterState(prev => ({
-      ...prev,
-      dateRange: range
+    dispatch(setData({
+      ...data,
+      startDate: range.start ? range.start.toISOString().split('T')[0] : "",
+      endDate: range.end ? range.end.toISOString().split('T')[0] : ""
+    }));
+  };
+
+  const deselectAllDates = () => {
+    dispatch(setData({
+      ...data,
+      selectedDateType: "",
+      startDate: "",
+      endDate: ""
     }));
   };
 
@@ -307,13 +356,13 @@ const FilterSection: React.FC = () => {
     };
   };
 
-  // Update your useEffect to log the formatted state
+  // Update your useEffect to log the formatted statea
 
 
   return (
-    <div className="grid grid-cols-3 md:grid-cols-1 gap-4 mb-6">
+    <div className="grid grid-cols-3 lg:grid-cols-2 md:grid-cols-1 gap-4 mb-6">
       {/* Module */}
-      <div className="flex flex-col" ref={moduleRef}>
+      <div className="flex flex-col lg:col-span-2" ref={moduleRef}>
         <label className="text-sm font-medium text-secondary-foreground mb-1">Module:</label>
         <div className="relative">
           <button
@@ -376,7 +425,7 @@ const FilterSection: React.FC = () => {
       </div>
 
       {/* Region, Group of Islands, Province, City/Municipality */}
-      <div className="flex flex-col" ref={regionRef}>
+      <div className="flex flex-col lg:col-span-2" ref={regionRef}>
         <label className="text-sm font-bold text-secondary-foreground mb-1">Region:</label>
         <div className="relative">
           <button
@@ -493,9 +542,72 @@ const FilterSection: React.FC = () => {
       </div>
 
       {/* Date Range */}
-      <div className="flex flex-col">
+      <div className="flex flex-col lg:col-span-2 " ref={dateRef}>
         <label className="text-sm font-medium text-secondary-foreground mb-1">Date Range:</label>
-        <DateRangePicker onChange={handleDateRangeChange} />
+        <div className="relative w-full ">
+          <button
+            type="button"
+            className="w-full bg-card border border-border rounded-md py-2 px-3 text-left flex justify-between items-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+            onClick={() => setIsDateOpen((open) => !open)}
+          >
+            <span className="text-sm text-secondary-foreground">
+              {selectedDateType ? selectedDateType : "Select date type"}
+            </span>
+            <ChevronDown size={18} className={`text-secondary-foreground transition-transform ${isDateOpen ? "rotate-180" : ""}`} />
+          </button>
+          {/* <button
+            className="absolute right-2 top-2 bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 text-xs font-semibold"
+            style={{ zIndex: 20, display: selectedDateType ? "block" : "none" }}
+            onClick={deselectAllDates}
+            type="button"
+          >
+            Reset
+          </button> */}
+          {isDateOpen && (
+            <div className="absolute left-0 bg-white right-0 mt-2 border border-border rounded-md shadow-lg z-20 p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[15px] font-semibold">Date Range</span>
+                <button
+                  className="text-red-400 text-[15px] font-semibold hover:text-red-600 focus:outline-none"
+                  onClick={deselectAllDates}
+                  type="button"
+                >
+                  Deselect
+                </button>
+              </div>
+              <div className="flex flex-col gap-2 mb-3">
+                {dateTypes.map((type) => (
+                  <label key={type} className="flex items-center gap-2 text-[15px] cursor-pointer">
+                    <input
+                      type="radio"
+                      checked={selectedDateType === type}
+                      onChange={() => handleDateTypeToggle(type)}
+                      className="accent-blue-600"
+                      name="date-type"
+                    />
+                    {type}
+                  </label>
+                ))}
+              </div>
+              <div className=' '>
+                {!selectedDateType && (
+                  <span className="text-sm text-muted-foreground text-center block">
+                    Please select day, month, or year
+                  </span>
+                )}
+                {selectedDateType === 'Day' && (
+                  <DateRangeDay value={{ start: startDate, end: endDate }} onChange={handleDateRangeChange} />
+                )}
+                {selectedDateType === 'Month' && (
+                  <DateRangeMonth value={{ start: startDate, end: endDate }} onChange={handleDateRangeChange} />
+                )}
+                {selectedDateType === 'Year' && (
+                  <DateRangeYear value={{ start: startDate, end: endDate }} onChange={handleDateRangeChange} />
+                )}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

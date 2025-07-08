@@ -64,39 +64,28 @@ function DateRangeMonth({
   }, [value?.start, value?.end, currentMonth, currentYear]);
 
   // Generate years for dropdown (e.g., currentYear-10 to currentYear+1)
-  const years = React.useMemo(
-    () => Array.from({ length: 15 }, (_, i) => currentYear - 10 + i),
-    [currentYear]
-  );
-  const monthOptions = React.useMemo(
-    () =>
-      months.map(m => ({
-        value: m,
-        label: format(new Date(currentYear, m, 1), "LLLL"),
-      })),
-    [currentYear]
-  );
-  const yearOptions = React.useMemo(
-    () =>
-      years.map(y => ({
-        value: y,
-        label: y.toString(),
-      })),
-    [years]
-  );
+  const years = Array.from({ length: 15 }, (_, i) => currentYear - 10 + i);
+  const monthOptions = months.map(m => ({
+    value: m,
+    label: format(new Date(currentYear, m, 1), "LLLL"),
+  }));
+  const yearOptions = years.map(y => ({
+    value: y,
+    label: y.toString(),
+  }));
 
   // Handlers
-  const handleFromMonth = (option: any) => {
-    setFromMonth(option ? option.value : undefined);
+  const handleFromMonth = (month: number | null) => {
+    setFromMonth(month === null ? undefined : month);
   };
-  const handleFromYear = (option: any) => {
-    setFromYear(option ? option.value : undefined);
+  const handleFromYear = (year: number | null) => {
+    setFromYear(year === null ? undefined : year);
   };
-  const handleToMonth = (option: any) => {
-    setToMonth(option ? option.value : undefined);
+  const handleToMonth = (month: number | null) => {
+    setToMonth(month === null ? undefined : month);
   };
-  const handleToYear = (option: any) => {
-    setToYear(option ? option.value : undefined);
+  const handleToYear = (year: number | null) => {
+    setToYear(year === null ? undefined : year);
   };
 
   const handleApply = () => {
@@ -135,7 +124,7 @@ function DateRangeMonth({
             <Select
               options={monthOptions}
               value={fromMonth !== undefined ? monthOptions.find(opt => opt.value === fromMonth) : null}
-              onChange={handleFromMonth}
+              onChange={option => handleFromMonth(option ? option.value : null)}
               placeholder="Month"
               isClearable
               className="w-full"
@@ -143,7 +132,7 @@ function DateRangeMonth({
             <Select
               options={yearOptions}
               value={fromYear !== undefined ? yearOptions.find(opt => opt.value === fromYear) : null}
-              onChange={handleFromYear}
+              onChange={option => handleFromYear(option ? option.value : null)}
               placeholder="Year"
               isClearable
               className="w-full"
@@ -156,7 +145,7 @@ function DateRangeMonth({
             <Select
               options={monthOptions}
               value={toMonth !== undefined ? monthOptions.find(opt => opt.value === toMonth) : null}
-              onChange={handleToMonth}
+              onChange={option => handleToMonth(option ? option.value : null)}
               placeholder="Month"
               isClearable
               isDisabled={fromMonth === undefined || fromYear === undefined}
@@ -165,7 +154,7 @@ function DateRangeMonth({
             <Select
               options={yearOptions}
               value={toYear !== undefined ? yearOptions.find(opt => opt.value === toYear) : null}
-              onChange={handleToYear}
+              onChange={option => handleToYear(option ? option.value : null)}
               placeholder="Year"
               isClearable
               isDisabled={fromMonth === undefined || fromYear === undefined}

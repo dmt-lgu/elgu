@@ -13,6 +13,7 @@ const initialState: DataState = {
   "real":[],     // Can be a string or an array of strings
   "startDate": "",
   "endDate": "",
+  "selectedDateType": "",
 }, // Initial empty list of regions
 };
 

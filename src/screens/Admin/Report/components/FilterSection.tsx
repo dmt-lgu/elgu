@@ -29,6 +29,7 @@ import { updateFilterField } from '../../../../redux/reportFilterSlice';
 import { AppDispatch } from '@/redux/store';
 import Swal from 'sweetalert2';
 
+// --- Utility Functions ---
 function displayCityName(name: string) {
   if (/^City of /i.test(name.trim())) return name;
   const match = name.match(/^(.+?)\s*City$/i);
@@ -235,107 +236,107 @@ const FilterSection: React.FC<FilterSectionProps> = ({
   const isDownloadDisabled = isSearchDisabled || !hasTableData;
 
   // --- Download Handler with Permit Choice ---
- const handleDownloadWithPermitChoice = async (type: "pdf" | "excel") => {
-  if (isDownloadDisabled || loading) return;
+  const handleDownloadWithPermitChoice = async (type: "pdf" | "excel") => {
+    if (isDownloadDisabled || loading) return;
 
-  // Dynamically build checkboxes based on selected modules
-  const selectedModules = filterState.selectedModules || [];
-  const checkboxOptions: { id: string; value: string; label: string }[] = [];
-  if (selectedModules.includes("Business Permit")) {
-    checkboxOptions.push({ id: "swal-bp", value: "business", label: "Business Permit" });
-  }
-  if (selectedModules.includes("Working Permit")) {
-    checkboxOptions.push({ id: "swal-wp", value: "working", label: "Working Permit" });
-  }
-  if (selectedModules.includes("Barangay Clearance")) {
-    checkboxOptions.push({ id: "swal-bc", value: "barangay", label: "Barangay Clearance" });
-  }
-
-  if (checkboxOptions.length === 0) return;
-
-  // If only one permit type, download automatically
-  if (checkboxOptions.length === 1) {
-    if (onDownload) {
-      onDownload(type, [checkboxOptions[0].value as "business" | "working" | "barangay"]);
+    // Dynamically build checkboxes based on selected modules
+    const selectedModules = filterState.selectedModules || [];
+    const checkboxOptions: { id: string; value: string; label: string }[] = [];
+    if (selectedModules.includes("Business Permit")) {
+      checkboxOptions.push({ id: "swal-bp", value: "business", label: "Business Permit" });
     }
-    return;
-  }
+    if (selectedModules.includes("Working Permit")) {
+      checkboxOptions.push({ id: "swal-wp", value: "working", label: "Working Permit" });
+    }
+    if (selectedModules.includes("Barangay Clearance")) {
+      checkboxOptions.push({ id: "swal-bc", value: "barangay", label: "Barangay Clearance" });
+    }
 
-  // Build HTML for checkboxes with Select All
-  const html = `
-    <div style="display: flex; flex-direction: column; align-items: flex-start;">
-      <label style="margin-bottom: 8px; font-weight: bold;">
-        <input type="checkbox" id="swal-select-all" />
-        Select All
-      </label>
-      ${checkboxOptions
-        .map(
-          (opt) => `
-        <label style="margin-bottom: 8px;">
-          <input type="checkbox" id="${opt.id}" value="${opt.value}" />
-          ${opt.label}
+    if (checkboxOptions.length === 0) return;
+
+    // If only one permit type, download automatically
+    if (checkboxOptions.length === 1) {
+      if (onDownload) {
+        onDownload(type, [checkboxOptions[0].value as "business" | "working" | "barangay"]);
+      }
+      return;
+    }
+
+    // Build HTML for checkboxes with Select All
+    const html = `
+      <div style="display: flex; flex-direction: column; align-items: flex-start;">
+        <label style="margin-bottom: 8px; font-weight: bold;">
+          <input type="checkbox" id="swal-select-all" />
+          Select All
         </label>
-      `
-        )
-        .join("")}
-    </div>
-  `;
+        ${checkboxOptions
+          .map(
+            (opt) => `
+          <label style="margin-bottom: 8px;">
+            <input type="checkbox" id="${opt.id}" value="${opt.value}" />
+            ${opt.label}
+          </label>
+        `
+          )
+          .join("")}
+      </div>
+    `;
 
-  await Swal.fire({
-    title: "Choose Permit Type(s)",
-    html,
-    focusConfirm: false,
-    didOpen: () => {
-      // --- Select All logic ---
-      const selectAllBox = document.getElementById("swal-select-all") as HTMLInputElement;
-      const checkboxes = checkboxOptions.map(opt => document.getElementById(opt.id) as HTMLInputElement);
+    await Swal.fire({
+      title: "Choose Permit Type(s)",
+      html,
+      focusConfirm: false,
+      didOpen: () => {
+        // --- Select All logic ---
+        const selectAllBox = document.getElementById("swal-select-all") as HTMLInputElement;
+        const checkboxes = checkboxOptions.map(opt => document.getElementById(opt.id) as HTMLInputElement);
 
-      // Check all by default when modal opens
-      checkboxes.forEach(cb => { cb.checked = true; });
-      selectAllBox.checked = true;
+        // Check all by default when modal opens
+        checkboxes.forEach(cb => { cb.checked = true; });
+        selectAllBox.checked = true;
 
-      // When Select All is clicked, check/uncheck all
-      selectAllBox.addEventListener("change", () => {
+        // When Select All is clicked, check/uncheck all
+        selectAllBox.addEventListener("change", () => {
+          checkboxes.forEach(cb => {
+            cb.checked = selectAllBox.checked;
+          });
+        });
+
+        // When any individual checkbox is changed, update Select All
         checkboxes.forEach(cb => {
-          cb.checked = selectAllBox.checked;
+          cb.addEventListener("change", () => {
+            const allChecked = checkboxes.every(c => c.checked);
+            selectAllBox.checked = allChecked;
+          });
         });
-      });
+      },
+      preConfirm: () => {
+        const checked = checkboxOptions.filter(
+          (opt) => (document.getElementById(opt.id) as HTMLInputElement)?.checked
+        );
+        if (checked.length === 0) {
+          Swal.showValidationMessage("Please select at least one permit type!");
+          return false;
+        }
+        return checked.map((opt) => opt.value);
+      },
 
-      // When any individual checkbox is changed, update Select All
-      checkboxes.forEach(cb => {
-        cb.addEventListener("change", () => {
-          const allChecked = checkboxes.every(c => c.checked);
-          selectAllBox.checked = allChecked;
-        });
-      });
-    },
-    preConfirm: () => {
-  const checked = checkboxOptions.filter(
-    (opt) => (document.getElementById(opt.id) as HTMLInputElement)?.checked
-  );
-  if (checked.length === 0) {
-    Swal.showValidationMessage("Please select at least one permit type!");
-    return false;
-  }
-  return checked.map((opt) => opt.value);
-},
-
-    confirmButtonText: "Download",
-    showCancelButton: true,
-    cancelButtonText: "Cancel",
-    customClass: {
-      popup: "swal2-popup-custom-width",
-    },
-    confirmButtonColor: "#3b82f6",
-    cancelButtonColor: "#ef4444",
-  }).then((result) => {
-  if (result.isConfirmed && Array.isArray(result.value)) {
-    if (onDownload) {
-      onDownload(type, result.value as ("business" | "working" | "barangay")[]);
-    }
-  }
-});
-};
+      confirmButtonText: "Download",
+      showCancelButton: true,
+      cancelButtonText: "Cancel",
+      customClass: {
+        popup: "swal2-popup-custom-width",
+      },
+      confirmButtonColor: "#3b82f6",
+      cancelButtonColor: "#ef4444",
+    }).then((result) => {
+      if (result.isConfirmed && Array.isArray(result.value)) {
+        if (onDownload) {
+          onDownload(type, result.value as ("business" | "working" | "barangay")[]);
+        }
+      }
+    });
+  };
 
   // --- Region Logic ---
   const selectAllRegions = () => {
@@ -759,77 +760,68 @@ const FilterSection: React.FC<FilterSectionProps> = ({
       {/* Date Range */}
       <div className="flex flex-col" ref={dateRef}>
         <label className="text-sm font-medium text-secondary-foreground mb-1">Date Range:</label>
-        <div className="relative">
+        <div className="relative w-full ">
           <button
-            onClick={() => setIsDateOpen(!isDateOpen)}
+            type="button"
             className="w-full bg-card border border-border rounded-md py-2 px-3 text-left flex justify-between items-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+            onClick={() => setIsDateOpen((open) => !open)}
           >
             <span className="text-sm text-secondary-foreground">
-              {selectedDateType
-                ? selectedDateType
-                : 'Date'}
+              {selectedDateType ? selectedDateType : "Select date type"}
             </span>
-            <ChevronDown size={18} className={`text-secondary-foreground  transition-transform ${isDateOpen ? 'transform rotate-180' : ''}`} />
+            <ChevronDown size={18} className={`text-secondary-foreground transition-transform ${isDateOpen ? "rotate-180" : ""}`} />
           </button>
           {isDateOpen && (
-            <div className="w-[400px] absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-md shadow-lg z-10">
-              <div className="flex justify-start p-2 border-b border-gray-200">
+            <div className="absolute w-96 left-0 bg-white right-0 mt-2 border border-border rounded-md shadow-lg z-20 p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[15px] font-semibold">Date Range</span>
                 <button
+                  className="text-red-400 text-[15px] font-semibold hover:text-red-600 focus:outline-none"
                   onClick={deselectAllDates}
-                  className="text-sm text-red-400 hover:text-red-800"
+                  type="button"
                 >
                   Deselect
                 </button>
               </div>
-              <div className="max-h-[200px] overflow-y-auto">
-                {dateRange.map((date, index) => (
-                  <label
-                    key={`Date-${index}`}
-                    className="flex items-center px-3 py-2 hover:bg-blue-200  cursor-pointer  text-accent-foreground"
-                  >
-                    <div className="relative flex items-center">
-                      <input
-                        type="radio"
-                        name="date-range-radio"
-                        checked={selectedDateType === date}
-                        onChange={() => handleDateTypeToggle(date)}
-                        className="opacity-0 absolute h-4 w-4 cursor-pointer hover:text-white"
-                      />
-                      <div className={`border h-4 w-4 rounded flex items-center justify-center ${
-                        selectedDateType === date
-                          ? 'bg-blue-600 border-blue-600'
-                          : 'border-gray-400'
-                      }`}>
-                        {selectedDateType === date && (
-                          <Check size={12} className="text-accent" />
-                        )}
-                      </div>
-                      <span className="ml-2 text-sm text-accent-foreground">{date}</span>
-                    </div>
+              
+              <div className="flex flex-col gap-2 mb-3">
+                {dateRange.map((type) => (
+                  <label key={type} className="flex items-center gap-2 text-[15px] cursor-pointer">
+                    <input
+                      type="radio"
+                      checked={selectedDateType === type}
+                      onChange={() => handleDateTypeToggle(type)}
+                      className="accent-blue-600"
+                      name="date-type"
+                    />
+                    {type}
                   </label>
                 ))}
-                <div className='flex flex-col gap-4 p-5 border-t border-gray-200'>
-                  {!selectedDateType && (
-                    <span className="text-sm text-muted-foreground text-center">
-                      Please select day, month, or year
-                    </span>
-                  )}
-                  {selectedDateType === 'Day' && (
-                    <DateRangeDay value={filterState.dateRange} onChange={handleDateRangeChange} />
-                  )}
-                  {selectedDateType === 'Month' && (
-                    <DateRangeMonth
-                      value={filterState.dateRange}
-                      onChange={handleDateRangeChange}
-                    />
-                  )}
-                  {selectedDateType === 'Year' && (
-                    <DateRangeYear
-                      value={filterState.dateRange}
-                      onChange={handleDateRangeChange}
-                    />
-                  )}
-                </div>
+              </div>
+              <div>
+                {!selectedDateType && (
+                  <span className="text-sm text-muted-foreground text-center">
+                    Please select day, month, or year
+                  </span>
+                )}
+                {selectedDateType === 'Day' && (
+                  <DateRangeDay
+                    value={filterState.dateRange}
+                    onChange={handleDateRangeChange}
+                  />
+                )}
+                {selectedDateType === 'Month' && (
+                  <DateRangeMonth
+                    value={filterState.dateRange}
+                    onChange={handleDateRangeChange}
+                  />
+                )}
+                {selectedDateType === 'Year' && (
+                  <DateRangeYear
+                    value={filterState.dateRange}
+                    onChange={handleDateRangeChange}
+                  />
+                )}
               </div>
             </div>
           )}
@@ -857,7 +849,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({
             </Button>
           ) : (
             <Button
-              className="bg-red-500 hover:bg-red-600 h-9 text-[12px]"
+              className="bg-red-500 hover:bg-red-600 h-9 text-[12px] text-white"
               onClick={onCancel}
               disabled={!loading}
               type="button"

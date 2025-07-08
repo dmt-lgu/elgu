@@ -73,16 +73,25 @@ function DateRangeYear({
     // Do not reset 'to' here!
   };
   const handleToYear = (year: number) => {
-    setTo({ year });
+    if (from && year < from.year) {
+      setTo(from);
+      setFrom({ year });
+    } else {
+      setTo({ year });
+    }
   };
 
   // Apply button handler
   const handleApply = () => {
     if (from && to && onChange) {
-      // Always use the user's explicit selection, do not swap or adjust
+      let startYear = from.year;
+      let endYear = to.year;
+      if (startYear > endYear) {
+        [startYear, endYear] = [endYear, startYear];
+      }
       onChange({
-        start: new Date(from.year, 0, 1), // 01-01-YYYY
-        end: new Date(to.year, 11, 31),   // 12-31-YYYY
+        start: new Date(startYear, 1, -29), // 01-01-YYYY
+        end: new Date(endYear, 11, 32), // 12-31-YYYY
       });
     } else if (from && onChange) {
       onChange({

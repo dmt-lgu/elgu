@@ -175,7 +175,7 @@ function Admin() {
         console.error("Error fetching transaction data:", error);
         Swal.fire({
           icon: "error",
-          title: "Error",
+          title: "Error", 
           text: "Failed to fetch transaction data. Please try again later.",
         });
       });
@@ -183,22 +183,22 @@ function Admin() {
 
   useEffect(() => {
     // Clear previous debounce if exists
-    if (debounceRef.current) clearTimeout(debounceRef.current);
+    // if (debounceRef.current) clearTimeout(debounceRef.current);
+    // debounceRef.current = setTimeout(() => {
+    //   if (data.locationName.length != 0) {
 
-    // Set new debounce
-    debounceRef.current = setTimeout(() => {
-      if (data.locationName.length != 0) {
-
-        GetTransaction();
+    //     GetTransaction();
         
-      }
+    //   }
       
-    }, 1400); // 500ms debounce, adjust as needed
+    // }, 1400); 
 
-    // Cleanup on unmount
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
+ 
+    // return () => {
+    //   if (debounceRef.current) clearTimeout(debounceRef.current);
+    // };
+    console.log(data.startDate,data.endDate);
+
   }, [data.locationName, data.startDate, data.endDate]);
 
 
