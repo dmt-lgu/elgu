@@ -385,7 +385,7 @@ function mapRegion(region: string): string {
 
       // Group by period and dictRo, and sum statuses
       const groupedByMonth: Record<string, Record<string, any>> = {};
-      console.log("BP records", records[0]);
+      // console.log("BP records", records[0]);
       records.forEach((row: any) => {
         
         const period = row[idx.period];
@@ -428,7 +428,7 @@ function mapRegion(region: string): string {
 
    
 
-      console.log("BP result", result);
+      // console.log("BP result", result);
 
 
        dispatch(setStatus({

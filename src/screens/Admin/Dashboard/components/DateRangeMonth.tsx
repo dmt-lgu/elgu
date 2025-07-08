@@ -7,11 +7,11 @@ import Select from "react-select";
 const months = Array.from({ length: 12 }, (_, i) => i);
 
 function getFirstDay(month: number, year: number) {
-  return new Date(year, month+1);
+  return new Date(year, month,1+1);
 }
 
 function getLastDay(month: number, year: number) {
-  return lastDayOfMonth(new Date(year, month, 1));
+  return lastDayOfMonth(new Date(year, month,));
 }
 
 interface DateRangeMonthProps {
@@ -63,11 +63,11 @@ function DateRangeMonth({
     }
   }, [value?.start, value?.end, currentMonth, currentYear]);
 
-  // Generate years for dropdown (e.g., currentYear-10 to currentYear+1)
-  const years = Array.from({ length: 15 }, (_, i) => currentYear - 10 + i);
+  // Generate years for dropdown (from currentYear down to currentYear-14)
+  const years = Array.from({ length: 15 }, (_, i) => currentYear - i);
   const monthOptions = months.map(m => ({
     value: m,
-    label: format(new Date(currentYear, m, 1), "LLLL"),
+    label: format(new Date(currentYear, m), "LLLL"),
   }));
   const yearOptions = years.map(y => ({
     value: y,
@@ -94,14 +94,10 @@ function DateRangeMonth({
       fromYear !== undefined &&
       onChange
     ) {
-      // Debug log
-      console.log("Apply start:", fromYear, fromMonth); // Should be 0-based
       const start = getFirstDay(fromMonth, fromYear);
 
       let end: Date | null = null;
       if (toMonth !== undefined && toYear !== undefined) {
-        // Debug log
-        console.log("Apply end:", toYear, toMonth); // Should be 0-based
         end = getLastDay(toMonth, toYear);
       }
 
