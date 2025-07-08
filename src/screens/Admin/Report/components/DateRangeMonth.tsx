@@ -1,35 +1,17 @@
 import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import React from "react";
-import { format, startOfMonth, endOfMonth, isAfter } from "date-fns";
-
-type MonthYear = { month: number; year: number };
-
-function getFirstDay(month: number, year: number) {
-  return startOfMonth(new Date(year, month, 1));
-}
-
-function getLastDay(month: number, year: number) {
-  return endOfMonth(new Date(year, month, 1));
-}
-
-function getMonthLabel(month: number, year: number) {
-  return format(new Date(year, month, 1), "LLLL yyyy");
-}
+import { format, lastDayOfMonth } from "date-fns";
+import Select from "react-select";
 
 const months = Array.from({ length: 12 }, (_, i) => i);
 
-// --- Utility: Normalize a date value to Date or null ---
-function ensureDate(d: Date | string | null | undefined): Date | null {
-  if (!d) return null;
-  if (d instanceof Date) return d;
-  if (typeof d === 'string') {
-    const dt = new Date(d);
-    return isNaN(dt.getTime()) ? null : dt;
-  }
-  return null;
+function getFirstDay(month: number, year: number) {
+  return new Date(year, month, 1);
+}
+
+function getLastDay(month: number, year: number) {
+  return lastDayOfMonth(new Date(year, month, 1));
 }
 
 interface DateRangeMonthProps {
@@ -43,181 +25,172 @@ function DateRangeMonth({
   value,
   onChange,
 }: DateRangeMonthProps) {
-  const currentYear = new Date().getFullYear();
-  const [open, setOpen] = React.useState(false);
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth();
 
   // Internal state for month/year selection
-  const [from, setFrom] = React.useState<MonthYear | null>(null);
-  const [to, setTo] = React.useState<MonthYear | null>(null);
+  const [fromMonth, setFromMonth] = React.useState<number | undefined>(undefined);
+  const [fromYear, setFromYear] = React.useState<number | undefined>(undefined);
+  const [toMonth, setToMonth] = React.useState<number | undefined>(undefined);
+  const [toYear, setToYear] = React.useState<number | undefined>(undefined);
 
-  // --- Always normalize value.start and value.end before using date methods ---
+  // Set default values on mount or when value changes
   React.useEffect(() => {
-    const start = ensureDate(value?.start);
-    const end = ensureDate(value?.end);
-
-    if (start) {
-      setFrom({ month: start.getMonth(), year: start.getFullYear() });
-    } else {
-      setFrom(null);
+    // If both are null, set to current date
+    if (!value?.start && !value?.end) {
+      setFromMonth(currentMonth);
+      setFromYear(currentYear);
+      setToMonth(undefined);
+      setToYear(undefined);
+      return;
     }
-    if (end) {
-      setTo({ month: end.getMonth(), year: end.getFullYear() });
-    } else {
-      setTo(null);
+    // If value.start is provided, set fromMonth/fromYear
+    if (value?.start) {
+      const d = new Date(value.start);
+      if (!isNaN(d.getTime())) {
+        setFromMonth(d.getMonth());
+        setFromYear(d.getFullYear());
+      }
     }
-  }, [value?.start, value?.end]);
+    // If value.end is provided, set toMonth/toYear
+    if (value?.end) {
+      const d = new Date(value.end);
+      if (!isNaN(d.getTime())) {
+        setToMonth(d.getMonth());
+        setToYear(d.getFullYear());
+      }
+    }
+  }, [value?.start, value?.end, currentMonth, currentYear]);
 
   // Generate years for dropdown (e.g., currentYear-10 to currentYear+1)
-  const years = Array.from({ length: 15 }, (_, i) => currentYear - 10 + i);
+  const years = React.useMemo(
+    () => Array.from({ length: 15 }, (_, i) => currentYear - 10 + i),
+    [currentYear]
+  );
+  const monthOptions = React.useMemo(
+    () =>
+      months.map(m => ({
+        value: m,
+        label: format(new Date(currentYear, m, 1), "LLLL"),
+      })),
+    [currentYear]
+  );
+  const yearOptions = React.useMemo(
+    () =>
+      years.map(y => ({
+        value: y,
+        label: y.toString(),
+      })),
+    [years]
+  );
 
-  // Apply button handler
-  const handleApply = () => {
-    if (from && to && onChange) {
-      // Always ensure start <= end
-      let startMonth = from;
-      let endMonth = to;
-      const fromDate = new Date(from.year, from.month, 1);
-      const toDate = new Date(to.year, to.month, 1);
-      if (isAfter(fromDate, toDate)) {
-        // swap
-        startMonth = to;
-        endMonth = from;
-      }
-      onChange({
-        start: getFirstDay(startMonth.month, startMonth.year),
-        end: getLastDay(endMonth.month, endMonth.year),
-      });
-    } else if (from && onChange) {
-      onChange({
-        start: getFirstDay(from.month, from.year),
-        end: null,
-      });
-    }
-    setOpen(false);
+  // Handlers
+  const handleFromMonth = (option: any) => {
+    setFromMonth(option ? option.value : undefined);
+  };
+  const handleFromYear = (option: any) => {
+    setFromYear(option ? option.value : undefined);
+  };
+  const handleToMonth = (option: any) => {
+    setToMonth(option ? option.value : undefined);
+  };
+  const handleToYear = (option: any) => {
+    setToYear(option ? option.value : undefined);
   };
 
-  // Clear button handler
+  const handleApply = () => {
+    if (
+      fromMonth !== undefined &&
+      fromYear !== undefined &&
+      onChange
+    ) {
+      const start = getFirstDay(fromMonth, fromYear);
+
+      let end: Date | null = null;
+      if (toMonth !== undefined && toYear !== undefined) {
+        end = getLastDay(toMonth, toYear);
+      }
+
+      onChange({ start, end });
+    }
+  };
+
   const handleClear = () => {
-    setFrom(null);
-    setTo(null);
+    setFromMonth(currentMonth);
+    setFromYear(currentYear);
+    setToMonth(undefined);
+    setToYear(undefined);
     if (onChange) {
       onChange({ start: null, end: null });
     }
-    setOpen(false);
   };
 
   return (
     <div className={cn("grid gap-2", className)}>
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            id="date"
-            variant="outline"
-            className={cn(
-              "w-[350px] justify-start text-left font-normal",
-              !from && "text-black"
-            )}
-          >
-            <CalendarIcon className="mr-2 h-4 w-4" />
-            {from ? (
-              to ? (
-                <>
-                  {getMonthLabel(from.month, from.year)} - {getMonthLabel(to.month, to.year)}
-                </>
-              ) : (
-                getMonthLabel(from.month, from.year)
-              )
-            ) : (
-              <span>Select month</span>
-            )}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-auto p-4" align="start">
-          <div className="flex flex-col gap-4">
-            <div>
-              <div className="font-semibold mb-1">Start Month</div>
-              <div className="flex gap-2">
-                <select
-                  className="border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={from ? from.month : ""}
-                  onChange={e => {
-                    const month = Number(e.target.value);
-                    setFrom(from ? { ...from, month } : { month, year: currentYear });
-                  }}
-                >
-                  <option value="" disabled>Select month</option>
-                  {months.map(m => (
-                    <option key={m} value={m}>{format(new Date(currentYear, m, 1), "LLLL")}</option>
-                  ))}
-                </select>
-                <select
-                  className="border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500" 
-                  value={from ? from.year : ""}
-                  onChange={e => {
-                    const year = Number(e.target.value);
-                    setFrom(from ? { ...from, year } : { month: 0, year });
-                  }}
-                >
-                  <option value="" disabled>Select year</option>
-                  {years.map(y => (
-                    <option key={y} value={y}>{y}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div>
-              <div className="font-semibold mb-1">End Month</div>
-              <div className="flex gap-2">
-                <select
-                  className="border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={to ? to.month : ""}
-                  onChange={e => {
-                    const month = Number(e.target.value);
-                    setTo(to ? { ...to, month } : from ? { month, year: from.year } : { month, year: currentYear });
-                  }}
-                  disabled={!from}
-                >
-                  <option value="" disabled>Select month</option>
-                  {months.map(m => (
-                    <option key={m} value={m}>{format(new Date(from ? from.year : currentYear, m, 1), "LLLL")}</option>
-                  ))}
-                </select>
-                <select
-                  className="border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={to ? to.year : ""}
-                  onChange={e => {
-                    const year = Number(e.target.value);
-                    setTo(to ? { ...to, year } : from ? { month: from.month, year } : { month: 0, year });
-                  }}
-                  disabled={!from}
-                >
-                  <option value="" disabled>Select year</option>
-                  {years.map(y => (
-                    <option key={y} value={y}>{y}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div className="flex gap-2 mt-2 justify-end">
-              <Button
-              className="h-8 "
-                variant="default"
-                onClick={handleApply}
-                disabled={!from}
-              >
-                Apply
-              </Button>
-              <Button
-                className="bg-red-500 text-white hover:bg-red-600 hover:text-white h-8"
-                variant="outline"
-                onClick={handleClear}
-              >
-                Clear
-              </Button>
-            </div>
+      <div className="flex flex-col gap-4">
+        <div>
+          <div className="font-semibold mb-1">Start Month</div>
+          <div className="flex gap-2">
+            <Select
+              options={monthOptions}
+              value={fromMonth !== undefined ? monthOptions.find(opt => opt.value === fromMonth) : null}
+              onChange={handleFromMonth}
+              placeholder="Month"
+              isClearable
+              className="w-full"
+            />
+            <Select
+              options={yearOptions}
+              value={fromYear !== undefined ? yearOptions.find(opt => opt.value === fromYear) : null}
+              onChange={handleFromYear}
+              placeholder="Year"
+              isClearable
+              className="w-full"
+            />
           </div>
-        </PopoverContent>
-      </Popover>
+        </div>
+        <div>
+          <div className="font-semibold mb-1">End Month</div>
+          <div className="flex gap-2">
+            <Select
+              options={monthOptions}
+              value={toMonth !== undefined ? monthOptions.find(opt => opt.value === toMonth) : null}
+              onChange={handleToMonth}
+              placeholder="Month"
+              isClearable
+              isDisabled={fromMonth === undefined || fromYear === undefined}
+              className="w-full"
+            />
+            <Select
+              options={yearOptions}
+              value={toYear !== undefined ? yearOptions.find(opt => opt.value === toYear) : null}
+              onChange={handleToYear}
+              placeholder="Year"
+              isClearable
+              isDisabled={fromMonth === undefined || fromYear === undefined}
+              className="w-full"
+            />
+          </div>
+        </div>
+        <div className="flex gap-2 mt-2 justify-end">
+          <Button
+            className="h-8 "
+            variant="default"
+            onClick={handleApply}
+            disabled={fromMonth === undefined || fromYear === undefined}
+          >
+            Apply
+          </Button>
+          <Button
+            className="bg-red-500 text-white hover:bg-red-600 hover:text-white h-8"
+            variant="outline"
+            onClick={handleClear}
+          >
+            Clear
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

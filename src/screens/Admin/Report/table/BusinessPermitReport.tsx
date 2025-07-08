@@ -300,7 +300,7 @@ export function getDateRangeLabel(
 
 
 
-const TableReport = forwardRef<HTMLDivElement, TableReportProps>(({
+const BusinessPermitReport = forwardRef<HTMLDivElement, TableReportProps>(({
   selectedRegions,
   dateRange,
   apiData,
@@ -442,7 +442,7 @@ const TableReport = forwardRef<HTMLDivElement, TableReportProps>(({
               {/* Only render the Region cell for the first LGU in the region, with rowSpan */}
               {idx === 0 && (
                 <TableCell
-                  className="border px-2 py-1 text-center font-bold bg-white left-0 z-10 align-middle"
+                  className="border px-2 py-1 text-center font-bold bg-card left-0 z-10 align-middle"
                   rowSpan={lguList.length}
                 >
                   {getRegionCode(region)}
@@ -450,7 +450,7 @@ const TableReport = forwardRef<HTMLDivElement, TableReportProps>(({
               )}
               <TableCell className="border px-2 py-1 text-start font-bold">
                 {lgu.lgu}
-                <span className="text-xs font-normal text-gray-500">
+                <span className="text-xs font-normal ">
                   {lgu.province ? `(${lgu.province})` : ""}
                 </span>
                 <br />
@@ -486,7 +486,7 @@ const TableReport = forwardRef<HTMLDivElement, TableReportProps>(({
                 {/* Only render the Region cell for the first LGU in the region, with rowSpan */}
                 {idx === 0 && mIdx === 0 && (
                   <TableCell
-                    className="border px-2 py-1 text-center font-bold bg-white sticky left-0 z-10 align-middle"
+                    className="border px-2 py-1 text-center font-bold bg-card left-0 z-10 align-middle"
                     rowSpan={lguList.reduce((acc, lgu) => acc + (lgu.monthlyResults?.length || 1), 0)}
                   >
                     {getRegionCode(region)}
@@ -494,7 +494,7 @@ const TableReport = forwardRef<HTMLDivElement, TableReportProps>(({
                 )}
                 <TableCell className="border px-2 py-1 text-start font-bold">
                   {lgu.lgu}
-                  <span className="text-xs font-normal text-gray-500">
+                  <span className="text-xs font-normal text-accent">
                     {lgu.province ? `(${lgu.province})` : ""}
                   </span>
                   <br />
@@ -622,44 +622,46 @@ useEffect(() => {
         <Table className="w-full border-collapse text-[10px]">
           <TableHeader>
             <TableRow>
-              <TableHead
-                colSpan={16}
-                className="bg-[#9ec6f7] text-black text-center font-bold text-base border sticky top-0"
-              >
-                {dateRangeLabel || "Report"}
+              <TableHead colSpan={16} className="bg-[#9ec6f7] text-black text-center font-bold text-base border top-0">
+                Business Permit
+                {dateRangeLabel && (
+                  <div className="text-xs text-gray-700 mt-1 font-bold">
+                    {dateRangeLabel}
+                  </div>
+                )}
               </TableHead>
             </TableRow>
             <TableRow>
-              <TableHead rowSpan={2} className="bg-[#9ec6f7] text-black font-bold border px-2 py-1 text-center align-middle sticky top-[40px]">Region</TableHead>
-              <TableHead rowSpan={2} className="bg-[#9ec6f7] text-black font-bold border px-2 py-1 text-center align-middle sticky top-[40px]">LGU</TableHead>
-              <TableHead colSpan={4} className="bg-[#9ec6f7] text-black font-bold border px-2 py-1 text-center sticky top-[40px]">NEW</TableHead>
-              <TableHead colSpan={4} className="bg-[#9ec6f7] text-black font-bold border px-2 py-1 text-center sticky top-[40px]">RENEWAL</TableHead>
-              <TableHead colSpan={3} className="bg-[#9ec6f7] text-black font-bold border px-2 py-1 text-center sticky top-[40px]">MALE</TableHead>
-              <TableHead colSpan={3} className="bg-[#9ec6f7] text-black font-bold border px-2 py-1 text-center sticky top-[40px]">FEMALE</TableHead>
+              <TableHead rowSpan={2} className="bg-[#9ec6f7] text-black font-bold border px-2 py-1 text-center align-middle top-[40px]">Region</TableHead>
+              <TableHead rowSpan={2} className="bg-[#9ec6f7] text-black font-bold border px-2 py-1 text-center align-middle top-[40px]">LGU</TableHead>
+              <TableHead colSpan={4} className="bg-[#9ec6f7] text-black font-bold border px-2 py-1 text-center top-[40px]">NEW</TableHead>
+              <TableHead colSpan={4} className="bg-[#9ec6f7] text-black font-bold border px-2 py-1 text-center top-[40px]">RENEWAL</TableHead>
+              <TableHead colSpan={3} className="bg-[#9ec6f7] text-black font-bold border px-2 py-1 text-center top-[40px]">MALE</TableHead>
+              <TableHead colSpan={3} className="bg-[#9ec6f7] text-black font-bold border px-2 py-1 text-center top-[40px]">FEMALE</TableHead>
             </TableRow>
             <TableRow>
-              <TableHead className="bg-[#9ec6f7] text-black border px-2 py-1 sticky top-[74px]">PAID</TableHead>
-              <TableHead className="bg-[#9ec6f7] text-black border px-2 py-1 sticky top-[74px] text-center">PAID <br />
+              <TableHead className="bg-[#9ec6f7] text-black border px-2 py-1 top-[74px]">PAID</TableHead>
+              <TableHead className="bg-[#9ec6f7] text-black border px-2 py-1 top-[74px] text-center">PAID <br />
                 <span className='text-[10px]'>(Per OR Paid with eGOVPay)</span>
               </TableHead>
-              <TableHead className="bg-[#9ec6f7] text-black border px-2 py-1 sticky top-[74px]">PENDING</TableHead>
-              <TableHead className="bg-[#9ec6f7] text-black border px-2 py-1 sticky top-[74px] text-center">GRANDTOTAL PER LGU</TableHead>
-              <TableHead className="bg-[#9ec6f7] text-black border px-2 py-1 sticky top-[74px]">PAID</TableHead>
-              <TableHead className="bg-[#9ec6f7] text-black border px-2 py-1 sticky top-[74px] text-center">PAID <br />
+              <TableHead className="bg-[#9ec6f7] text-black border px-2 py-1 top-[74px]">PENDING</TableHead>
+              <TableHead className="bg-[#9ec6f7] text-black border px-2 py-1 top-[74px] text-center">GRANDTOTAL PER LGU</TableHead>
+              <TableHead className="bg-[#9ec6f7] text-black border px-2 py-1 top-[74px]">PAID</TableHead>
+              <TableHead className="bg-[#9ec6f7] text-black border px-2 py-1 top-[74px] text-center">PAID <br />
                 <span className='text-[10px]'>(Per OR Paid with eGOVPay)</span>
               </TableHead>
-              <TableHead className="bg-[#9ec6f7] text-black border px-2 py-1 sticky top-[74px]">PENDING</TableHead>
-              <TableHead className="bg-[#9ec6f7] text-black border px-2 py-1 sticky top-[74px] text-center">GRANDTOTAL PER LGU</TableHead>
-              <TableHead className="bg-[#9ec6f7] text-black border px-2 py-1 sticky top-[74px]">PAID</TableHead>
-              <TableHead className="bg-[#9ec6f7] text-black border px-2 py-1 sticky top-[74px]">PENDING</TableHead>
-              <TableHead className="bg-[#9ec6f7] text-black border px-2 py-1 sticky top-[74px] text-center">GRANDTOTAL PER LGU</TableHead>
-              <TableHead className="bg-[#9ec6f7] text-black border px-2 py-1 sticky top-[74px]">PAID</TableHead>
-              <TableHead className="bg-[#9ec6f7] text-black border px-2 py-1 sticky top-[74px]">PENDING</TableHead>
-              <TableHead className="bg-[#9ec6f7] text-black border px-2 py-1 sticky top-[74px] text-center">GRANDTOTAL PER LGU</TableHead>
+              <TableHead className="bg-[#9ec6f7] text-black border px-2 py-1 top-[74px]">PENDING</TableHead>
+              <TableHead className="bg-[#9ec6f7] text-black border px-2 py-1 top-[74px] text-center">GRANDTOTAL PER LGU</TableHead>
+              <TableHead className="bg-[#9ec6f7] text-black border px-2 py-1 top-[74px]">PAID</TableHead>
+              <TableHead className="bg-[#9ec6f7] text-black border px-2 py-1 top-[74px]">PENDING</TableHead>
+              <TableHead className="bg-[#9ec6f7] text-black border px-2 py-1 top-[74px] text-center">GRANDTOTAL PER LGU</TableHead>
+              <TableHead className="bg-[#9ec6f7] text-black border px-2 py-1 top-[74px]">PAID</TableHead>
+              <TableHead className="bg-[#9ec6f7] text-black border px-2 py-1 top-[74px]">PENDING</TableHead>
+              <TableHead className="bg-[#9ec6f7] text-black border px-2 py-1 top-[74px] text-center">GRANDTOTAL PER LGU</TableHead>
             </TableRow>
           </TableHeader>
          
-          <TableBody className="[&>tr:nth-child(odd)]:bg-zinc-200">
+          <TableBody className="[&>tr:nth-child(odd)]:bg-accent">
             {loading ? (
               <TableRow>
                 <TableCell colSpan={16} className="text-center py-4 border">
@@ -730,4 +732,4 @@ useEffect(() => {
   );
 });
 
-export default TableReport;
+export default BusinessPermitReport;

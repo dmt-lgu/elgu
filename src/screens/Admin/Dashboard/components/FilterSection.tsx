@@ -547,7 +547,7 @@ const FilterSection: React.FC = () => {
         <div className="relative w-full ">
           <button
             type="button"
-            className="w-full bg-white border border-border rounded-md py-2 px-3 text-left flex justify-between items-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full bg-card border border-border rounded-md py-2 px-3 text-left flex justify-between items-center focus:outline-none focus:ring-2 focus:ring-blue-500"
             onClick={() => setIsDateOpen((open) => !open)}
           >
             <span className="text-sm text-secondary-foreground">

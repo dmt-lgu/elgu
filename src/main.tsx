@@ -26,7 +26,6 @@ const Report = lazy(() =>
   wait(1300).then(() => import("./screens/Admin/Report/Reports.tsx")));
 
 
-
 const router = createBrowserRouter([
 
   {
