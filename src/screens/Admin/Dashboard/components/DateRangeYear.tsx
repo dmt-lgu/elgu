@@ -27,11 +27,11 @@ function DateRangeYear({
   const startYearRedux = reduxStart ? new Date(reduxStart).getFullYear() : new Date().getFullYear() - 10;
   const endYearRedux = reduxEnd ? new Date(reduxEnd).getFullYear() : new Date().getFullYear() + 1;
 
-  // Generate years for dropdown based on Redux
+  // Generate years for dropdown based on Redux, highest to lowest
   const years = Array.from(
-    { length: endYearRedux - startYearRedux + 1 },
+    { length: endYearRedux - startYearRedux  },
     (_, i) => startYearRedux + i
-  );
+  ).reverse();
   const yearOptions = years.map(y => ({
     value: y,
     label: y.toString(),

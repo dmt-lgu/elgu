@@ -142,7 +142,7 @@ function Admin() {
             municipalities: response.data?.[region.id]
           }
         });
-        console.log("Updated regions:", regionss);
+
         dispatch(setLoad(false));
         dispatch(setRegions(updatedRegions));
       }).catch(error => {
@@ -181,14 +181,42 @@ function Admin() {
       });
   }
 
+
+  //   function GetTransactionBC() {
+
+  //   dispatch(setLoad(true));
+  //   axios.post(`${import.meta.env.VITE_URL}/api/bc/transaction-count/`, {
+  //     "locationName": data.real,
+  //     "startDate": data.startDate,
+  //     "endDate": data.endDate
+  //   })
+  //     .then(response => {
+  //       const totals = calculateTotals(response.data);
+  //       // dispatch(setCard(totals))
+  //       // dispatch(setTransaction(response.data));
+  //       // dispatch(setLoad(false)); // Set loading to false after fetching data
+  //       console.log("Total results BC:", response.data);
+  //     })
+  //     .catch(error => {
+  //       console.error("Error fetching transaction data:", error);
+  //       Swal.fire({
+  //         icon: "error",
+  //         title: "Error", 
+  //         text: "Failed to fetch transaction data. Please try again later.",
+  //       });
+  //     });
+  // }
+
+
   useEffect(() => {
     // Clear previous debounce if exists
     // if (debounceRef.current) clearTimeout(debounceRef.current);
     // debounceRef.current = setTimeout(() => {
     //   if (data.locationName.length != 0) {
-
-    //     GetTransaction();
-        
+    //     if (data.startDate && data.endDate) {
+    //       GetTransaction();
+          
+    //     }
     //   }
       
     // }, 1400); 
@@ -197,7 +225,9 @@ function Admin() {
     // return () => {
     //   if (debounceRef.current) clearTimeout(debounceRef.current);
     // };
-    console.log(data.startDate,data.endDate);
+   
+
+    console.log("Data changed:", data.startDate, data.endDate);
 
   }, [data.locationName, data.startDate, data.endDate]);
 
@@ -313,7 +343,7 @@ fetchRegions()
                 <MenuIcon className="w-6 h-6" />
               </button>
               <div className="flex-1 flex justify-end">
-                <ModeToggle />
+                {/* <ModeToggle /> */}
               </div>
             </div>
           </header>
