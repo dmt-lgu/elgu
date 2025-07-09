@@ -3,15 +3,16 @@ import { cn } from "@/lib/utils";
 import React from "react";
 import { format, lastDayOfMonth } from "date-fns";
 import Select from "react-select";
-
+import { selectLoad } from '@/redux/loadSlice';
+import { useSelector } from "react-redux";
 const months = Array.from({ length: 12 }, (_, i) => i);
 
 function getFirstDay(month: number, year: number) {
-  return new Date(year, month,1+1);
+  return new Date(year, month,1);
 }
 
 function getLastDay(month: number, year: number) {
-  return lastDayOfMonth(new Date(year, month,));
+  return lastDayOfMonth(new Date(year, month,1));
 }
 
 interface DateRangeMonthProps {
@@ -34,7 +35,7 @@ function DateRangeMonth({
   const [fromYear, setFromYear] = React.useState<number | undefined>(undefined);
   const [toMonth, setToMonth] = React.useState<number | undefined>(undefined);
   const [toYear, setToYear] = React.useState<number | undefined>(undefined);
-
+ const loading = useSelector(selectLoad);
   // Set default values on mount or when value changes
   React.useEffect(() => {
     // If both are null, set to current date
@@ -164,12 +165,12 @@ function DateRangeMonth({
         </div>
         <div className="flex gap-2 mt-2 justify-end">
           <Button
-            className="h-8 "
+            className={loading?" h-8 pointer-events-none":"h-8"}
             variant="default"
             onClick={handleApply}
             disabled={fromMonth === undefined || fromYear === undefined}
           >
-            Apply
+            {loading ? "Applying..."  : "Apply"}
           </Button>
           <Button
             className="bg-red-500 text-white hover:bg-red-600 hover:text-white h-8"
