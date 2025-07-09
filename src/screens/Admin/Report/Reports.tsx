@@ -9,12 +9,43 @@ import { exportTableReportToExcel } from './utils/reportToExcel';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState, AppDispatch } from '@/redux/store';
 import { updateFilterField } from '../../../redux/reportFilterSlice';
-import { setTableData, setAppliedFilter } from '../../../redux/tableDataSlice';
+import { setTableData, setAppliedFilter } from '../../../redux/businessPermitSlice';
 import ScrollToTopButton from './components/ScrollToTopButton';
 import Swal from 'sweetalert2';
 import WorkingPermitReport from './table/WorkingPermitReport';
-import { Bp } from './utils/types';
 import BrgyClearanceReport from './table/BrgyClearanceReport';
+
+// --- NEW: Working Permit Redux persistence imports ---
+import {
+  setWorkingPermitTableData,
+  setWorkingPermitAppliedFilter,
+} from '@/redux/workingPermitTableSlice';
+
+// --- NEW: Barangay Clearance Redux persistence imports ---
+import {
+  setBrgyClearanceTableData,
+  setBrgyClearanceAppliedFilter,
+} from '@/redux/brgyClearanceTableSlice';
+
+type DateRange = { start: string | null; end: string | null };
+
+type AppliedFilter = {
+  selectedRegions: string[];
+  selectedProvinces: string[];
+  selectedCities: string[];
+  dateRange: DateRange;
+  selectedDateType: string;
+  selectedIslands: string[];
+};
+
+const BP = "Business Permit";
+const WP = "Working Permit";
+const BC = "Barangay Clearance";
+
+// Helper: deep filter equality
+function areFiltersEqual(a: any, b: any) {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
 
 function ensureDate(val: Date | string | null | undefined): Date | null {
   if (!val) return null;
@@ -30,17 +61,6 @@ function normalizeDateRange(dateRange: { start: Date | string | null; end: Date 
   };
 }
 
-type DateRange = { start: Date | string | null; end: Date | string | null };
-
-type AppliedFilter = {
-  selectedRegions: string[];
-  selectedProvinces: string[];
-  selectedCities: string[];
-  dateRange: DateRange;
-  selectedDateType: string;
-  selectedIslands: string[];
-};
-
 function formatLocalDate(date: Date | null): string | null {
   if (!date) return null;
   const yyyy = date.getFullYear();
@@ -49,19 +69,154 @@ function formatLocalDate(date: Date | null): string | null {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-const WP = "Working Permit";
-const BC = "Barangay Clearance";
+// --- Custom hook for fetching and persisting report data ---
+function useReportData({
+  moduleKey,
+  apiUrl,
+  appliedFilter,
+  // lguToRegion,
+  reduxTableData,
+  reduxAppliedFilter,
+  setReduxTableData,
+  setReduxAppliedFilter,
+  hasSearched,
+  abortSignal,
+}: {
+  moduleKey: string;
+  apiUrl: string;
+  appliedFilter: AppliedFilter;
+  lguToRegion: Record<string, string>;
+  reduxTableData: any;
+  reduxAppliedFilter: any;
+  setReduxTableData: (data: any) => void;
+  setReduxAppliedFilter: (filter: any) => void;
+  hasSearched: boolean;
+  abortSignal: AbortSignal | undefined;
+}) {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+
+  // Compose the current filter for this module
+  const currentFilter = useMemo(() => ({
+    selectedRegions: appliedFilter.selectedRegions,
+    selectedProvinces: appliedFilter.selectedProvinces,
+    selectedCities: appliedFilter.selectedCities,
+    selectedIslands: appliedFilter.selectedIslands,
+    dateRange: appliedFilter.dateRange,
+    // Optionally add more fields if needed
+  }), [
+    appliedFilter.selectedRegions,
+    appliedFilter.selectedProvinces,
+    appliedFilter.selectedCities,
+    appliedFilter.selectedIslands,
+    appliedFilter.dateRange?.start,
+    appliedFilter.dateRange?.end,
+  ]);
+
+  useEffect(() => {
+    if (
+      !hasSearched ||
+      (!appliedFilter.selectedRegions.length && !appliedFilter.selectedIslands.length) ||
+      !appliedFilter.dateRange.start ||
+      !appliedFilter.dateRange.end
+    ) {
+      setData(null);
+      return;
+    }
+
+    // Use persisted data if filter matches
+    if (
+      reduxTableData &&
+      reduxAppliedFilter &&
+      areFiltersEqual(currentFilter, reduxAppliedFilter)
+    ) {
+      setData(reduxTableData);
+      setLoading(false);
+      return;
+    }
+
+    // Else, fetch new data
+    setLoading(true);
+    const payload: any = {
+      locationName: appliedFilter.selectedRegions,
+      provinces: appliedFilter.selectedProvinces,
+      cities: appliedFilter.selectedCities,
+      startDate: appliedFilter.dateRange.start ? formatLocalDate(ensureDate(appliedFilter.dateRange.start)) : null,
+      endDate: appliedFilter.dateRange.end ? formatLocalDate(ensureDate(appliedFilter.dateRange.end)) : null,
+    };
+    Object.keys(payload).forEach(
+      (key) =>
+        (Array.isArray(payload[key]) && payload[key].length === 0) ||
+        payload[key] === null
+          ? delete payload[key]
+          : null
+    );
+
+    axios.post(apiUrl, payload, { signal: abortSignal })
+      .then((response) => {
+        setData(response.data);
+        // Only persist for BP, WP, and BC (main Redux slices)
+        if (moduleKey === BP) {
+          setReduxTableData(response.data);
+          setReduxAppliedFilter(currentFilter);
+        }
+        if (moduleKey === WP) {
+          setReduxTableData(response.data);
+          setReduxAppliedFilter(currentFilter);
+        }
+        if (moduleKey === BC) {
+          setReduxTableData(response.data);
+          setReduxAppliedFilter(currentFilter);
+        }
+      })
+      .catch((err: any) => {
+        if (err?.name === "CanceledError" || err?.code === "ERR_CANCELED" || err?.message === "canceled") {
+          // Request was cancelled, do not show error
+        } else {
+          setData(null);
+          if (moduleKey === BP) {
+            setReduxTableData(null);
+          }
+          if (moduleKey === WP) {
+            setReduxTableData(null);
+          }
+          if (moduleKey === BC) {
+            setReduxTableData(null);
+          }
+        }
+      })
+      .finally(() => setLoading(false));
+    // eslint-disable-next-line
+  }, [
+    hasSearched,
+    JSON.stringify(currentFilter),
+    JSON.stringify(reduxAppliedFilter),
+    reduxTableData,
+    apiUrl,
+    abortSignal,
+    moduleKey,
+  ]);
+
+  return { data, loading };
+}
 
 const Reports: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
 
-  const persistedTableData = useSelector((state: RootState) => state.tableReport.tableData);
-  const persistedAppliedFilter = useSelector((state: RootState) => state.tableReport.appliedFilter);
+  // Redux state
+  const persistedTableData = useSelector((state: RootState) => state.businessPermitTable.tableData);
+  const persistedAppliedFilter = useSelector((state: RootState) => state.businessPermitTable.appliedFilter);
   const selectedModules = useSelector((state: RootState) => state.reportFilter.selectedModules);
-  const [hasSearched, setHasSearched] = useState(false);
 
-   const searchAbortController = useRef<AbortController | null>(null);
+  // --- NEW: Working Permit Redux state ---
+  const persistedWPTableData = useSelector((state: RootState) => state.workingPermitTable.tableData);
+  const persistedWPAppliedFilter = useSelector((state: RootState) => state.workingPermitTable.appliedFilter);
 
+  // --- NEW: Barangay Clearance Redux state ---
+  const persistedBrgyTableData = useSelector((state: RootState) => state.brgyClearanceTable.tableData);
+  const persistedBrgyAppliedFilter = useSelector((state: RootState) => state.brgyClearanceTable.appliedFilter);
+
+  // Local state
   const [appliedFilter, setAppliedFilterState] = useState<AppliedFilter>({
     selectedRegions: [],
     selectedProvinces: [],
@@ -70,33 +225,35 @@ const Reports: React.FC = () => {
     selectedDateType: "",
     selectedIslands: [],
   });
+  const [lastAppliedFilters, setLastAppliedFilters] = useState<any>(null);
+  const [hasTableData, setHasTableData] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
 
-  const [tableData, setTableDataState] = useState<any>(null); // Business Permit data
-  const [wpTableData, setWpTableDataState] = useState<any>(null); // Working Permit data
-  const [bcTableData, setBcTableDataState] = useState<any>(null); // Barangay Clearance data
-  const [loading, setLoading] = useState(false); // Business Permit loading
-  const [wpLoading, setWpLoading] = useState(false); // Working Permit loading
-  const [bcLoading, setBcLoading] = useState(false); // Barangay Clearance loading
+  // LGU-to-region mapping
   const [lguToRegion, setLguToRegion] = useState<Record<string, string>>({});
   const [lguRegionLoading, setLguRegionLoading] = useState(true);
 
-  const [hasTableData, setHasTableData] = useState(false);
+  // Abort controller for fetches
+  const searchAbortController = useRef<AbortController | null>(null);
 
+  // Table container ref for scroll-to-top
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+
+  // On mount, restore persisted filter/data if available
   useEffect(() => {
     if (persistedAppliedFilter) {
       setAppliedFilterState(persistedAppliedFilter);
       setHasSearched(true);
     }
-    if (persistedTableData) {
-      setTableDataState(persistedTableData);
-    }
   }, []);
 
+  // Normalize date range for useMemo
   const normalizedDateRange = useMemo(
     () => normalizeDateRange(appliedFilter.dateRange),
     [appliedFilter.dateRange?.start, appliedFilter.dateRange?.end]
   );
 
+  // Fetch LGU-to-region mapping on mount
   useEffect(() => {
     const fetchLguToRegion = async () => {
       setLguRegionLoading(true);
@@ -119,186 +276,67 @@ const Reports: React.FC = () => {
     fetchLguToRegion();
   }, []);
 
-  useEffect(() => {
-    if (
-      !hasSearched ||
-      (!appliedFilter.selectedRegions.length && !appliedFilter.selectedIslands.length) ||
-      !normalizedDateRange.start ||
-      !normalizedDateRange.end
-    ) {
-      setTableDataState(null);
-      setHasTableData(false);
-      return;
-    }
-
-    const fetchTableData = async () => {
-      setLoading(true);
-      try {
-        const payload: any = {
-          locationName: appliedFilter.selectedRegions,
-          provinces: appliedFilter.selectedProvinces,
-          cities: appliedFilter.selectedCities,
-          startDate: normalizedDateRange.start
-            ? formatLocalDate(normalizedDateRange.start)
-            : null,
-          endDate: normalizedDateRange.end
-            ? formatLocalDate(normalizedDateRange.end)
-            : null,
-        };
-        Object.keys(payload).forEach(
-          (key) =>
-            (Array.isArray(payload[key]) && payload[key].length === 0) ||
-            payload[key] === null
-              ? delete payload[key]
-              : null
-        );
-        const response = await axios.post(`${import.meta.env.VITE_URL}/api/bp/transaction-count`, payload);
-        setTableDataState(response.data);
-        dispatch(setTableData(response.data));
-        dispatch(setAppliedFilter(appliedFilter));
-      } catch {
-        setTableDataState(null);
-        dispatch(setTableData(null));
-        Swal.fire({
-          icon: "error",
-          title: "Request Failed",
-          text: "Gateway Timeout: The server took too long to respond. Please try again later.",
-          confirmButtonText: "OK",
-          confirmButtonColor: "#3b82f6",
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchTableData();
-  }, [
+  // --- Use custom hook for each report type ---
+  const { data: tableData, loading: loading } = useReportData({
+    moduleKey: BP,
+    apiUrl: `${import.meta.env.VITE_URL}/api/bp/transaction-count`,
+    appliedFilter,
+    lguToRegion,
+    reduxTableData: persistedTableData,
+    reduxAppliedFilter: persistedAppliedFilter,
+    setReduxTableData: (data) => dispatch(setTableData(data)),
+    setReduxAppliedFilter: (filter) => dispatch(setAppliedFilter(filter)),
     hasSearched,
-    appliedFilter.selectedRegions,
-    appliedFilter.selectedProvinces,
-    appliedFilter.selectedCities,
-    normalizedDateRange.start,
-    normalizedDateRange.end,
-  ]);
+    abortSignal: searchAbortController.current?.signal,
+  });
 
-  useEffect(() => {
-    if (
-      !hasSearched ||
-      (!appliedFilter.selectedRegions.length && !appliedFilter.selectedIslands.length) ||
-      !normalizedDateRange.start ||
-      !normalizedDateRange.end
-    ) {
-      setWpTableDataState(null);
-      return;
-    }
-
-    const fetchWpTableData = async () => {
-      setWpLoading(true);
-      try {
-        const payload: any = {
-          locationName: appliedFilter.selectedRegions,
-          provinces: appliedFilter.selectedProvinces,
-          cities: appliedFilter.selectedCities,
-          startDate: normalizedDateRange.start
-            ? formatLocalDate(normalizedDateRange.start)
-            : null,
-          endDate: normalizedDateRange.end
-            ? formatLocalDate(normalizedDateRange.end)
-            : null,
-        };
-        Object.keys(payload).forEach(
-          (key) =>
-            (Array.isArray(payload[key]) && payload[key].length === 0) ||
-            payload[key] === null
-              ? delete payload[key]
-              : null
-        );
-        const response = await axios.post(`${import.meta.env.VITE_URL}/api/wp/transaction-count`, payload);
-        setWpTableDataState(response.data);
-      } catch {
-        setWpTableDataState(null);
-      } finally {
-        setWpLoading(false);
-      }
-    };
-
-    fetchWpTableData();
-  }, [
+  // --- UPDATED: Working Permit uses Redux persistence ---
+  const { data: wpTableData, loading: wpLoading } = useReportData({
+    moduleKey: WP,
+    apiUrl: `${import.meta.env.VITE_URL}/api/wp/transaction-count`,
+    appliedFilter,
+    lguToRegion,
+    reduxTableData: persistedWPTableData,
+    reduxAppliedFilter: persistedWPAppliedFilter,
+    setReduxTableData: (data) => dispatch(setWorkingPermitTableData(data)),
+    setReduxAppliedFilter: (filter) => dispatch(setWorkingPermitAppliedFilter(filter)),
     hasSearched,
-    appliedFilter.selectedRegions,
-    appliedFilter.selectedProvinces,
-    appliedFilter.selectedCities,
-    normalizedDateRange.start,
-    normalizedDateRange.end,
-  ]);
+    abortSignal: searchAbortController.current?.signal,
+  });
 
-  useEffect(() => {
-    if (
-      !hasSearched ||
-      (!appliedFilter.selectedRegions.length && !appliedFilter.selectedIslands.length) ||
-      !normalizedDateRange.start ||
-      !normalizedDateRange.end
-    ) {
-      setBcTableDataState(null);
-      return;
-    }
-
-    const fetchBcTableData = async () => {
-      setBcLoading(true);
-      try {
-        const payload: any = {
-          locationName: appliedFilter.selectedRegions,
-          provinces: appliedFilter.selectedProvinces,
-          cities: appliedFilter.selectedCities,
-          startDate: normalizedDateRange.start
-            ? formatLocalDate(normalizedDateRange.start)
-            : null,
-          endDate: normalizedDateRange.end
-            ? formatLocalDate(normalizedDateRange.end)
-            : null,
-        };
-        Object.keys(payload).forEach(
-          (key) =>
-            (Array.isArray(payload[key]) && payload[key].length === 0) ||
-            payload[key] === null
-              ? delete payload[key]
-              : null
-        );
-        const response = await axios.post(`${import.meta.env.VITE_URL}/api/bc/transaction-count`, payload);
-        setBcTableDataState(response.data);
-      } catch {
-        setBcTableDataState(null);
-      } finally {
-        setBcLoading(false);
-      }
-    };
-
-    fetchBcTableData();
-  }, [
+  // --- NEW: Barangay Clearance uses Redux persistence ---
+  const { data: bcTableData, loading: bcLoading } = useReportData({
+    moduleKey: BC,
+    apiUrl: `${import.meta.env.VITE_URL}/api/bc/transaction-count`,
+    appliedFilter,
+    lguToRegion,
+    reduxTableData: persistedBrgyTableData,
+    reduxAppliedFilter: persistedBrgyAppliedFilter,
+    setReduxTableData: (data) => dispatch(setBrgyClearanceTableData(data)),
+    setReduxAppliedFilter: (filter) => dispatch(setBrgyClearanceAppliedFilter(filter)),
     hasSearched,
-    appliedFilter.selectedRegions,
-    appliedFilter.selectedProvinces,
-    appliedFilter.selectedCities,
-    normalizedDateRange.start,
-    normalizedDateRange.end,
-  ]);
+    abortSignal: searchAbortController.current?.signal,
+  });
 
   // --- PDF/Excel Export Handler ---
-  const handleDownload = async (type: "pdf" | "excel") => {
-    const moduleLabels: string[] = [];
-    if (selectedModules.includes(Bp)) moduleLabels.push("Business Permit");
-    if (selectedModules.includes(WP)) moduleLabels.push("Working Permit");
-    if (selectedModules.includes(BC)) moduleLabels.push("Barangay Clearance");
-    const combinedModuleLabel = moduleLabels.join(", ");
+  const handleDownload = async (type: "pdf" | "excel", permitTypes?: ("business" | "working" | "barangay")[]) => {
+    const modulesToExport = permitTypes
+      ? permitTypes.map((type) => {
+          if (type === "business") return BP;
+          if (type === "working") return WP;
+          if (type === "barangay") return BC;
+          return "";
+        }).filter(Boolean)
+      : selectedModules;
 
     // Business Permit
-    if (selectedModules.includes(Bp) && tableData) {
+    if (modulesToExport.includes(BP) && tableData) {
       const filteredResults = filterTableResults({
         apiData: tableData,
         selectedRegions: appliedFilter.selectedRegions,
         selectedProvinces: appliedFilter.selectedProvinces,
         selectedCities: appliedFilter.selectedCities,
-        selectedDates: [], // <-- Always show all data, do not filter by date type
+        selectedDates: [],
         selectedIslands: appliedFilter.selectedIslands,
         lguToRegion,
         dateRange: appliedFilter.dateRange,
@@ -317,9 +355,9 @@ const Reports: React.FC = () => {
           dateRangeLabel,
           logoUrl: dictImage,
           fileLabel: "business-permit-report",
-          isDayMode: false, // <-- Always false to show all data, not per-day
+          isDayMode: false,
           isBarangayClearance: false,
-          moduleLabel: combinedModuleLabel,
+          moduleLabel: "Business Permit",
         });
       }
       if (type === "excel") {
@@ -328,19 +366,19 @@ const Reports: React.FC = () => {
           lguToRegion,
           dateRangeLabel,
           fileLabel: "business-permit-report",
-          isDayMode: false, // <-- Always false
+          isDayMode: false,
         });
       }
     }
 
     // Working Permit
-    if (selectedModules.includes(WP) && wpTableData) {
+    if (modulesToExport.includes(WP) && wpTableData) {
       const filteredResults = filterTableResults({
         apiData: wpTableData,
         selectedRegions: appliedFilter.selectedRegions,
         selectedProvinces: appliedFilter.selectedProvinces,
         selectedCities: appliedFilter.selectedCities,
-        selectedDates: [], // <-- Always show all data
+        selectedDates: [],
         selectedIslands: appliedFilter.selectedIslands,
         lguToRegion,
         dateRange: appliedFilter.dateRange,
@@ -359,9 +397,9 @@ const Reports: React.FC = () => {
           dateRangeLabel,
           logoUrl: dictImage,
           fileLabel: "working-permit-report",
-          isDayMode: false, // <-- Always false
+          isDayMode: false,
           isBarangayClearance: false,
-          moduleLabel: combinedModuleLabel,
+          moduleLabel: "Working Permit",
         });
       }
       if (type === "excel") {
@@ -370,19 +408,19 @@ const Reports: React.FC = () => {
           lguToRegion,
           dateRangeLabel,
           fileLabel: "working-permit-report",
-          isDayMode: false, // <-- Always false
+          isDayMode: false,
         });
       }
     }
 
     // Barangay Clearance
-    if (selectedModules.includes(BC) && bcTableData) {
+    if (modulesToExport.includes(BC) && bcTableData) {
       const filteredResults = filterTableResults({
         apiData: bcTableData,
         selectedRegions: appliedFilter.selectedRegions,
         selectedProvinces: appliedFilter.selectedProvinces,
         selectedCities: appliedFilter.selectedCities,
-        selectedDates: [], // <-- Always show all data
+        selectedDates: [],
         selectedIslands: appliedFilter.selectedIslands,
         lguToRegion,
         dateRange: appliedFilter.dateRange,
@@ -401,8 +439,8 @@ const Reports: React.FC = () => {
           dateRangeLabel,
           logoUrl: dictImage,
           fileLabel: "barangay-clearance-report",
-          isDayMode: false, // <-- Always false
-          moduleLabel: combinedModuleLabel,
+          isDayMode: false,
+          moduleLabel: "Barangay Clearance",
         });
       }
       if (type === "excel") {
@@ -411,23 +449,51 @@ const Reports: React.FC = () => {
           lguToRegion,
           dateRangeLabel,
           fileLabel: "barangay-clearance-report",
-          isDayMode: false, // <-- Always false
+          isDayMode: false,
         });
       }
     }
   };
 
+  // Search handler
   const handleSearch = (filters: any) => {
-    setAppliedFilterState(filters);
+    const normalizedDateRange = {
+      start: filters.dateRange?.start
+        ? typeof filters.dateRange.start === "string"
+          ? filters.dateRange.start
+          : filters.dateRange.start instanceof Date
+            ? filters.dateRange.start.toISOString().slice(0, 10)
+            : null
+        : null,
+      end: filters.dateRange?.end
+        ? typeof filters.dateRange.end === "string"
+          ? filters.dateRange.end
+          : filters.dateRange.end instanceof Date
+            ? filters.dateRange.end.toISOString().slice(0, 10)
+            : null
+        : null,
+    };
+
+    const normalizedFilters = {
+      ...filters,
+      dateRange: normalizedDateRange,
+    };
+
+    if (areFiltersEqual(normalizedFilters, lastAppliedFilters)) {
+      return;
+    }
+
+    setAppliedFilterState(normalizedFilters);
     setHasSearched(true);
-    dispatch(setAppliedFilter(filters));
-    // Reset abort controller for new search
+    setLastAppliedFilters(normalizedFilters);
+    dispatch(setAppliedFilter(normalizedFilters));
     if (searchAbortController.current) {
       searchAbortController.current.abort();
     }
     searchAbortController.current = new AbortController();
   };
 
+  // Reset handler
   const handleReset = () => {
     dispatch(updateFilterField({ key: 'selectedRegions', value: [] }));
     dispatch(updateFilterField({ key: 'selectedProvinces', value: [] }));
@@ -437,6 +503,7 @@ const Reports: React.FC = () => {
     dispatch(updateFilterField({ key: 'selectedIslands', value: [] }));
     dispatch(updateFilterField({ key: 'selectedModules', value: [] }));
     setHasSearched(false);
+    setLastAppliedFilters(null);
     setAppliedFilterState({
       selectedRegions: [],
       selectedProvinces: [],
@@ -445,25 +512,23 @@ const Reports: React.FC = () => {
       selectedDateType: "",
       selectedIslands: [],
     });
-    setTableDataState(null);
-    setWpTableDataState(null);
-    setBcTableDataState(null);
     setHasTableData(false);
     dispatch(setTableData(null));
     dispatch(setAppliedFilter(null));
+    // --- NEW: Reset Working Permit Redux state ---
+    dispatch(setWorkingPermitTableData(null));
+    dispatch(setWorkingPermitAppliedFilter(null));
+    // --- NEW: Reset Barangay Clearance Redux state ---
+    dispatch(setBrgyClearanceTableData(null));
+    dispatch(setBrgyClearanceAppliedFilter(null));
   };
 
-  const tableContainerRef = useRef<HTMLDivElement>(null);
-
+  // Cancel search handler
   const handleCancelSearch = () => {
     if (searchAbortController.current) {
       searchAbortController.current.abort();
       searchAbortController.current = null;
     }
-    setLoading(false);
-    setWpLoading(false);
-    setBcLoading(false);
-    // Optionally, show a toast or Swal to inform user
     Swal.fire({
       icon: "info",
       title: "Search Cancelled",
@@ -492,9 +557,10 @@ const Reports: React.FC = () => {
           hasTableData={hasTableData}
           loading={loading || wpLoading || bcLoading}
           onCancel={handleCancelSearch}
+          hasSearched={hasSearched}
         />
 
-        {selectedModules.includes(Bp) && (
+        {selectedModules.includes(BP) && (
           <BusinessPermitReport
             selectedRegions={appliedFilter.selectedRegions}
             dateRange={appliedFilter.dateRange}

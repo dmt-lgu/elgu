@@ -12,11 +12,19 @@ import transactionReducer from './transactionSlice';
 import loadReducer from './loadSlice';
 import statusReducer from './statusSlice';
 import reportFilterReducer from './reportFilterSlice';
-import tableReportDataReducer from './tableDataSlice'; 
+import businessPermitTableReducer from './businessPermitSlice';
+import workingPermitTableReducer from './workingPermitTableSlice';
+import brgyClearanceTableReducer from './brgyClearanceTableSlice'; 
 
 const persistConfig = {
   key: 'root',
   storage,
+  whitelist: [
+    'reportFilter',
+    'businessPermitTable',
+    'workingPermitTable',
+    'brgyClearanceTable', 
+  ],
 };
 
 const rootReducer = combineReducers({
@@ -30,18 +38,18 @@ const rootReducer = combineReducers({
   load: loadReducer,
   status: statusReducer,
   reportFilter: reportFilterReducer,
-  tableReport: tableReportDataReducer, 
+  businessPermitTable: businessPermitTableReducer,
+  workingPermitTable: workingPermitTableReducer,
+  brgyClearanceTable: brgyClearanceTableReducer, 
 });
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);
 
 export const store = configureStore({
   reducer: persistedReducer,
-   middleware: (getDefaultMiddleware) =>
+  middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
-      immutableCheck: false, // <-- disables the check
-      // Or, to increase the threshold:
-      // immutableCheck: { warnAfter: 200 }
+      immutableCheck: false,
     }),
 });
 

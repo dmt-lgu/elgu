@@ -39,6 +39,8 @@ function displayCityName(name: string) {
   return name.trim();
 }
 
+
+
 function normalizeApiCities(apiCities: Record<string, string[]>): Record<string, string[]> {
   const normalized: Record<string, string[]> = {};
   for (const [province, cityList] of Object.entries(apiCities)) {
@@ -130,7 +132,12 @@ interface FilterSectionProps {
   hasTableData?: boolean;
   loading?: boolean;
   onCancel?: () => void;
+  hasSearched?: boolean;
+  isActive?: boolean;
+  
 }
+
+
 
 const FilterSection: React.FC<FilterSectionProps> = ({
   onSearch,
@@ -139,6 +146,8 @@ const FilterSection: React.FC<FilterSectionProps> = ({
   hasTableData = false,
   loading = false,
   onCancel,
+  hasSearched = false,
+  isActive = true, 
 }) => {
   // Redux
   const dispatch = useDispatch<AppDispatch>();
@@ -354,17 +363,17 @@ const FilterSection: React.FC<FilterSectionProps> = ({
     dispatch(updateFilterField({ key: 'selectedCities', value: [] }));
   };
 
-  const handleDateRangeChange = (range: { start: Date | null; end: Date | null }) => {
-    dispatch(
-      updateFilterField({
-        key: 'dateRange',
-        value: {
-          start: range.start ?? null,
-          end: range.end ?? null,
-        },
-      })
-    );
-  };
+const handleDateRangeChange = (range: { start: string | null; end: string | null }) => {
+  dispatch(
+    updateFilterField({
+      key: 'dateRange',
+      value: {
+        start: range.start,
+        end: range.end,
+      },
+    })
+  );
+};
 
   // Helper: get all provinces from selected regions
   const getProvincesFromRegions = (regions: string[]) => {
@@ -834,33 +843,33 @@ const FilterSection: React.FC<FilterSectionProps> = ({
           <Button
             className="bg-[#CB371C] hover:bg-[#CB371C] h-9 text-[12px] text-white"
             onClick={handleReset}
-            disabled={loading}
+            disabled={loading || !isActive}
           >
             Reset
           </Button>
           {/* Search/Cancel Button */}
-          {!loading ? (
-            <Button
-              className="bg-primary h-9 text-[12px] text-white"
-              onClick={handleSearchClick}
-              disabled={isSearchDisabled || loading}
-            >
-              Search
-            </Button>
-          ) : (
+          {loading && hasSearched && isActive ? (
             <Button
               className="bg-red-500 hover:bg-red-600 h-9 text-[12px] text-white"
               onClick={onCancel}
-              disabled={!loading}
+              disabled={!loading || !isActive}
               type="button"
             >
               Cancel
+            </Button>
+          ) : (
+            <Button
+              className="bg-primary h-9 text-[12px] text-white"
+              onClick={handleSearchClick}
+              disabled={isSearchDisabled || loading || !isActive}
+            >
+              Search
             </Button>
           )}
           <DropdownMenu>
             <DropdownMenuTrigger>
               <Button
-                disabled={isDownloadDisabled || loading}
+                disabled={isDownloadDisabled || loading || !isActive}
                 className="bg-[#8411DD] hover:bg-[#8411DD] text-white max-w-full text-[10px] h-9 md:w-full"
               >
                 Download
@@ -870,16 +879,16 @@ const FilterSection: React.FC<FilterSectionProps> = ({
               <DropdownMenuLabel>Download Options</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                onClick={() => handleDownloadWithPermitChoice("pdf")}
-                className={`cursor-pointer hover:bg-primary hover:text-white ${isDownloadDisabled || loading ? 'opacity-50 pointer-events-none' : ''}`}
-                disabled={isDownloadDisabled || loading}
+                onClick={() => isActive && handleDownloadWithPermitChoice("pdf")}
+                className={`cursor-pointer hover:bg-primary hover:text-white ${isDownloadDisabled || loading || !isActive ? 'opacity-50 pointer-events-none' : ''}`}
+                disabled={isDownloadDisabled || loading || !isActive}
               >
                 PDF
               </DropdownMenuItem>
               <DropdownMenuItem
-                onClick={() => handleDownloadWithPermitChoice("excel")}
-                className={`cursor-pointer ${isDownloadDisabled || loading ? 'opacity-50 pointer-events-none' : ''}`}
-                disabled={isDownloadDisabled || loading}
+                onClick={() => isActive && handleDownloadWithPermitChoice("excel")}
+                className={`cursor-pointer ${isDownloadDisabled || loading || !isActive ? 'opacity-50 pointer-events-none' : ''}`}
+                disabled={isDownloadDisabled || loading || !isActive}
               >
                 Excel
               </DropdownMenuItem>

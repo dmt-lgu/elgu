@@ -1,4 +1,4 @@
-import React, { forwardRef, useEffect, useMemo } from 'react';
+import React, { forwardRef, useEffect, useMemo, useState } from 'react';
 import {
   Table,
   TableBody,
@@ -28,7 +28,7 @@ interface TableReportProps {
   selectedIslands?: string[];
   lguProvinceFilter?: { lgu: string; province: string };
   hasSearched?: boolean;
-  onTableDataChange?: (hasData: boolean) => void; // <-- NEW: callback to notify parent if table has data
+  onTableDataChange?: (hasData: boolean) => void;
 }
 
 // --- Utility: Normalize a date value to Date or null ---
@@ -68,7 +68,6 @@ function formatMonthYear(monthStr: string): string {
 function groupResultsByRegion(results: any[], lguToRegion: Record<string, string>) {
   const grouped: Record<string, any[]> = {};
   results.forEach(lgu => {
-    // Only use internal key for grouping
     const regionInternal =
       regionMapping[lgu.region] ||
       regionMapping[lgu.regionCode] ||
@@ -197,10 +196,120 @@ export function filterTableResults({
   lguToRegion?: Record<string, string>;
   dateRange?: { start: Date | string | null; end: Date | string | null };
 }) {
+  // Helper: Normalize a date value to Date or null
+  function ensureDate(d: Date | string | null | undefined): Date | null {
+    if (!d) return null;
+    if (d instanceof Date) return d;
+    if (typeof d === 'string') {
+      const dt = new Date(d);
+      return isNaN(dt.getTime()) ? null : dt;
+    }
+    return null;
+  }
+
+  // Helper: Normalize a DateRange object
+  function normalizeDateRange(dr: { start: Date | string | null; end: Date | string | null }) {
+    return {
+      start: ensureDate(dr?.start),
+      end: ensureDate(dr?.end),
+    };
+  }
+
+  // Helper: Check if a month is in the selected range
+  function isMonthInRange(monthStr: string, range: { start: Date | null; end: Date | null }) {
+    if (!range.start && !range.end) return true;
+    const monthDate = monthStr.length === 7
+      ? new Date(monthStr + "-01")
+      : new Date(monthStr);
+
+    const start = range.start ? new Date(range.start.getFullYear(), range.start.getMonth(), 1) : null;
+    const end = range.end ? new Date(range.end.getFullYear(), range.end.getMonth() + 1, 0) : null;
+
+    if (start && end) {
+      return monthDate >= start && monthDate <= end;
+    } else if (start) {
+      return monthDate >= start;
+    } else if (end) {
+      return monthDate <= end;
+    }
+    return true;
+  }
+
+  // Helper: Extract province from lgu.province or from lgu.lgu string
+  function extractProvince(lgu: any): string | undefined {
+    if (lgu.province && typeof lgu.province === "string" && lgu.province.trim() !== "") {
+      return lgu.province.trim();
+    }
+    if (lgu.lgu && typeof lgu.lgu === "string") {
+      const parts = lgu.lgu.split(",");
+      if (parts.length > 1) {
+        return parts[parts.length - 1].trim();
+      }
+    }
+    return undefined;
+  }
+
+  // Helper: Extract city/municipality from lgu.lgu or lgu.city
+  function extractCity(lgu: any): string | undefined {
+    if (lgu.city && typeof lgu.city === "string" && lgu.city.trim() !== "") {
+      return lgu.city.trim();
+    }
+    if (lgu.lgu && typeof lgu.lgu === "string") {
+      const parts = lgu.lgu.split(",");
+      if (parts.length > 1) {
+        return parts[0].trim();
+      }
+      return lgu.lgu.trim();
+    }
+    return undefined;
+  }
+
+  // Merge LGU+province and sum all months in range (for Month/Year selection)
+  function mergeLguProvinceSumAllMonths(
+    results: any[],
+    dateRange: { start: Date | null; end: Date | null }
+  ) {
+    const merged: Record<string, any> = {};
+
+    results.forEach(lgu => {
+      const province = extractProvince(lgu) || "";
+      const key = `${lgu.lgu}||${province}`;
+      if (!merged[key]) {
+        merged[key] = {
+          ...lgu,
+          monthlyResults: [],
+          sum: {},
+          months: [],
+        };
+      }
+      // Filter months in range
+      const filteredMonths = lgu.monthlyResults.filter((month: any) =>
+        isMonthInRange(month.month, dateRange)
+      );
+      filteredMonths.forEach((month: any) => {
+        merged[key].months.push(month.month);
+        Object.keys(month).forEach(k => {
+          if (typeof month[k] === "number") {
+            merged[key].sum[k] = (merged[key].sum[k] || 0) + month[k];
+          }
+        });
+      });
+    });
+
+    // Clean up months (unique)
+    Object.values(merged).forEach((item: any) => {
+      item.months = Array.from(new Set(item.months));
+    });
+
+    return Object.values(merged);
+  }
+
+  // --- Begin filter logic ---
   const normalizedDateRange = normalizeDateRange(dateRange);
   let filtered = Array.isArray(apiData?.results) ? apiData.results : [];
 
   // Helper: get all regions from selected islands
+  // You must import or define islandRegionMap and regionMapping in this file or import from your utils
   const getRegionsFromIslands = (islands: string[]) => {
     const regions = islands.flatMap(island => islandRegionMap[island] || []);
     return Array.from(new Set(regions));
@@ -297,9 +406,7 @@ export function getDateRangeLabel(
   return "";
 }
 
-
-
-
+// --- Loader Persistence Logic using Redux-persisted table data/filter ---
 const BusinessPermitReport = forwardRef<HTMLDivElement, TableReportProps>(({
   selectedRegions,
   dateRange,
@@ -311,31 +418,122 @@ const BusinessPermitReport = forwardRef<HTMLDivElement, TableReportProps>(({
   selectedDates = [],
   selectedIslands,
   hasSearched = false,
-  onTableDataChange, // <-- NEW
+  onTableDataChange,
 }, ref) => {
-  // Normalize dateRange at the top of the component
   const normalizedDateRange = useMemo(
     () => normalizeDateRange(dateRange),
     [dateRange?.start, dateRange?.end]
   );
 
-  // Get selectedIslands from Redux if not passed as prop
+  // Redux persisted data/filter
+  const persistedTableData = useSelector((state: RootState) => state.businessPermitTable.tableData);
+  const persistedAppliedFilter = useSelector((state: RootState) => state.businessPermitTable.appliedFilter);
   const reduxSelectedIslands = useSelector((state: RootState) => state.reportFilter.selectedIslands || []);
   const islandsToUse = selectedIslands && selectedIslands.length > 0 ? selectedIslands : reduxSelectedIslands;
 
-  // Helper: get all regions from selected islands
-  const getRegionsFromIslands = (islands: string[]) => {
-    const regions = islands.flatMap(island => islandRegionMap[island] || []);
-    return Array.from(new Set(regions));
-  };
+  
+  // Helper to compare filters shallowly
+  function isSameFilter(a: any, b: any) {
+    if (!a || !b) return false;
+    return (
+      JSON.stringify(a.selectedRegions) === JSON.stringify(b.selectedRegions) &&
+      JSON.stringify(a.selectedProvinces) === JSON.stringify(b.selectedProvinces) &&
+      JSON.stringify(a.selectedCities) === JSON.stringify(b.selectedCities) &&
+      JSON.stringify(a.selectedIslands) === JSON.stringify(b.selectedIslands) &&
+      JSON.stringify(a.dateRange) === JSON.stringify(b.dateRange)
+    );
+  }
+
+  // --- Loader logic: initialize based on persisted data/filter match ---
+  const [showLoader, setShowLoader] = useState(() => {
+    if (
+      persistedTableData &&
+      persistedAppliedFilter &&
+      isSameFilter(
+        {
+          selectedRegions,
+          selectedProvinces,
+          selectedCities,
+          selectedIslands: islandsToUse,
+          dateRange,
+        },
+        {
+          selectedRegions: persistedAppliedFilter.selectedRegions,
+          selectedProvinces: persistedAppliedFilter.selectedProvinces,
+          selectedCities: persistedAppliedFilter.selectedCities,
+          selectedIslands: persistedAppliedFilter.selectedIslands,
+          dateRange: persistedAppliedFilter.dateRange,
+        }
+      )
+    ) {
+      return false;
+    }
+    return true;
+  });
+
+  useEffect(() => {
+    if (
+      persistedTableData &&
+      persistedAppliedFilter &&
+      isSameFilter(
+        {
+          selectedRegions,
+          selectedProvinces,
+          selectedCities,
+          selectedIslands: islandsToUse,
+          dateRange,
+        },
+        {
+          selectedRegions: persistedAppliedFilter.selectedRegions,
+          selectedProvinces: persistedAppliedFilter.selectedProvinces,
+          selectedCities: persistedAppliedFilter.selectedCities,
+          selectedIslands: persistedAppliedFilter.selectedIslands,
+          dateRange: persistedAppliedFilter.dateRange,
+        }
+      )
+    ) {
+      setShowLoader(false);
+    } else {
+      setShowLoader(true);
+    }
+  }, [
+    persistedTableData,
+    persistedAppliedFilter,
+    selectedRegions,
+    selectedProvinces,
+    selectedCities,
+    islandsToUse,
+    dateRange,
+  ]);
+
+  // Use persistedTableData if available and filter matches, else use apiData
+  const effectiveApiData =
+    persistedTableData &&
+    persistedAppliedFilter &&
+    isSameFilter(
+      {
+        selectedRegions,
+        selectedProvinces,
+        selectedCities,
+        selectedIslands: islandsToUse,
+        dateRange,
+      },
+      {
+        selectedRegions: persistedAppliedFilter.selectedRegions,
+        selectedProvinces: persistedAppliedFilter.selectedProvinces,
+        selectedCities: persistedAppliedFilter.selectedCities,
+        selectedIslands: persistedAppliedFilter.selectedIslands,
+        dateRange: persistedAppliedFilter.dateRange,
+      }
+    )
+      ? persistedTableData
+      : apiData;
 
   const filteredResults = useMemo(() => {
-    let filtered = Array.isArray(apiData?.results) ? apiData.results : [];
+    let filtered = Array.isArray(effectiveApiData?.results) ? effectiveApiData.results : [];
 
-    // Filter by islands if any are selected
     if (islandsToUse.length > 0) {
-      const regionsFromIslands = getRegionsFromIslands(islandsToUse);
-      // Convert region codes to internal keys
+      const regionsFromIslands = islandsToUse.flatMap(island => islandRegionMap[island] || []);
       const regionsInternal = regionsFromIslands.map(code => regionMapping[code] || code);
       filtered = filtered.filter((lgu: any) => {
         const regionInternal =
@@ -346,7 +544,6 @@ const BusinessPermitReport = forwardRef<HTMLDivElement, TableReportProps>(({
       });
     } else if (selectedRegions.length > 0) {
       filtered = filtered.filter((lgu: any) => {
-        // Map region code to internal key if possible
         const regionInternal =
           regionMapping[lgu.region] ||
           regionMapping[lgu.regionCode] ||
@@ -381,7 +578,6 @@ const BusinessPermitReport = forwardRef<HTMLDivElement, TableReportProps>(({
       });
     }
 
-    // If "Day" is selected, DO NOT merge, just filter by date range
     if (selectedDates && selectedDates.includes("Day")) {
       return filtered.map((lgu: any) => ({
         ...lgu,
@@ -391,14 +587,13 @@ const BusinessPermitReport = forwardRef<HTMLDivElement, TableReportProps>(({
         months: lgu.monthlyResults
           .filter((month: any) => isMonthInRange(month.month, normalizedDateRange))
           .map((month: any) => month.month),
-        sum: {}, // Not used in this mode
+        sum: {},
       }));
     }
 
-    // Else, merge and sum duplicates here!
     return mergeLguProvinceSumAllMonths(filtered, normalizedDateRange);
   }, [
-    apiData?.results,
+    effectiveApiData?.results,
     selectedRegions.join("-"),
     selectedProvinces.join("-"),
     selectedCities.join("-"),
@@ -411,10 +606,10 @@ const BusinessPermitReport = forwardRef<HTMLDivElement, TableReportProps>(({
 
   // Notify parent if table has data (for enabling Download button)
   useEffect(() => {
-  if (onTableDataChange) {
-    onTableDataChange(filteredResults.length > 0);
-  }
-}, [filteredResults.length, onTableDataChange]);
+    if (onTableDataChange) {
+      onTableDataChange(filteredResults.length > 0);
+    }
+  }, [filteredResults.length, onTableDataChange]);
 
   // Format date range label
   let dateRangeLabel = "";
@@ -439,7 +634,6 @@ const BusinessPermitReport = forwardRef<HTMLDivElement, TableReportProps>(({
           const sum = lgu.sum;
           rows.push(
             <TableRow key={`${region}-${lgu.lgu}`}>
-              {/* Only render the Region cell for the first LGU in the region, with rowSpan */}
               {idx === 0 && (
                 <TableCell
                   className="border px-2 py-1 text-center font-bold bg-card left-0 z-10 align-middle"
@@ -479,11 +673,9 @@ const BusinessPermitReport = forwardRef<HTMLDivElement, TableReportProps>(({
             </TableRow>
           );
         } else {
-          // Day mode: render per monthlyResults
           lgu.monthlyResults.forEach((month: any, mIdx: number) => {
             rows.push(
               <TableRow key={`${region}-${lgu.lgu}-${month.month}-${mIdx}`}>
-                {/* Only render the Region cell for the first LGU in the region, with rowSpan */}
                 {idx === 0 && mIdx === 0 && (
                   <TableCell
                     className="border px-2 py-1 text-center font-bold bg-card left-0 z-10 align-middle"
@@ -541,7 +733,6 @@ const BusinessPermitReport = forwardRef<HTMLDivElement, TableReportProps>(({
     };
 
     filteredResults.forEach((lgu: any) => {
-      // If sum exists, use it (Month/Year mode), else sum monthlyResults (Day mode)
       if (lgu.sum && Object.keys(lgu.sum).length > 0) {
         totals.newPaid += lgu.sum.newPaid || 0;
         totals.newGeoPay += lgu.sum.newPaidViaEgov || 0;
@@ -572,49 +763,13 @@ const BusinessPermitReport = forwardRef<HTMLDivElement, TableReportProps>(({
     return totals;
   }, [filteredResults]);
 
-  // Swal no results effect only (loading modal removed)
-  // const noResultsAlertShown = useRef<boolean>(false);
-
-useEffect(() => {
-  // You can add your logic here if you want to show a Swal alert or handle no results.
-  // Example (uncomment if you want to show an alert):
-  /*
-  if (
-    !loading &&
-    filteredResults.length === 0 &&
-    hasSearched &&
-    selectedRegions.length > 0 &&
-    normalizedDateRange.start &&
-    normalizedDateRange.end &&
-    !noResultsAlertShown.current
-  ) {
-    Swal.fire({
-      icon: "info",
-      title: "No Results",
-      text: "No results found, Please try again!",
-      timer: 2000,
-      showConfirmButton: false,
-    });
-    noResultsAlertShown.current = true;
-  } else if (filteredResults.length > 0) {
-    noResultsAlertShown.current = false;
-  }
-  */
-}, [
-  loading,
-  filteredResults.length,
-  selectedRegions.join(","),
-  normalizedDateRange?.start?.toISOString?.() ?? "",
-  normalizedDateRange?.end?.toISOString?.() ?? "",
-  hasSearched
-]);
-
   return (
-    
     <div ref={ref} className="bg-card p-4 rounded-md border text-secondary-foreground border-border shadow-sm">
-      {loading && (
-        <Loading />
-      )}
+      {/* Only show the Loading overlay, not the loader TableRow/TableBody, if persisted data/filter match */}
+    {hasSearched && (showLoader || loading) && 
+      <Loading 
+    />}
+
       <div ref={ref}>
         <div className='flex justify-center mb-4 p-5'>
           <img src={dictImage} alt="dict logo" className='w-80 h-full'/>
@@ -661,14 +816,15 @@ useEffect(() => {
             </TableRow>
           </TableHeader>
          
-          <TableBody className="[&>tr:nth-child(odd)]:bg-accent">
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={16} className="text-center py-4 border">
-                  <LoaderTable />
-                </TableCell>
-              </TableRow>
-            ) : (
+           <TableBody className="[&>tr:nth-child(odd)]:bg-accent">
+            {/* Only show loader TableRow if not using persisted data/filter */}
+            {hasSearched && (showLoader || loading) ? (
+                <TableRow>
+                  <TableCell colSpan={16} className="text-center py-4 border">
+                    <LoaderTable />
+                  </TableCell>
+                </TableRow>
+              ) : (
               filteredResults.length === 0 ? (
                 hasSearched ? ( 
                   (selectedRegions.length > 0 || (normalizedDateRange?.start && normalizedDateRange?.end)) ? (
@@ -708,25 +864,24 @@ useEffect(() => {
                   ({dateRangeLabel})
                 </span>
               </TableCell>
-              <TableCell className="border px-2 py-1 text-center">{loading ? 0 : grandTotals.newPaid}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{loading ? 0 : grandTotals.newGeoPay}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{loading ? 0 : grandTotals.newPending}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{loading ? 0 : (grandTotals.newPaid + grandTotals.newGeoPay + grandTotals.newPending)}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{loading ? 0 : grandTotals.renewalPaid}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{loading ? 0 : grandTotals.renewalGeoPay}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{loading ? 0 : grandTotals.renewalPending}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{loading ? 0 : (grandTotals.renewalPaid + grandTotals.renewalGeoPay + grandTotals.renewalPending)}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{loading ? 0 : grandTotals.malePaid}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{loading ? 0 : grandTotals.malePending}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{loading ? 0 : (grandTotals.malePaid + grandTotals.malePending)}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{loading ? 0 : grandTotals.femalePaid}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{loading ? 0 : grandTotals.femalePending}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{loading ? 0 : (grandTotals.femalePaid + grandTotals.femalePending)}</TableCell>
+              {/* Show 0s if loading or showLoader is true */}
+              <TableCell className="border px-2 py-1 text-center">{(showLoader || loading) ? 0 : grandTotals.newPaid}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{(showLoader || loading) ? 0 : grandTotals.newGeoPay}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{(showLoader || loading) ? 0 : grandTotals.newPending}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{(showLoader || loading) ? 0 : (grandTotals.newPaid + grandTotals.newGeoPay + grandTotals.newPending)}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{(showLoader || loading) ? 0 : grandTotals.renewalPaid}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{(showLoader || loading) ? 0 : grandTotals.renewalGeoPay}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{(showLoader || loading) ? 0 : grandTotals.renewalPending}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{(showLoader || loading) ? 0 : (grandTotals.renewalPaid + grandTotals.renewalGeoPay + grandTotals.renewalPending)}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{(showLoader || loading) ? 0 : grandTotals.malePaid}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{(showLoader || loading) ? 0 : grandTotals.malePending}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{(showLoader || loading) ? 0 : (grandTotals.malePaid + grandTotals.malePending)}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{(showLoader || loading) ? 0 : grandTotals.femalePaid}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{(showLoader || loading) ? 0 : grandTotals.femalePending}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{(showLoader || loading) ? 0 : (grandTotals.femalePaid + grandTotals.femalePending)}</TableCell>
             </TableRow>
           </TableBody>
-          
         </Table>
-        
       </div>
     </div>
   );

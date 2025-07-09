@@ -1,4 +1,4 @@
-import React, { forwardRef, useEffect, useMemo } from 'react';
+import React, { forwardRef, useEffect, useMemo, useState } from 'react';
 import {
   Table,
   TableBody,
@@ -181,6 +181,18 @@ function mergeLguProvinceSumAllMonths(
   return Object.values(merged);
 }
 
+// --- Loader persistence logic ---
+function isSameFilter(a: any, b: any) {
+  if (!a || !b) return false;
+  return (
+    JSON.stringify(a.selectedRegions) === JSON.stringify(b.selectedRegions) &&
+    JSON.stringify(a.selectedProvinces) === JSON.stringify(b.selectedProvinces) &&
+    JSON.stringify(a.selectedCities) === JSON.stringify(b.selectedCities) &&
+    JSON.stringify(a.selectedIslands) === JSON.stringify(b.selectedIslands) &&
+    JSON.stringify(a.dateRange) === JSON.stringify(b.dateRange)
+  );
+}
+
 const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
   selectedRegions,
   dateRange,
@@ -200,22 +212,56 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
     [dateRange?.start, dateRange?.end]
   );
 
-  // Get selectedIslands from Redux if not passed as prop
+  // Loader persistence logic
+  const persistedBrgyTableData = useSelector((state: RootState) => state.brgyClearanceTable.tableData);
+  const persistedBrgyAppliedFilter = useSelector((state: RootState) => state.brgyClearanceTable.appliedFilter);
   const reduxSelectedIslands = useSelector((state: RootState) => state.reportFilter.selectedIslands || []);
   const islandsToUse = selectedIslands && selectedIslands.length > 0 ? selectedIslands : reduxSelectedIslands;
 
-  // Helper: get all regions from selected islands
-  const getRegionsFromIslands = (islands: string[]) => {
-    const regions = islands.flatMap(island => islandRegionMap[island] || []);
-    return Array.from(new Set(regions));
-  };
+  const [showLoader, setShowLoader] = useState(true);
 
+  useEffect(() => {
+    if (
+      persistedBrgyTableData &&
+      persistedBrgyAppliedFilter &&
+      isSameFilter(
+        {
+          selectedRegions,
+          selectedProvinces,
+          selectedCities,
+          selectedIslands: islandsToUse,
+          dateRange,
+        },
+        {
+          selectedRegions: persistedBrgyAppliedFilter.selectedRegions,
+          selectedProvinces: persistedBrgyAppliedFilter.selectedProvinces,
+          selectedCities: persistedBrgyAppliedFilter.selectedCities,
+          selectedIslands: persistedBrgyAppliedFilter.selectedIslands,
+          dateRange: persistedBrgyAppliedFilter.dateRange,
+        }
+      )
+    ) {
+      setShowLoader(false);
+    } else {
+      setShowLoader(true);
+    }
+  }, [
+    persistedBrgyTableData,
+    persistedBrgyAppliedFilter,
+    selectedRegions,
+    selectedProvinces,
+    selectedCities,
+    islandsToUse,
+    dateRange,
+  ]);
+
+  // Get filtered results (table data logic unchanged)
   const filteredResults = useMemo(() => {
     let filtered = Array.isArray(apiData?.results) ? apiData.results : [];
 
     // Filter by islands if any are selected
     if (islandsToUse.length > 0) {
-      const regionsFromIslands = getRegionsFromIslands(islandsToUse);
+      const regionsFromIslands = islandsToUse.flatMap(island => islandRegionMap[island] || []);
       // Convert region codes to internal keys
       const regionsInternal = regionsFromIslands.map(code => regionMapping[code] || code);
       filtered = filtered.filter((lgu: any) => {
@@ -395,7 +441,7 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
 
   return (
     <div ref={ref} className="bg-card p-4 rounded-md border text-secondary-foreground border-border shadow-sm">
-      {loading && (
+     {(hasSearched && (showLoader || loading)) && (
         <Loading />
       )}
       <div>
@@ -421,7 +467,7 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
             </TableRow>
           </TableHeader>
           <TableBody className="[&>tr:nth-child(odd)]:bg-accent">
-            {loading ? (
+            {hasSearched && (showLoader || loading) ? (
               <TableRow>
                 <TableCell colSpan={3} className="text-center py-4 border">
                   <LoaderTable />
@@ -468,18 +514,21 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
                 </span>
               </TableCell>
               <TableCell className="border px-2 py-1 text-center">
-                {filteredResults.reduce((sum: number, lgu: any) => {
-                  if (typeof lgu.totalCount === "number") {
-                    return sum + lgu.totalCount;
-                  }
-                  if (Array.isArray(lgu.monthlyResults)) {
-                    return sum + lgu.monthlyResults.reduce(
-                      (mSum: number, month: any) => mSum + (typeof month.totalCount === "number" ? month.totalCount : 0),
-                      0
-                    );
-                  }
-                  return sum;
-                }, 0)}
+                {(loading || showLoader)
+                  ? 0
+                  : filteredResults.reduce((sum: number, lgu: any) => {
+                      if (typeof lgu.totalCount === "number") {
+                        return sum + lgu.totalCount;
+                      }
+                      if (Array.isArray(lgu.monthlyResults)) {
+                        return sum + lgu.monthlyResults.reduce(
+                          (mSum: number, month: any) => mSum + (typeof month.totalCount === "number" ? month.totalCount : 0),
+                          0
+                        );
+                      }
+                      return sum;
+                    }, 0)
+                }
               </TableCell>
             </TableRow>
           </TableBody>
