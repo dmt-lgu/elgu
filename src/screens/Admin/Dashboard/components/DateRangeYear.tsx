@@ -24,15 +24,27 @@ function DateRangeYear({
   const reduxStart = data?.startDate;
   const reduxEnd = data?.endDate;
 
-  // Parse years from Redux dates, fallback to current year if not set
-  const startYearRedux = reduxStart ? new Date(reduxStart).getFullYear() : new Date().getFullYear() - 10;
-  const endYearRedux = reduxEnd ? new Date(reduxEnd).getFullYear() : new Date().getFullYear() + 1;
+  // Parse years from Redux dates, fallback to current year if not set or invalid
+  const currentYear = new Date().getFullYear();
+  
+  const startYearRedux = (() => {
+    if (!reduxStart || reduxStart === "") return currentYear - 10;
+    const date = new Date(reduxStart);
+    return isNaN(date.getTime()) ? currentYear - 10 : date.getFullYear();
+  })();
+  
+  const endYearRedux = (() => {
+    if (!reduxEnd || reduxEnd === "") return currentYear + 1;
+    const date = new Date(reduxEnd);
+    return isNaN(date.getTime()) ? currentYear + 1 : date.getFullYear();
+  })();
 
   // Generate years for dropdown based on Redux, highest to lowest
   const years = Array.from(
-    { length: endYearRedux - startYearRedux  },
+    { length: endYearRedux - startYearRedux + 1 }, // Added +1 to include both start and end years
     (_, i) => startYearRedux + i
   ).reverse();
+  
   const yearOptions = years.map(y => ({
     value: y,
     label: y.toString(),
@@ -43,10 +55,28 @@ function DateRangeYear({
   const [to, setTo] = React.useState<YearOnly | null>(null);
   const loading = useSelector(selectLoad);
 
+  // Initialize with Redux values on mount
+  React.useEffect(() => {
+    if (reduxStart && reduxStart !== "") {
+      const startDate = new Date(reduxStart);
+      if (!isNaN(startDate.getTime())) {
+        setFrom({ year: startDate.getFullYear() });
+      }
+    }
+    
+    if (reduxEnd && reduxEnd !== "") {
+      const endDate = new Date(reduxEnd);
+      if (!isNaN(endDate.getTime())) {
+        setTo({ year: endDate.getFullYear() });
+      }
+    }
+  }, [reduxStart, reduxEnd]);
+
   // Sync with value prop (robust to string or Date)
   React.useEffect(() => {
     let startDate: Date | null = null;
     let endDate: Date | null = null;
+    
     if (value?.start) {
       startDate = value.start instanceof Date ? value.start : new Date(value.start);
       if (!isNaN(startDate.getTime())) {
@@ -57,6 +87,7 @@ function DateRangeYear({
     } else {
       setFrom(null);
     }
+    
     if (value?.end) {
       endDate = value.end instanceof Date ? value.end : new Date(value.end);
       if (!isNaN(endDate.getTime())) {
@@ -74,6 +105,7 @@ function DateRangeYear({
     setFrom({ year });
     // Do not reset 'to' here!
   };
+  
   const handleToYear = (year: number) => {
     if (from && year < from.year) {
       setTo(from);
@@ -92,8 +124,8 @@ function DateRangeYear({
         [startYear, endYear] = [endYear, startYear];
       }
       onChange({
-        start: new Date(from.year, 0, 1), // 01-01-YYYY
-        end: new Date(to.year, 11, 31),   // 12-31-YYYY
+        start: new Date(startYear, 0, 1), // 01-01-YYYY
+        end: new Date(endYear, 11, 31),   // 12-31-YYYY
       });
     } else if (from && onChange) {
       onChange({
@@ -158,9 +190,9 @@ function DateRangeYear({
             variant="default"
             onClick={handleApply}
             disabled={!from}
-            className={loading?" h-8 pointer-events-none":"h-8"}
+            className={loading ? " h-8 pointer-events-none" : "h-8"}
           >
-          {loading ? "Applying..." : "Apply"}
+            {loading ? "Applying..." : "Apply"}
           </Button>
           <Button
             variant="outline"

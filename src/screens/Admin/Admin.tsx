@@ -206,6 +206,11 @@ function Admin() {
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
+      console.log("Fetching transaction data with:", {
+        locationName: data.locationName,
+        startDate: data.startDate,
+        endDate: data.endDate,
+      });
       if (data.locationName.length !== 0 && data.startDate && data.endDate) {
         GetTransaction();
       }
