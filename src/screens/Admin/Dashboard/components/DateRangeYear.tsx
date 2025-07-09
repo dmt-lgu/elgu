@@ -4,6 +4,7 @@ import React from "react";
 import Select from "react-select";
 import { useSelector } from "react-redux";
 import { selectData } from "@/redux/dataSlice"; // Update the import path as needed
+import { selectLoad } from '@/redux/loadSlice';
 
 type YearOnly = { year: number };
 
@@ -40,6 +41,7 @@ function DateRangeYear({
   // Internal state for year selection
   const [from, setFrom] = React.useState<YearOnly | null>(null);
   const [to, setTo] = React.useState<YearOnly | null>(null);
+  const loading = useSelector(selectLoad);
 
   // Sync with value prop (robust to string or Date)
   React.useEffect(() => {
@@ -90,8 +92,8 @@ function DateRangeYear({
         [startYear, endYear] = [endYear, startYear];
       }
       onChange({
-        start: new Date(startYear, 1, -29), // 01-01-YYYY
-        end: new Date(endYear, 11, 32), // 12-31-YYYY
+        start: new Date(from.year, 0, 1), // 01-01-YYYY
+        end: new Date(to.year, 11, 31),   // 12-31-YYYY
       });
     } else if (from && onChange) {
       onChange({
@@ -156,9 +158,9 @@ function DateRangeYear({
             variant="default"
             onClick={handleApply}
             disabled={!from}
-            className="h-8 "
+            className={loading?" h-8 pointer-events-none":"h-8"}
           >
-            Apply
+          {loading ? "Applying..." : "Apply"}
           </Button>
           <Button
             variant="outline"

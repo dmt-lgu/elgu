@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { Button } from "@/components/ui/button";
+import { selectLoad } from '@/redux/loadSlice';
+import { useSelector } from 'react-redux';
 
 interface DateRange {
   start: Date | null;
@@ -20,7 +22,7 @@ const DateRangeDay: React.FC<DateRangePickerProps> = ({ value, onChange }) => {
   // Draft values (user editing)
   const [draftStart, setDraftStart] = useState<Date | null>(value?.start ?? null);
   const [draftEnd, setDraftEnd] = useState<Date | null>(value?.end ?? null);
-
+  const loading = useSelector(selectLoad);
   // Sync with parent value
   useEffect(() => {
     setAppliedStart(value?.start ?? null);
@@ -74,12 +76,12 @@ const DateRangeDay: React.FC<DateRangePickerProps> = ({ value, onChange }) => {
       </div>
       <div className="flex gap-2 mt-2 justify-end">
         <Button
-          className="h-8"
+          className={loading?" h-8 pointer-events-none":"h-8"}
           variant="default"
           onClick={handleApply}
           disabled={!draftStart}
         >
-          Apply
+          {loading ? "Applying..." : "Apply"}
         </Button>
         <Button
           className="bg-red-500 text-white hover:bg-red-600 hover:text-white h-8"

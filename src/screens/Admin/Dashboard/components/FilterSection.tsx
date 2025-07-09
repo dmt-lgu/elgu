@@ -11,10 +11,6 @@ import { FilterState } from '../utils/types';
 import { selectRegions } from '@/redux/regionSlice';
 import { selectData, setData } from '@/redux/dataSlice';
 
-const formatDate = (date: Date | null): string => {
-  if (!date) return '';
-  return date.toISOString().split('T')[0]; // Returns YYYY-MM-DD format
-};
 
 // Add this type for the formatted state
 interface FormattedFilterState {
@@ -108,12 +104,13 @@ const FilterSection: React.FC = () => {
     }));
   };
 
+  // FIXED: Initialize filterState with serializable values only
   const [filterState, setFilterState] = useState<FilterState>({
     selectedModules: [modules[0]],
     selectedRegions: data?.locationName || [], // Initialize from Redux data
     dateRange: {
-      start: null,
-      end: null
+      start: null, // This should be null or string, not Date object
+      end: null    // This should be null or string, not Date object
     }
   });
 
@@ -176,9 +173,6 @@ const FilterSection: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Get municipalities for selected regions
-
-
   // --- Other handlers ---
   const toggleModule = (module: string) => {
     setFilterState(prev => ({
@@ -224,9 +218,6 @@ const FilterSection: React.FC = () => {
     setSelectedIslands([]);
     setCityOptions([]);
   };
-
-  // Helper: get all regions from selected islands
-
 
   // When group of islands is toggled
   const toggleIsland = (island: string) => {
@@ -300,7 +291,7 @@ const FilterSection: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isDateOpen]);
 
-  // Redux state for date range
+  // Redux state for date range - FIXED: Use string values instead of Date objects
   const selectedDateType = data.selectedDateType || "";
   const startDate = data.startDate ? new Date(data.startDate) : null;
   const endDate = data.endDate ? new Date(data.endDate) : null;
@@ -312,12 +303,31 @@ const FilterSection: React.FC = () => {
     }));
   };
 
+  // FIXED: Store dates as strings in Redux
   const handleDateRangeChange = (range: { start: Date | null; end: Date | null }) => {
+    // Use 'Asia/Manila' for date format
+    const formatLocal = (date: Date | null) =>
+      date
+        ? date.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }) // 'YYYY-MM-DD'
+        : "";
+
+    // Store as strings in Redux (already correct)
     dispatch(setData({
       ...data,
-      startDate: range.start ? range.start.toISOString().split('T')[0] : "",
-      endDate: range.end ? range.end.toISOString().split('T')[0] : ""
+      startDate: formatLocal(range.start),
+      endDate: formatLocal(range.end)
     }));
+
+    // FIXED: Don't store Date objects in filterState - store strings or keep it separate
+    // Remove this problematic update to filterState.dateRange since it's not being used elsewhere
+    // If you need it, store as strings:
+    // setFilterState(prev => ({
+    //   ...prev,
+    //   dateRange: {
+    //     start: formatLocal(range.start),
+    //     end: formatLocal(range.end)
+    //   }
+    // }));
   };
 
   const deselectAllDates = () => {
@@ -341,7 +351,7 @@ const FilterSection: React.FC = () => {
     }
   }, [filterState.selectedRegions]); // Only depend on selectedRegions
 
-  // Add this function inside your component to format the state
+  // FIXED: Update the getFormattedState function to handle date range properly
   const getFormattedState = (): FormattedFilterState => {
     return {
       selectedModules: filterState.selectedModules,
@@ -350,14 +360,12 @@ const FilterSection: React.FC = () => {
         return matchedRegion ? matchedRegion.id : region;
       }),
       dateRange: {
-        start: formatDate(filterState.dateRange.start),
-        end: formatDate(filterState.dateRange.end)
+        // Use the Redux state values which are already strings
+        start: data.startDate || "",
+        end: data.endDate || ""
       }
     };
   };
-
-  // Update your useEffect to log the formatted statea
-
 
   return (
     <div className="grid grid-cols-3 lg:grid-cols-2 md:grid-cols-1 gap-4 mb-6">
@@ -555,14 +563,6 @@ const FilterSection: React.FC = () => {
             </span>
             <ChevronDown size={18} className={`text-secondary-foreground transition-transform ${isDateOpen ? "rotate-180" : ""}`} />
           </button>
-          {/* <button
-            className="absolute right-2 top-2 bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 text-xs font-semibold"
-            style={{ zIndex: 20, display: selectedDateType ? "block" : "none" }}
-            onClick={deselectAllDates}
-            type="button"
-          >
-            Reset
-          </button> */}
           {isDateOpen && (
             <div className="absolute left-0 bg-white right-0 mt-2 border border-border rounded-md shadow-lg z-20 p-4">
               <div className="flex items-center justify-between mb-2">

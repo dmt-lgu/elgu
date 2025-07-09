@@ -215,11 +215,13 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
         }
       },
       datalabels: {
-        anchor: chartType === 'pie' ? 'center' : 'end',
+        anchor: chartType === 'pie' ? 'center' : 'center',
         align: chartType === 'pie' ? 'center' : 'center',
         color: '#222',
+       
         font: {
           weight: 'bold' as const,
+          
           size: 10,
         },
         formatter: (value: number, _context: any) => {

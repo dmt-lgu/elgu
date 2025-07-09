@@ -208,10 +208,11 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
         },
       },
       datalabels: {
-        anchor: chartType === 'pie' ? 'center' : 'end',
+        anchor: chartType === 'pie' ? 'center' : 'center',
         align: chartType === 'pie' ? 'center' : 'center',
-        color: '#222',
+        color: '#1b1b1b',
         font: {
+          weight: 'bold',
           size: 10,
         },
         formatter: (value: number, _context: any) => {
@@ -361,7 +362,8 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
         <tbody>
           {dateRegionMap.map((period, idx) => (
             <tr key={period.date} className={idx % 2 === 0 ? 'bg-[#2222ff08] border-b' : 'bg-[#ffffff] border-b'}>
-              <td className="px-2 py-1 font-semibold">{period.date}</td>
+              <td className="px-2 py-1 font-semibold"> <div className=' w-14'>{period.date}
+                </div> </td>
               {regionNames.map((regionName:any) => {
                 const item = period.map[regionName] || { operational: 0, developmental: 0, withdraw: 0 };
                 // Find previous period's region data by region name
@@ -380,29 +382,61 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
                 const wd = getChangeProps(item.withdraw, prev?.withdraw);
 
                 return (
-                  <td key={regionName} className="px-2 py-1 align-top">
-                    <div>
-                      <span className="text-[11px]">Operational: </span>
-                      <span className={`font-semibold ${op.color}`}>
-                        {item.operational} {op.arrow}
-                      </span>
-                      {op.percent && <span className={`ml-1 text-xs ${op.color}`}>{op.percent}</span>}
-                    </div>
-                    <div>
-                      <span className="text-[11px]">Developmental: </span>
-                      <span className={`font-semibold ${dev.color}`}>
-                        {item.developmental} {dev.arrow}
-                      </span>
-                      {dev.percent && <span className={`ml-1 text-xs ${dev.color}`}>{dev.percent}</span>}
-                    </div>
-                    <div>
-                      <span className="text-[11px]">Withdraw: </span>
-                      <span className={`font-semibold ${wd.color}`}>
-                        {item.withdraw} {wd.arrow}
-                      </span>
-                      {wd.percent && <span className={`ml-1 text-xs ${wd.color}`}>{wd.percent}</span>}
-                    </div>
-                  </td>
+                 <td key={regionName} className="relative px-2 py-1 align-top cursor-pointer group">
+  <div className=' w-40'>
+    <span className="text-[11px]">Operational: </span>
+    <span className={`font-semibold ${op.color}`}>
+      {item.operational} {op.arrow}
+    </span>
+    {op.percent && <span className={`ml-1 text-xs ${op.color}`}>{op.percent}</span>}
+  </div>
+  <div>
+    <span className="text-[11px]">Developmental: </span>
+    <span className={`font-semibold ${dev.color}`}>
+      {item.developmental} {dev.arrow}
+    </span>
+    {dev.percent && <span className={`ml-1 text-xs ${dev.color}`}>{dev.percent}</span>}
+  </div>
+  <div>
+    <span className="text-[11px]">Withdraw: </span>
+    <span className={`font-semibold ${wd.color}`}>
+      {item.withdraw} {wd.arrow}
+    </span>
+    {wd.percent && <span className={`ml-1 text-xs ${wd.color}`}>{wd.percent}</span>}
+  </div>
+
+  {/* Hover info */}
+  <div className="absolute bottom-[-1.5rem] z-50 left-1/2 -translate-x-1/2 text-[10px] bg-white/10 backdrop-blur-sm text-white px-2 py-1 rounded opacity-0 min-w-0 p-4 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none border border-border ">
+      
+      <div className=' flex gap-2 text-black justify-between w-40'>
+        <p className=' text-base uppercase font-bold '>{regionName} </p>
+      <p>{period.date}</p>
+      </div>
+             
+       <div className=' w-40'>
+    <span className="text-[11px] text-black">Operational: </span>
+    <span className={`font-semibold ${op.color}`}>
+      {item.operational} {op.arrow}
+    </span>
+    {op.percent && <span className={`ml-1 text-xs ${op.color}`}>{op.percent}</span>}
+  </div>
+  <div>
+    <span className="text-[11px] text-black">Developmental: </span>
+    <span className={`font-semibold ${dev.color}`}>
+      {item.developmental} {dev.arrow}
+    </span>
+    {dev.percent && <span className={`ml-1 text-xs ${dev.color}`}>{dev.percent}</span>}
+  </div>
+  <div>
+    <span className="text-[11px] text-black">Withdraw: </span>
+    <span className={`font-semibold ${wd.color}`}>
+      {item.withdraw} {wd.arrow}
+    </span>
+    {wd.percent && <span className={`ml-1 text-xs ${wd.color}`}>{wd.percent}</span>}
+  </div>
+  </div>
+</td>
+
                 );
               })}
             </tr>
