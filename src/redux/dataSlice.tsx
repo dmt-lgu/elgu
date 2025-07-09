@@ -6,7 +6,7 @@ interface DataState {
 
 const initialState: DataState = {
   value: {
-    
+  "modules": [], // Initial empty list of modules
   "locationName": [],
   "municipalities": [],
   "province": [],

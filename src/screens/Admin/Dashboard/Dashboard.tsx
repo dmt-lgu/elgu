@@ -546,7 +546,7 @@ function mapRegion(region: string): string {
       <StatusChartComponent 
         data={bpChartData?.current || []}
         raw={bpChartData?.breakdown || []}
-        title="Operational vs. Developmental vs. Withdrawal (BPLS)"
+        title="BPLS - Operational vs. Developmental vs. Withdrawal "
         period={`${data.startDate} - ${data.endDate}`}
       />
       

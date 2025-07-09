@@ -265,7 +265,7 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-sm font-bold uppercase">
           {chartType === "pie"
-            ? `Operational vs Developmental vs Withdraw (Percentage)`
+            ? `BPLS - Operational vs Developmental vs Withdraw ( Overall Percentage)`
             : title}
         </h2>
         <div className="flex gap-2">

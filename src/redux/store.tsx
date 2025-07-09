@@ -5,7 +5,6 @@ import { combineReducers } from 'redux';
 import regionReducer from './regionSlice';
 import chartReducer from './chartSlice';
 import projectReducer from './projectSlice';
-import dateReducer from './dateSlice';
 import dataReducer from './dataSlice';
 import cardReducer from './cardSlice';
 import transactionReducer from './transactionSlice';
@@ -23,7 +22,6 @@ const rootReducer = combineReducers({
   region: regionReducer,
   charts: chartReducer,
   project: projectReducer,
-  dates: dateReducer,
   datas: dataReducer,
   card: cardReducer,
   transaction: transactionReducer,
