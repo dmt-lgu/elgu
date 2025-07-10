@@ -32,7 +32,8 @@ type RowData = {
   regionKey: string;
   lgu: any;
   month?: string; // for day mode
-  monthData?: any; // for day mode
+  monthData?: any; // for day mode or year mode
+  yearLabel?: string; // for year mode
 };
 
 interface ExportTableReportToPDFParams {
@@ -44,6 +45,8 @@ interface ExportTableReportToPDFParams {
   isDayMode?: boolean;
   isBarangayClearance?: boolean;
   moduleLabel?: string;
+  selectedDateType?: string; // "Day" | "Month" | "Year"
+  selectedModules?: string[]; // ["Business Permit", ...]
 }
 
 /**
@@ -58,11 +61,46 @@ export async function exportTableReportToPDF({
   isDayMode = false,
   isBarangayClearance = true,
   moduleLabel,
+  selectedDateType,
+  selectedModules = [],
 }: ExportTableReportToPDFParams): Promise<void> {
   // --- 1. Prepare rows for PDF ---
   let allRows: RowData[] = [];
 
-  if (isDayMode) {
+  // --- YEAR MODE: 7 rows for BP/WP only (not Barangay Clearance) ---
+  const isYearMode =
+    selectedDateType === "Year" &&
+    !isBarangayClearance &&
+    (selectedModules.includes("Business Permit") || selectedModules.includes("Working Permit"));
+
+  if (isYearMode) {
+    // 7 years: current year and previous 6 years
+    const currentYear = new Date().getFullYear();
+    const years = Array.from({ length: 7 }, (_, i) => (currentYear - 6 + i).toString());
+
+    // For each LGU, create 7 rows (one per year)
+    filteredResults.forEach(lgu => {
+      const regionInternal =
+        regionMapping[lgu.region] ||
+        regionMapping[lgu.regionCode] ||
+        lguToRegion[lgu.lgu];
+      years.forEach(year => {
+        // Try to find year data in lgu.yearlyResults or lgu.years
+        let yearData = null;
+        if (Array.isArray(lgu.yearlyResults)) {
+          yearData = lgu.yearlyResults.find((y: any) => String(y.year) === year);
+        } else if (Array.isArray(lgu.years)) {
+          yearData = lgu.years.find((y: any) => String(y.year) === year);
+        }
+        allRows.push({
+          regionKey: regionInternal || lgu.regionKey || lgu.region || lgu.regionCode || "",
+          lgu,
+          yearLabel: year,
+          monthData: yearData || {}, // Use monthData for compatibility with table rendering
+        });
+      });
+    });
+  } else if (isDayMode) {
     // For day mode, use filteredResults directly, each row is a day entry as in the UI
     allRows = filteredResults.map((row: any) => ({
       regionKey:
@@ -103,7 +141,10 @@ export async function exportTableReportToPDF({
 
   // --- 3. Paginate rows ---
   let rowChunks: RowData[][] = [];
-  if (isBarangayClearance) {
+  if (isYearMode) {
+    // Only first page, all rows in one chunk
+    rowChunks = [allRows];
+  } else if (isBarangayClearance) {
     const ROWS_FIRST_PAGE = 15;
     const ROWS_PER_PAGE = 18;
     let idx = 0;
@@ -226,18 +267,17 @@ export async function exportTableReportToPDF({
 
   // --- 7. Create table chunk for a page ---
   const createTableChunk = (
-  rows: RowData[],
-  isLastPage: boolean
-): HTMLDivElement => {
-  const minTableWidth = 1200;
-  const wrapperDiv = document.createElement('div');
-  wrapperDiv.style.width = minTableWidth + 'px';
-  wrapperDiv.style.background = '#fff';
-  wrapperDiv.style.fontFamily = "'Rubik', sans-serif";
+    rows: RowData[],
+    isLastPage: boolean
+  ): HTMLDivElement => {
+    const minTableWidth = 1200;
+    const wrapperDiv = document.createElement('div');
+    wrapperDiv.style.width = minTableWidth + 'px';
+    wrapperDiv.style.background = '#fff';
+    wrapperDiv.style.fontFamily = "'Rubik', sans-serif";
 
     const tableChunk = document.createElement('table');
-  tableChunk.setAttribute('style', `width: 100%; font-size: 10px; font-family: Rubik, sans-serif; min-width: ${minTableWidth}px;`);
-
+    tableChunk.setAttribute('style', `width: 100%; font-size: 10px; font-family: Rubik, sans-serif; min-width: ${minTableWidth}px;`);
 
     // Header
     const thead = document.createElement('thead');
@@ -332,61 +372,49 @@ export async function exportTableReportToPDF({
     // Body
     const tbodyChunk = document.createElement('tbody');
 
-    if (isDayMode) {
-    // For DAY mode: do NOT group/merge Region column, show Region for every row
-    rows.forEach((row, idx) => {
-      const tr = document.createElement('tr');
-      const isStriped = idx % 2 === 0;
+    // --- Special rendering for Year mode 7-row logic ---
+    if (isYearMode) {
+      rows.forEach((row, idx) => {
+        const tr = document.createElement('tr');
+        const isStriped = idx % 2 === 0;
 
-      // Region cell (always present, no rowspan)
-      const tdRegion = document.createElement('td');
-      tdRegion.textContent = regionKeyToCode[row.regionKey] || row.regionKey;
-      tdRegion.style.border = '#e5e5e5 1px solid';
-      tdRegion.style.textAlign = 'center';
-      tdRegion.style.fontWeight = "bold";
-      tdRegion.style.fontFamily = "'Rubik', sans-serif";
-      tdRegion.style.padding = "12px 12px";
-      tdRegion.style.width = columnWidths[0] + "px";
-      tr.appendChild(tdRegion);
+        // Region cell (always present, no rowspan)
+        const tdRegion = document.createElement('td');
+        tdRegion.textContent = regionKeyToCode[row.regionKey] || row.regionKey;
+        tdRegion.style.border = '#e5e5e5 1px solid';
+        tdRegion.style.textAlign = 'center';
+        tdRegion.style.fontWeight = "bold";
+        tdRegion.style.fontFamily = "'Rubik', sans-serif";
+        tdRegion.style.padding = "12px 12px";
+        tdRegion.style.width = columnWidths[0] + "px";
+        tr.appendChild(tdRegion);
 
-      // LGU cell (unchanged)
-      const lguTd = document.createElement('td');
-      lguTd.style.border = '#e5e5e5 0.5px solid';
-      lguTd.style.textAlign = isBarangayClearance ? 'center' : 'start';
-      lguTd.style.fontFamily = "'Rubik', sans-serif";
-      lguTd.style.width = columnWidths[1] + "px";
-      lguTd.style.padding = "4px 2px";
-      if (isStriped) lguTd.style.background = "#e4e4e7";
+        // LGU cell
+        const lguTd = document.createElement('td');
+        lguTd.style.border = '#e5e5e5 0.5px solid';
+        lguTd.style.textAlign = 'start';
+        lguTd.style.fontFamily = "'Rubik', sans-serif";
+        lguTd.style.width = columnWidths[1] + "px";
+        lguTd.style.padding = "4px 2px";
+        if (isStriped) lguTd.style.background = "#e4e4e7";
 
-      let lguText = row.lgu.lgu || "";
-      if (row.lgu.province) lguText += ` (${row.lgu.province})`;
+        let lguText = row.lgu.lgu || "";
+        if (row.lgu.province) lguText += ` (${row.lgu.province})`;
 
-      let monthInfo = "";
-      if (row.month) {
-        monthInfo = ` (${formatMonthYear(row.month)})`;
-      }
-
-      lguTd.innerHTML = `
-        <span style="font-weight:bold; font-size:10px; font-family:'Rubik', sans-serif;">${lguText}</span>
-        <span style="font-weight:normal; color: #1d4ed8; font-size:7px; font-family:'Rubik', sans-serif;">
-            <br />
-            ${monthInfo}
-        </span>
-        `;
-      tr.appendChild(lguTd);
-
-      // Results/data columns (unchanged)
-      if (isBarangayClearance) {
-        let resultVal = "";
-        if (row.monthData && typeof row.monthData.totalCount === "number") {
-          resultVal = row.monthData.totalCount;
-        } else if (typeof row.lgu.totalCount === "number") {
-          resultVal = row.lgu.totalCount;
-        } else {
-          resultVal = "";
+        let yearInfo = "";
+        if (row.yearLabel) {
+          yearInfo = ` (${row.yearLabel})`;
         }
-        tr.appendChild(makeTd(resultVal, { width: columnWidths[2] + "px", fontSize: "10px", striped: isStriped }));
-      } else {
+
+        lguTd.innerHTML = `
+          <span style="font-weight:bold; font-size:10px; font-family:'Rubik', sans-serif;">${lguText}</span>
+          <span style="font-weight:normal; color: #1d4ed8; font-size:7px; font-family:'Rubik', sans-serif;">
+              <br />
+              ${yearInfo}
+          </span>
+        `;
+        tr.appendChild(lguTd);
+
         // Data columns for BP/WP
         let data = row.monthData || row.lgu.sum || {};
         // NEW
@@ -407,42 +435,120 @@ export async function exportTableReportToPDF({
         tr.appendChild(makeTd(data.femalePaid, { width: columnWidths[13] + "px", fontSize: "10px", striped: isStriped }));
         tr.appendChild(makeTd(data.femalePending, { width: columnWidths[14] + "px", fontSize: "10px", striped: isStriped }));
         tr.appendChild(makeTd((data.femalePaid || 0) + (data.femalePending || 0), { width: columnWidths[15] + "px", fontSize: "10px", striped: isStriped }));
-      }
 
-      tbodyChunk.appendChild(tr);
-    });
-  } else {
-    // Original grouping logic for non-day mode (unchanged)
-    let prevRegionKey: string | null = null;
-    let regionRowsLeft = 0;
+        tbodyChunk.appendChild(tr);
+      });
+    } else if (isDayMode) {
+      // ... (existing day mode logic unchanged)
+      rows.forEach((row, idx) => {
+        const tr = document.createElement('tr');
+        const isStriped = idx % 2 === 0;
 
-    // Count how many rows for each region on this page
-    const regionCounts: Record<string, number> = {};
-    rows.forEach(r => {
-      regionCounts[r.regionKey] = (regionCounts[r.regionKey] || 0) + 1;
-    });
+        // Region cell (always present, no rowspan)
+        const tdRegion = document.createElement('td');
+        tdRegion.textContent = regionKeyToCode[row.regionKey] || row.regionKey;
+        tdRegion.style.border = '#e5e5e5 1px solid';
+        tdRegion.style.textAlign = 'center';
+        tdRegion.style.fontWeight = "bold";
+        tdRegion.style.fontFamily = "'Rubik', sans-serif";
+        tdRegion.style.padding = "12px 12px";
+        tdRegion.style.width = columnWidths[0] + "px";
+        tr.appendChild(tdRegion);
 
-    rows.forEach((row, idx) => {
-      const tr = document.createElement('tr');
-      const isStriped = idx % 2 === 0;
+        // LGU cell (unchanged)
+        const lguTd = document.createElement('td');
+        lguTd.style.border = '#e5e5e5 0.5px solid';
+        lguTd.style.textAlign = isBarangayClearance ? 'center' : 'start';
+        lguTd.style.fontFamily = "'Rubik', sans-serif";
+        lguTd.style.width = columnWidths[1] + "px";
+        lguTd.style.padding = "4px 2px";
+        if (isStriped) lguTd.style.background = "#e4e4e7";
 
-      // Region cell (grouped/merged)
-      if (idx === 0 || row.regionKey !== prevRegionKey) {
-        const td = document.createElement('td');
-        td.textContent = regionKeyToCode[row.regionKey] || row.regionKey;
-        td.style.border = '#e5e5e5 1px solid';
-        td.style.textAlign = 'center';
-        td.style.fontWeight = "bold";
-        td.style.fontFamily = "'Rubik', sans-serif";
-        td.style.padding = "12px 12px";
-        td.style.width = columnWidths[0] + "px";
-        td.rowSpan = regionCounts[row.regionKey];
-        tr.appendChild(td);
-        regionRowsLeft = regionCounts[row.regionKey] - 1;
-        prevRegionKey = row.regionKey;
-      } else if (regionRowsLeft > 0) {
-        regionRowsLeft--;
-      }
+        let lguText = row.lgu.lgu || "";
+        if (row.lgu.province) lguText += ` (${row.lgu.province})`;
+
+        let monthInfo = "";
+        if (row.month) {
+          monthInfo = ` (${formatMonthYear(row.month)})`;
+        }
+
+        lguTd.innerHTML = `
+          <span style="font-weight:bold; font-size:10px; font-family:'Rubik', sans-serif;">${lguText}</span>
+          <span style="font-weight:normal; color: #1d4ed8; font-size:7px; font-family:'Rubik', sans-serif;">
+              <br />
+              ${monthInfo}
+          </span>
+        `;
+        tr.appendChild(lguTd);
+
+        // Results/data columns (unchanged)
+        if (isBarangayClearance) {
+          let resultVal = "";
+          if (row.monthData && typeof row.monthData.totalCount === "number") {
+            resultVal = row.monthData.totalCount;
+          } else if (typeof row.lgu.totalCount === "number") {
+            resultVal = row.lgu.totalCount;
+          } else {
+            resultVal = "";
+          }
+          tr.appendChild(makeTd(resultVal, { width: columnWidths[2] + "px", fontSize: "10px", striped: isStriped }));
+        } else {
+          // Data columns for BP/WP
+          let data = row.monthData || row.lgu.sum || {};
+          // NEW
+          tr.appendChild(makeTd(data.newPaid, { width: columnWidths[2] + "px", fontSize: "10px", striped: isStriped }));
+          tr.appendChild(makeTd(data.newPaidViaEgov, { width: columnWidths[3] + "px", fontSize: "10px", striped: isStriped }));
+          tr.appendChild(makeTd(data.newPending, { width: columnWidths[4] + "px", fontSize: "10px", striped: isStriped }));
+          tr.appendChild(makeTd((data.newPaid || 0) + (data.newPaidViaEgov || 0) + (data.newPending || 0), { width: columnWidths[5] + "px", fontSize: "10px", striped: isStriped }));
+          // RENEWAL
+          tr.appendChild(makeTd(data.renewPaid, { width: columnWidths[6] + "px", fontSize: "10px", striped: isStriped }));
+          tr.appendChild(makeTd(data.renewPaidViaEgov, { width: columnWidths[7] + "px", fontSize: "10px", striped: isStriped }));
+          tr.appendChild(makeTd(data.renewPending, { width: columnWidths[8] + "px", fontSize: "10px", striped: isStriped }));
+          tr.appendChild(makeTd((data.renewPaid || 0) + (data.renewPaidViaEgov || 0) + (data.renewPending || 0), { width: columnWidths[9] + "px", fontSize: "10px", striped: isStriped }));
+          // MALE
+          tr.appendChild(makeTd(data.malePaid, { width: columnWidths[10] + "px", fontSize: "10px", striped: isStriped }));
+          tr.appendChild(makeTd(data.malePending, { width: columnWidths[11] + "px", fontSize: "10px", striped: isStriped }));
+          tr.appendChild(makeTd((data.malePaid || 0) + (data.malePending || 0), { width: columnWidths[12] + "px", fontSize: "10px", striped: isStriped }));
+          // FEMALE
+          tr.appendChild(makeTd(data.femalePaid, { width: columnWidths[13] + "px", fontSize: "10px", striped: isStriped }));
+          tr.appendChild(makeTd(data.femalePending, { width: columnWidths[14] + "px", fontSize: "10px", striped: isStriped }));
+          tr.appendChild(makeTd((data.femalePaid || 0) + (data.femalePending || 0), { width: columnWidths[15] + "px", fontSize: "10px", striped: isStriped }));
+        }
+
+        tbodyChunk.appendChild(tr);
+      });
+    } else {
+      // Original grouping logic for non-day, non-year mode (unchanged)
+      let prevRegionKey: string | null = null;
+      let regionRowsLeft = 0;
+
+      // Count how many rows for each region on this page
+      const regionCounts: Record<string, number> = {};
+      rows.forEach(r => {
+        regionCounts[r.regionKey] = (regionCounts[r.regionKey] || 0) + 1;
+      });
+
+      rows.forEach((row, idx) => {
+        const tr = document.createElement('tr');
+        const isStriped = idx % 2 === 0;
+
+        // Region cell (grouped/merged)
+        if (idx === 0 || row.regionKey !== prevRegionKey) {
+          const td = document.createElement('td');
+          td.textContent = regionKeyToCode[row.regionKey] || row.regionKey;
+          td.style.border = '#e5e5e5 1px solid';
+          td.style.textAlign = 'center';
+          td.style.fontWeight = "bold";
+          td.style.fontFamily = "'Rubik', sans-serif";
+          td.style.padding = "12px 12px";
+          td.style.width = columnWidths[0] + "px";
+          td.rowSpan = regionCounts[row.regionKey];
+          tr.appendChild(td);
+          regionRowsLeft = regionCounts[row.regionKey] - 1;
+          prevRegionKey = row.regionKey;
+        } else if (regionRowsLeft > 0) {
+          regionRowsLeft--;
+        }
 
         // LGU cell
         const lguTd = document.createElement('td');
@@ -467,7 +573,7 @@ export async function exportTableReportToPDF({
               <br />
               ${monthInfo}
           </span>
-          `;
+        `;
         tr.appendChild(lguTd);
 
         if (isBarangayClearance) {
@@ -605,8 +711,8 @@ export async function exportTableReportToPDF({
     }
 
     tableChunk.appendChild(tbodyChunk);
-  wrapperDiv.appendChild(tableChunk);
-  return wrapperDiv;
+    wrapperDiv.appendChild(tableChunk);
+    return wrapperDiv;
   };
 
   // --- 8. SweetAlert2 Progress Bar and PDF Generation ---
