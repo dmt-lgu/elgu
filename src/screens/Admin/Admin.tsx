@@ -185,7 +185,7 @@ function Admin() {
         dispatch(setTransaction(response.data));
         dispatch(setLoad(false));
         setIsLoading(false);
-        console.log("Total results:", totals);
+        // console.log("Total results:", totals);
       })
       .catch((error) => {
         if (axios.isCancel(error) || error.name === "CanceledError") {
@@ -206,11 +206,11 @@ function Admin() {
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      console.log("Fetching transaction data with:", {
-        locationName: data.locationName,
-        startDate: data.startDate,
-        endDate: data.endDate,
-      });
+      // console.log("Fetching transaction data with:", {
+      //   locationName: data.locationName,
+      //   startDate: data.startDate,
+      //   endDate: data.endDate,
+      // });
       if (data.locationName.length !== 0 && data.startDate && data.endDate) {
         GetTransaction();
       }
