@@ -187,6 +187,9 @@ const FilterSection: React.FC<FilterSectionProps> = ({
       if (regionRef.current && !regionRef.current.contains(event.target as Node)) {
         setIsRegionOpen(false);
       }
+      if (dateRef.current && !dateRef.current.contains(event.target as Node)) {
+        setIsDateOpen(false);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
