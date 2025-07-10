@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import BusinessPermitReport, { filterTableResults, getDateRangeLabel } from './table/BusinessPermitReport';
+import BusinessPermitReport, { getDateRangeLabel } from './table/BusinessPermitReport';
 import FilterSection from './components/FilterSection';
 import axios from '../../../plugin/axios';
 import { regionMapping } from '../../../screens/Admin/Report/utils/mockData';
