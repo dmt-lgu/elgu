@@ -24,6 +24,15 @@ const persistConfig = {
     'businessPermitTable',
     'workingPermitTable',
     'brgyClearanceTable', 
+    'region',
+    'charts',
+    'project',
+    'dates',
+    'datas',
+    'card',
+    'transaction',
+    'load',
+    'status',
   ],
 };
 
