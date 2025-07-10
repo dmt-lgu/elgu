@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { format } from 'date-fns';
 import { Button } from "@/components/ui/button";
 
 interface DateRange {
-  start: Date | null;
-  end: Date | null;
+  start: string | null;
+  end: string | null;
 }
 
 interface DateRangePickerProps {
@@ -14,12 +13,12 @@ interface DateRangePickerProps {
 
 const DateRangeDay: React.FC<DateRangePickerProps> = ({ value, onChange }) => {
   // Last applied values
-  const [_appliedStart, setAppliedStart] = useState<Date | null>(value?.start ?? null);
-  const [_appliedEnd, setAppliedEnd] = useState<Date | null>(value?.end ?? null);
+  const [_appliedStart, setAppliedStart] = useState<string | null>(value?.start ?? null);
+  const [_appliedEnd, setAppliedEnd] = useState<string | null>(value?.end ?? null);
 
   // Draft values (user editing)
-  const [draftStart, setDraftStart] = useState<Date | null>(value?.start ?? null);
-  const [draftEnd, setDraftEnd] = useState<Date | null>(value?.end ?? null);
+  const [draftStart, setDraftStart] = useState<string | null>(value?.start ?? null);
+  const [draftEnd, setDraftEnd] = useState<string | null>(value?.end ?? null);
 
   // Sync with parent value
   useEffect(() => {
@@ -29,13 +28,12 @@ const DateRangeDay: React.FC<DateRangePickerProps> = ({ value, onChange }) => {
     setDraftEnd(value?.end ?? null);
   }, [value?.start, value?.end]);
 
-  const handleDraftStartChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const date = e.target.value ? new Date(e.target.value) : null;
-    setDraftStart(date);
-  };
+const handleDraftStartChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  setDraftStart(e.target.value || null);
+};
 
   const handleDraftEndChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const date = e.target.value ? new Date(e.target.value) : null;
+    const date = e.target.value ? e.target.value : null;
     setDraftEnd(date);
   };
 
@@ -58,7 +56,7 @@ const DateRangeDay: React.FC<DateRangePickerProps> = ({ value, onChange }) => {
       <div className="flex border border-border rounded-md overflow-hidden">
         <input
           type="date"
-          value={draftStart ? format(draftStart, 'yyyy-MM-dd') : ''}
+          value={draftStart ?? ''}
           onChange={handleDraftStartChange}
           className="w-32 flex-1 py-2 px-3 text-secondary-foreground bg-card focus:outline-none"
           placeholder="Start date"
@@ -66,7 +64,7 @@ const DateRangeDay: React.FC<DateRangePickerProps> = ({ value, onChange }) => {
         <div className="bg-border px-2 flex items-center text-secondary-foreground">to</div>
         <input
           type="date"
-          value={draftEnd ? format(draftEnd, 'yyyy-MM-dd') : ''}
+          value={draftEnd ?? ''}
           onChange={handleDraftEndChange}
           className="w-32 flex-1 py-2 px-3 text-secondary-foreground bg-card focus:outline-none"
           placeholder="End date"

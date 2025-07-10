@@ -1,4 +1,4 @@
-import React, { forwardRef, useEffect, useMemo } from 'react';
+import React, { forwardRef, useEffect, useMemo, useState } from 'react';
 import {
   Table,
   TableBody,
@@ -17,7 +17,7 @@ import LoaderTable from '../utils/LoaderTable';
 import Loading from '../utils/Loading';
 
 interface WorkingPermitProps {
-  selectedRegions: string[]; // <-- same as BusinessPermitReport
+  selectedRegions: string[];
   dateRange: { start: Date | string | null; end: Date | string | null };
   apiData: any;
   loading: boolean;
@@ -67,7 +67,6 @@ function formatMonthYear(monthStr: string): string {
 function groupResultsByRegion(results: any[], lguToRegion: Record<string, string>) {
   const grouped: Record<string, any[]> = {};
   results.forEach(lgu => {
-    // Only use internal key for grouping
     const regionInternal =
       regionMapping[lgu.region] ||
       regionMapping[lgu.regionCode] ||
@@ -296,8 +295,17 @@ export function getDateRangeLabel(
   return "";
 }
 
-
-
+// --- Loader Persistence Logic using Redux-persisted table data/filter ---
+function isSameFilter(a: any, b: any) {
+  if (!a || !b) return false;
+  return (
+    JSON.stringify(a.selectedRegions) === JSON.stringify(b.selectedRegions) &&
+    JSON.stringify(a.selectedProvinces) === JSON.stringify(b.selectedProvinces) &&
+    JSON.stringify(a.selectedCities) === JSON.stringify(b.selectedCities) &&
+    JSON.stringify(a.selectedIslands) === JSON.stringify(b.selectedIslands) &&
+    JSON.stringify(a.dateRange) === JSON.stringify(b.dateRange)
+  );
+}
 
 const WorkingPermitReport = forwardRef<HTMLDivElement, WorkingPermitProps>(({
   selectedRegions,
@@ -310,7 +318,7 @@ const WorkingPermitReport = forwardRef<HTMLDivElement, WorkingPermitProps>(({
   selectedDates = [],
   selectedIslands,
   hasSearched = false,
-  onTableDataChange, // <-- NEW
+  onTableDataChange,
 }, ref) => {
   // Normalize dateRange at the top of the component
   const normalizedDateRange = useMemo(
@@ -318,23 +326,55 @@ const WorkingPermitReport = forwardRef<HTMLDivElement, WorkingPermitProps>(({
     [dateRange?.start, dateRange?.end]
   );
 
-  // Get selectedIslands from Redux if not passed as prop
+  // Loader persistence logic for Working Permit (use workingPermitTable slice)
+  const persistedWPTableData = useSelector((state: RootState) => state.workingPermitTable.tableData);
+  const persistedWPAppliedFilter = useSelector((state: RootState) => state.workingPermitTable.appliedFilter);
   const reduxSelectedIslands = useSelector((state: RootState) => state.reportFilter.selectedIslands || []);
   const islandsToUse = selectedIslands && selectedIslands.length > 0 ? selectedIslands : reduxSelectedIslands;
 
-  // Helper: get all regions from selected islands
-  const getRegionsFromIslands = (islands: string[]) => {
-    const regions = islands.flatMap(island => islandRegionMap[island] || []);
-    return Array.from(new Set(regions));
-  };
+  const [showLoader, setShowLoader] = useState(true);
 
+  useEffect(() => {
+    if (
+      persistedWPTableData &&
+      persistedWPAppliedFilter &&
+      isSameFilter(
+        {
+          selectedRegions,
+          selectedProvinces,
+          selectedCities,
+          selectedIslands: islandsToUse,
+          dateRange,
+        },
+        {
+          selectedRegions: persistedWPAppliedFilter.selectedRegions,
+          selectedProvinces: persistedWPAppliedFilter.selectedProvinces,
+          selectedCities: persistedWPAppliedFilter.selectedCities,
+          selectedIslands: persistedWPAppliedFilter.selectedIslands,
+          dateRange: persistedWPAppliedFilter.dateRange,
+        }
+      )
+    ) {
+      setShowLoader(false);
+    } else {
+      setShowLoader(true);
+    }
+  }, [
+    persistedWPTableData,
+    persistedWPAppliedFilter,
+    selectedRegions,
+    selectedProvinces,
+    selectedCities,
+    islandsToUse,
+    dateRange,
+  ]);
+
+  // Table data logic (unchanged)
   const filteredResults = useMemo(() => {
     let filtered = Array.isArray(apiData?.results) ? apiData.results : [];
 
-    // Filter by islands if any are selected
     if (islandsToUse.length > 0) {
-      const regionsFromIslands = getRegionsFromIslands(islandsToUse);
-      // Convert region codes to internal keys
+      const regionsFromIslands = islandsToUse.flatMap(island => islandRegionMap[island] || []);
       const regionsInternal = regionsFromIslands.map(code => regionMapping[code] || code);
       filtered = filtered.filter((lgu: any) => {
         const regionInternal =
@@ -345,7 +385,6 @@ const WorkingPermitReport = forwardRef<HTMLDivElement, WorkingPermitProps>(({
       });
     } else if (selectedRegions.length > 0) {
       filtered = filtered.filter((lgu: any) => {
-        // Map region code to internal key if possible
         const regionInternal =
           regionMapping[lgu.region] ||
           regionMapping[lgu.regionCode] ||
@@ -380,7 +419,6 @@ const WorkingPermitReport = forwardRef<HTMLDivElement, WorkingPermitProps>(({
       });
     }
 
-    // If "Day" is selected, DO NOT merge, just filter by date range
     if (selectedDates && selectedDates.includes("Day")) {
       return filtered.map((lgu: any) => ({
         ...lgu,
@@ -390,11 +428,10 @@ const WorkingPermitReport = forwardRef<HTMLDivElement, WorkingPermitProps>(({
         months: lgu.monthlyResults
           .filter((month: any) => isMonthInRange(month.month, normalizedDateRange))
           .map((month: any) => month.month),
-        sum: {}, // Not used in this mode
+        sum: {},
       }));
     }
 
-    // Else, merge and sum duplicates here!
     return mergeLguProvinceSumAllMonths(filtered, normalizedDateRange);
   }, [
     apiData?.results,
@@ -410,10 +447,10 @@ const WorkingPermitReport = forwardRef<HTMLDivElement, WorkingPermitProps>(({
 
   // Notify parent if table has data (for enabling Download button)
   useEffect(() => {
-  if (onTableDataChange) {
-    onTableDataChange(filteredResults.length > 0);
-  }
-}, [filteredResults.length, onTableDataChange]);
+    if (onTableDataChange) {
+      onTableDataChange(filteredResults.length > 0);
+    }
+  }, [filteredResults.length, onTableDataChange]);
 
   // Format date range label
   let dateRangeLabel = "";
@@ -438,7 +475,6 @@ const WorkingPermitReport = forwardRef<HTMLDivElement, WorkingPermitProps>(({
           const sum = lgu.sum;
           rows.push(
             <TableRow key={`${region}-${lgu.lgu}`}>
-              {/* Only render the Region cell for the first LGU in the region, with rowSpan */}
               {idx === 0 && (
                 <TableCell
                   className="border px-2 py-1 text-center font-bold bg-card  left-0 z-10 align-middle"
@@ -478,11 +514,9 @@ const WorkingPermitReport = forwardRef<HTMLDivElement, WorkingPermitProps>(({
             </TableRow>
           );
         } else {
-          // Day mode: render per monthlyResults
           lgu.monthlyResults.forEach((month: any, mIdx: number) => {
             rows.push(
               <TableRow key={`${region}-${lgu.lgu}-${month.month}-${mIdx}`}>
-                {/* Only render the Region cell for the first LGU in the region, with rowSpan */}
                 {idx === 0 && mIdx === 0 && (
                   <TableCell
                     className="border px-2 py-1 text-center font-bold bg-card  left-0 z-10 align-middle"
@@ -540,7 +574,6 @@ const WorkingPermitReport = forwardRef<HTMLDivElement, WorkingPermitProps>(({
     };
 
     filteredResults.forEach((lgu: any) => {
-      // If sum exists, use it (Month/Year mode), else sum monthlyResults (Day mode)
       if (lgu.sum && Object.keys(lgu.sum).length > 0) {
         totals.newPaid += lgu.sum.newPaid || 0;
         totals.newGeoPay += lgu.sum.newPaidViaEgov || 0;
@@ -571,47 +604,9 @@ const WorkingPermitReport = forwardRef<HTMLDivElement, WorkingPermitProps>(({
     return totals;
   }, [filteredResults]);
 
-  // Swal no results effect only (loading modal removed)
-  // const noResultsAlertShown = useRef<boolean>(false);
-
-useEffect(() => {
-  // You can add your logic here if you want to show a Swal alert or handle no results.
-  // Example (uncomment if you want to show an alert):
-  /*
-  if (
-    !loading &&
-    filteredResults.length === 0 &&
-    hasSearched &&
-    selectedRegions.length > 0 &&
-    normalizedDateRange.start &&
-    normalizedDateRange.end &&
-    !noResultsAlertShown.current
-  ) {
-    Swal.fire({
-      icon: "info",
-      title: "No Results",
-      text: "No results found, Please try again!",
-      timer: 2000,
-      showConfirmButton: false,
-    });
-    noResultsAlertShown.current = true;
-  } else if (filteredResults.length > 0) {
-    noResultsAlertShown.current = false;
-  }
-  */
-}, [
-  loading,
-  filteredResults.length,
-  selectedRegions.join(","),
-  normalizedDateRange?.start?.toISOString?.() ?? "",
-  normalizedDateRange?.end?.toISOString?.() ?? "",
-  hasSearched
-]);
-
   return (
-    
     <div ref={ref} className="bg-card p-4 rounded-md border text-secondary-foreground border-border shadow-sm">
-      {loading && (
+      {(hasSearched && (showLoader || loading)) && (
         <Loading />
       )}
       <div ref={ref}>
@@ -661,7 +656,7 @@ useEffect(() => {
           </TableHeader>
          
           <TableBody className="[&>tr:nth-child(odd)]:bg-accent">
-            {loading ? (
+           {hasSearched && (showLoader || loading) ? (
               <TableRow>
                 <TableCell colSpan={16} className="text-center py-4 border">
                   <LoaderTable />
@@ -707,25 +702,24 @@ useEffect(() => {
                   ({dateRangeLabel})
                 </span>
               </TableCell>
-              <TableCell className="border px-2 py-1 text-center">{loading ? 0 : grandTotals.newPaid}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{loading ? 0 : grandTotals.newGeoPay}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{loading ? 0 : grandTotals.newPending}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{loading ? 0 : (grandTotals.newPaid + grandTotals.newGeoPay + grandTotals.newPending)}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{loading ? 0 : grandTotals.renewalPaid}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{loading ? 0 : grandTotals.renewalGeoPay}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{loading ? 0 : grandTotals.renewalPending}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{loading ? 0 : (grandTotals.renewalPaid + grandTotals.renewalGeoPay + grandTotals.renewalPending)}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{loading ? 0 : grandTotals.malePaid}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{loading ? 0 : grandTotals.malePending}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{loading ? 0 : (grandTotals.malePaid + grandTotals.malePending)}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{loading ? 0 : grandTotals.femalePaid}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{loading ? 0 : grandTotals.femalePending}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{loading ? 0 : (grandTotals.femalePaid + grandTotals.femalePending)}</TableCell>
+              {/* Show 0s if loading or showLoader is true */}
+              <TableCell className="border px-2 py-1 text-center">{(showLoader || loading) ? 0 : grandTotals.newPaid}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{(showLoader || loading) ? 0 : grandTotals.newGeoPay}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{(showLoader || loading) ? 0 : grandTotals.newPending}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{(showLoader || loading) ? 0 : (grandTotals.newPaid + grandTotals.newGeoPay + grandTotals.newPending)}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{(showLoader || loading) ? 0 : grandTotals.renewalPaid}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{(showLoader || loading) ? 0 : grandTotals.renewalGeoPay}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{(showLoader || loading) ? 0 : grandTotals.renewalPending}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{(showLoader || loading) ? 0 : (grandTotals.renewalPaid + grandTotals.renewalGeoPay + grandTotals.renewalPending)}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{(showLoader || loading) ? 0 : grandTotals.malePaid}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{(showLoader || loading) ? 0 : grandTotals.malePending}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{(showLoader || loading) ? 0 : (grandTotals.malePaid + grandTotals.malePending)}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{(showLoader || loading) ? 0 : grandTotals.femalePaid}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{(showLoader || loading) ? 0 : grandTotals.femalePending}</TableCell>
+              <TableCell className="border px-2 py-1 text-center">{(showLoader || loading) ? 0 : (grandTotals.femalePaid + grandTotals.femalePending)}</TableCell>
             </TableRow>
           </TableBody>
-          
         </Table>
-        
       </div>
     </div>
   );

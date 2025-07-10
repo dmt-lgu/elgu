@@ -2,15 +2,18 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import React from "react";
 import Select from "react-select";
-import { useSelector } from "react-redux";
-import { selectData } from "@/redux/dataSlice"; // Update the import path as needed
+// import { selectData } from "@/redux/dataSlice"; // Update the import path as needed
 
-type YearOnly = { year: number };
+// Utility to get year range (same as DateRangeMonth)
+function getYearRange(currentYear: number, range: number = 15) {
+  // Default: currentYear down to currentYear - 14 (15 years)
+  return Array.from({ length: range }, (_, i) => currentYear - i);
+}
 
 interface DateRangeYearProps {
   className?: string;
-  value?: { start: Date | null; end: Date | null };
-  onChange?: (range: { start: Date | null; end: Date | null }) => void;
+  value?: { start: string | null; end: string | null };
+  onChange?: (range: { start: string | null; end: string | null }) => void;
 }
 
 function DateRangeYear({
@@ -18,37 +21,30 @@ function DateRangeYear({
   value,
   onChange,
 }: DateRangeYearProps) {
-  // Get startDate and endDate from Redux
-  const data = useSelector(selectData);
-  const reduxStart = data?.startDate;
-  const reduxEnd = data?.endDate;
+  // Get startDate and endDate from Redux (if you want to use them for min/max)
+  // const data = useSelector(selectData);
 
-  // Parse years from Redux dates, fallback to current year if not set
-  const startYearRedux = reduxStart ? new Date(reduxStart).getFullYear() : new Date().getFullYear() - 10;
-  const endYearRedux = reduxEnd ? new Date(reduxEnd).getFullYear() : new Date().getFullYear() + 1;
+  // Use current year for consistency with DateRangeMonth
+  const now = new Date();
+  const currentYear = now.getFullYear();
 
-  // Generate years for dropdown based on Redux
-  const years = Array.from(
-    { length: endYearRedux - startYearRedux + 1 },
-    (_, i) => startYearRedux + i
-  );
+  // Use the same year range as DateRangeMonth
+  const years = getYearRange(currentYear, 15);
   const yearOptions = years.map(y => ({
     value: y,
     label: y.toString(),
   }));
 
   // Internal state for year selection
-  const [from, setFrom] = React.useState<YearOnly | null>(null);
-  const [to, setTo] = React.useState<YearOnly | null>(null);
+  const [from, setFrom] = React.useState<number | null>(null);
+  const [to, setTo] = React.useState<number | null>(null);
 
-  // Sync with value prop (robust to string or Date)
+  // Sync with value prop (robust to string)
   React.useEffect(() => {
-    let startDate: Date | null = null;
-    let endDate: Date | null = null;
     if (value?.start) {
-      startDate = value.start instanceof Date ? value.start : new Date(value.start);
+      const startDate = new Date(value.start);
       if (!isNaN(startDate.getTime())) {
-        setFrom({ year: startDate.getFullYear() });
+        setFrom(startDate.getFullYear());
       } else {
         setFrom(null);
       }
@@ -56,9 +52,9 @@ function DateRangeYear({
       setFrom(null);
     }
     if (value?.end) {
-      endDate = value.end instanceof Date ? value.end : new Date(value.end);
+      const endDate = new Date(value.end);
       if (!isNaN(endDate.getTime())) {
-        setTo({ year: endDate.getFullYear() });
+        setTo(endDate.getFullYear());
       } else {
         setTo(null);
       }
@@ -68,25 +64,27 @@ function DateRangeYear({
   }, [value?.start, value?.end]);
 
   // Handlers
-  const handleFromYear = (year: number) => {
-    setFrom({ year });
-    // Do not reset 'to' here!
+  const handleFromYear = (year: number | null) => {
+    setFrom(year);
+    // If to is before from, reset to
+    if (to !== null && year !== null && to < year) {
+      setTo(null);
+    }
   };
-  const handleToYear = (year: number) => {
-    setTo({ year });
+  const handleToYear = (year: number | null) => {
+    setTo(year);
   };
 
   // Apply button handler
   const handleApply = () => {
     if (from && to && onChange) {
-      // Always use the user's explicit selection, do not swap or adjust
       onChange({
-        start: new Date(from.year, 0, 1), // 01-01-YYYY
-        end: new Date(to.year, 11, 31),   // 12-31-YYYY
+        start: `${from}-01-01`,
+        end: `${to}-12-31`,
       });
     } else if (from && onChange) {
       onChange({
-        start: new Date(from.year, 0, 1),
+        start: `${from}-01-01`,
         end: null,
       });
     }
@@ -109,13 +107,12 @@ function DateRangeYear({
             <div className="font-semibold mb-1">Start Year</div>
             <Select
               options={yearOptions}
-              value={from ? yearOptions.find(opt => opt.value === from.year) : null}
+              value={from ? yearOptions.find(opt => opt.value === from) : null}
               onChange={option => {
                 if (option && typeof option.value === "number") {
                   handleFromYear(option.value);
                 } else {
-                  setFrom(null);
-                  setTo(null);
+                  handleFromYear(null);
                 }
               }}
               placeholder="Select year"
@@ -126,13 +123,13 @@ function DateRangeYear({
           <div className="w-full">
             <div className="font-semibold mb-1">End Year</div>
             <Select
-              options={yearOptions.filter(opt => from ? opt.value >= from.year : true)}
-              value={to ? yearOptions.find(opt => opt.value === to.year) : null}
+              options={yearOptions.filter(opt => from ? opt.value >= from : true)}
+              value={to ? yearOptions.find(opt => opt.value === to) : null}
               onChange={option => {
                 if (option && typeof option.value === "number") {
                   handleToYear(option.value);
                 } else {
-                  setTo(null);
+                  handleToYear(null);
                 }
               }}
               placeholder="Select year"

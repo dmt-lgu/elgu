@@ -39,6 +39,8 @@ function displayCityName(name: string) {
   return name.trim();
 }
 
+
+
 function normalizeApiCities(apiCities: Record<string, string[]>): Record<string, string[]> {
   const normalized: Record<string, string[]> = {};
   for (const [province, cityList] of Object.entries(apiCities)) {
@@ -130,7 +132,12 @@ interface FilterSectionProps {
   hasTableData?: boolean;
   loading?: boolean;
   onCancel?: () => void;
+  hasSearched?: boolean;
+  isActive?: boolean;
+  
 }
+
+
 
 const FilterSection: React.FC<FilterSectionProps> = ({
   onSearch,
@@ -139,6 +146,8 @@ const FilterSection: React.FC<FilterSectionProps> = ({
   hasTableData = false,
   loading = false,
   onCancel,
+  hasSearched = false,
+  isActive = true, 
 }) => {
   // Redux
   const dispatch = useDispatch<AppDispatch>();
@@ -237,106 +246,109 @@ const FilterSection: React.FC<FilterSectionProps> = ({
 
   // --- Download Handler with Permit Choice ---
   const handleDownloadWithPermitChoice = async (type: "pdf" | "excel") => {
-    if (isDownloadDisabled || loading) return;
+  if (isDownloadDisabled || loading) return;
 
-    // Dynamically build checkboxes based on selected modules
-    const selectedModules = filterState.selectedModules || [];
-    const checkboxOptions: { id: string; value: string; label: string }[] = [];
-    if (selectedModules.includes("Business Permit")) {
-      checkboxOptions.push({ id: "swal-bp", value: "business", label: "Business Permit" });
-    }
-    if (selectedModules.includes("Working Permit")) {
-      checkboxOptions.push({ id: "swal-wp", value: "working", label: "Working Permit" });
-    }
-    if (selectedModules.includes("Barangay Clearance")) {
-      checkboxOptions.push({ id: "swal-bc", value: "barangay", label: "Barangay Clearance" });
-    }
+  // Dynamically build checkboxes based on selected modules
+  const selectedModules = filterState.selectedModules || [];
+  const checkboxOptions: { id: string; value: string; label: string }[] = [];
+  if (selectedModules.includes("Business Permit")) {
+    checkboxOptions.push({ id: "swal-bp", value: "business", label: "Business Permit" });
+  }
+  if (selectedModules.includes("Working Permit")) {
+    checkboxOptions.push({ id: "swal-wp", value: "working", label: "Working Permit" });
+  }
+  if (selectedModules.includes("Barangay Clearance")) {
+    checkboxOptions.push({ id: "swal-bc", value: "barangay", label: "Barangay Clearance" });
+  }
 
-    if (checkboxOptions.length === 0) return;
+  if (checkboxOptions.length === 0) return;
 
-    // If only one permit type, download automatically
-    if (checkboxOptions.length === 1) {
-      if (onDownload) {
-        onDownload(type, [checkboxOptions[0].value as "business" | "working" | "barangay"]);
-      }
-      return;
+  // If only one permit type, download automatically
+  if (checkboxOptions.length === 1) {
+    if (onDownload) {
+      onDownload(type, [checkboxOptions[0].value as "business" | "working" | "barangay"]);
     }
+    return;
+  }
 
-    // Build HTML for checkboxes with Select All
-    const html = `
-      <div style="display: flex; flex-direction: column; align-items: flex-start;">
-        <label style="margin-bottom: 8px; font-weight: bold;">
-          <input type="checkbox" id="swal-select-all" />
-          Select All
+  // Build HTML for checkboxes with Select All
+  const html = `
+    <div style="display: flex; flex-direction: column; align-items: flex-start;">
+      <label style="margin-bottom: 8px; font-weight: bold;">
+        <input type="checkbox" id="swal-select-all" />
+        Select All
+      </label>
+      ${checkboxOptions
+        .map(
+          (opt) => `
+        <label style="margin-bottom: 8px;">
+          <input type="checkbox" id="${opt.id}" value="${opt.value}" />
+          ${opt.label}
         </label>
-        ${checkboxOptions
-          .map(
-            (opt) => `
-          <label style="margin-bottom: 8px;">
-            <input type="checkbox" id="${opt.id}" value="${opt.value}" />
-            ${opt.label}
-          </label>
-        `
-          )
-          .join("")}
-      </div>
-    `;
+      `
+        )
+        .join("")}
+    </div>
+  `;
 
-    await Swal.fire({
-      title: "Choose Permit Type(s)",
-      html,
-      focusConfirm: false,
-      didOpen: () => {
-        // --- Select All logic ---
-        const selectAllBox = document.getElementById("swal-select-all") as HTMLInputElement;
-        const checkboxes = checkboxOptions.map(opt => document.getElementById(opt.id) as HTMLInputElement);
+  await Swal.fire({
+    title: "Choose Permit Type(s)",
+    html,
+    focusConfirm: false,
+    didOpen: () => {
+      // --- Select All logic ---
+      const selectAllBox = document.getElementById("swal-select-all") as HTMLInputElement;
+      const checkboxes = checkboxOptions.map(opt => document.getElementById(opt.id) as HTMLInputElement);
 
-        // Check all by default when modal opens
-        checkboxes.forEach(cb => { cb.checked = true; });
-        selectAllBox.checked = true;
+      // Check all by default when modal opens
+      checkboxes.forEach(cb => { cb.checked = true; });
+      selectAllBox.checked = true;
 
-        // When Select All is clicked, check/uncheck all
-        selectAllBox.addEventListener("change", () => {
-          checkboxes.forEach(cb => {
-            cb.checked = selectAllBox.checked;
-          });
-        });
-
-        // When any individual checkbox is changed, update Select All
+      // When Select All is clicked, check/uncheck all
+      selectAllBox.addEventListener("change", () => {
         checkboxes.forEach(cb => {
-          cb.addEventListener("change", () => {
-            const allChecked = checkboxes.every(c => c.checked);
-            selectAllBox.checked = allChecked;
-          });
+          cb.checked = selectAllBox.checked;
         });
-      },
-      preConfirm: () => {
-        const checked = checkboxOptions.filter(
-          (opt) => (document.getElementById(opt.id) as HTMLInputElement)?.checked
-        );
-        if (checked.length === 0) {
-          Swal.showValidationMessage("Please select at least one permit type!");
-          return false;
-        }
-        return checked.map((opt) => opt.value);
-      },
+      });
 
-      confirmButtonText: "Download",
-      showCancelButton: true,
-      cancelButtonText: "Cancel",
-      customClass: {
-        popup: "swal2-popup-custom-width",
-      },
-      confirmButtonColor: "#3b82f6",
-      cancelButtonColor: "#ef4444",
-    }).then((result) => {
-      if (result.isConfirmed && Array.isArray(result.value)) {
-        if (onDownload) {
-          onDownload(type, result.value as ("business" | "working" | "barangay")[]);
-        }
+      // When any individual checkbox is changed, update Select All
+      checkboxes.forEach(cb => {
+        cb.addEventListener("change", () => {
+          const allChecked = checkboxes.every(c => c.checked);
+          selectAllBox.checked = allChecked;
+        });
+      });
+    },
+    preConfirm: () => {
+      // Only checked permit types will be included
+      const checked = checkboxOptions.filter(
+        (opt) => (document.getElementById(opt.id) as HTMLInputElement)?.checked
+      );
+      if (checked.length === 0) {
+        Swal.showValidationMessage("Please select at least one permit type!");
+        return false;
       }
-    });
-  };
+      // Only return checked permit types
+      return checked.map((opt) => opt.value);
+    },
+
+    confirmButtonText: "Download",
+    showCancelButton: true,
+    cancelButtonText: "Cancel",
+    customClass: {
+      popup: "swal2-popup-custom-width",
+    },
+    confirmButtonColor: "#3b82f6",
+    cancelButtonColor: "#ef4444",
+  }).then((result) => {
+    // Only checked permit types are passed to onDownload
+    if (result.isConfirmed && Array.isArray(result.value)) {
+      if (onDownload) {
+        onDownload(type, result.value as ("business" | "working" | "barangay")[]);
+      }
+    }
+  });
+};
 
   // --- Region Logic ---
   const selectAllRegions = () => {
@@ -354,17 +366,17 @@ const FilterSection: React.FC<FilterSectionProps> = ({
     dispatch(updateFilterField({ key: 'selectedCities', value: [] }));
   };
 
-  const handleDateRangeChange = (range: { start: Date | null; end: Date | null }) => {
-    dispatch(
-      updateFilterField({
-        key: 'dateRange',
-        value: {
-          start: range.start ?? null,
-          end: range.end ?? null,
-        },
-      })
-    );
-  };
+const handleDateRangeChange = (range: { start: string | null; end: string | null }) => {
+  dispatch(
+    updateFilterField({
+      key: 'dateRange',
+      value: {
+        start: range.start,
+        end: range.end,
+      },
+    })
+  );
+};
 
   // Helper: get all provinces from selected regions
   const getProvincesFromRegions = (regions: string[]) => {
@@ -834,33 +846,33 @@ const FilterSection: React.FC<FilterSectionProps> = ({
           <Button
             className="bg-[#CB371C] hover:bg-[#CB371C] h-9 text-[12px] text-white"
             onClick={handleReset}
-            disabled={loading}
+            disabled={loading || !isActive}
           >
             Reset
           </Button>
           {/* Search/Cancel Button */}
-          {!loading ? (
-            <Button
-              className="bg-primary h-9 text-[12px] text-white"
-              onClick={handleSearchClick}
-              disabled={isSearchDisabled || loading}
-            >
-              Search
-            </Button>
-          ) : (
+          {loading && hasSearched && isActive ? (
             <Button
               className="bg-red-500 hover:bg-red-600 h-9 text-[12px] text-white"
               onClick={onCancel}
-              disabled={!loading}
+              disabled={!loading || !isActive}
               type="button"
             >
               Cancel
+            </Button>
+          ) : (
+            <Button
+              className="bg-primary h-9 text-[12px] text-white"
+              onClick={handleSearchClick}
+              disabled={isSearchDisabled || loading || !isActive}
+            >
+              Search
             </Button>
           )}
           <DropdownMenu>
             <DropdownMenuTrigger>
               <Button
-                disabled={isDownloadDisabled || loading}
+                disabled={isDownloadDisabled || loading || !isActive}
                 className="bg-[#8411DD] hover:bg-[#8411DD] text-white max-w-full text-[10px] h-9 md:w-full"
               >
                 Download
@@ -870,16 +882,16 @@ const FilterSection: React.FC<FilterSectionProps> = ({
               <DropdownMenuLabel>Download Options</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                onClick={() => handleDownloadWithPermitChoice("pdf")}
-                className={`cursor-pointer hover:bg-primary hover:text-white ${isDownloadDisabled || loading ? 'opacity-50 pointer-events-none' : ''}`}
-                disabled={isDownloadDisabled || loading}
+                onClick={() => isActive && handleDownloadWithPermitChoice("pdf")}
+                className={`cursor-pointer hover:bg-primary hover:text-white ${isDownloadDisabled || loading || !isActive ? 'opacity-50 pointer-events-none' : ''}`}
+                disabled={isDownloadDisabled || loading || !isActive}
               >
                 PDF
               </DropdownMenuItem>
               <DropdownMenuItem
-                onClick={() => handleDownloadWithPermitChoice("excel")}
-                className={`cursor-pointer ${isDownloadDisabled || loading ? 'opacity-50 pointer-events-none' : ''}`}
-                disabled={isDownloadDisabled || loading}
+                onClick={() => isActive && handleDownloadWithPermitChoice("excel")}
+                className={`cursor-pointer ${isDownloadDisabled || loading || !isActive ? 'opacity-50 pointer-events-none' : ''}`}
+                disabled={isDownloadDisabled || loading || !isActive}
               >
                 Excel
               </DropdownMenuItem>

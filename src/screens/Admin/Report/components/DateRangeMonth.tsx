@@ -3,7 +3,8 @@ import { cn } from "@/lib/utils";
 import React from "react";
 import { format, lastDayOfMonth } from "date-fns";
 import Select from "react-select";
-
+import { selectLoad } from '@/redux/loadSlice';
+import { useSelector } from "react-redux";
 const months = Array.from({ length: 12 }, (_, i) => i);
 
 function getFirstDay(month: number, year: number) {
@@ -17,7 +18,7 @@ function getLastDay(month: number, year: number) {
 interface DateRangeMonthProps {
   className?: string;
   value?: { start: Date | string | null; end: Date | string | null };
-  onChange?: (range: { start: Date | null; end: Date | null }) => void;
+  onChange?: (range: { start: string | null; end: string | null }) => void;
 }
 
 function DateRangeMonth({
@@ -34,6 +35,7 @@ function DateRangeMonth({
   const [fromYear, setFromYear] = React.useState<number | undefined>(undefined);
   const [toMonth, setToMonth] = React.useState<number | undefined>(undefined);
   const [toYear, setToYear] = React.useState<number | undefined>(undefined);
+  const loading = useSelector(selectLoad);
 
   // Set default values on mount or when value changes
   React.useEffect(() => {
@@ -63,40 +65,29 @@ function DateRangeMonth({
     }
   }, [value?.start, value?.end, currentMonth, currentYear]);
 
-  // Generate years for dropdown (e.g., currentYear-10 to currentYear+1)
-  const years = React.useMemo(
-    () => Array.from({ length: 15 }, (_, i) => currentYear - 10 + i),
-    [currentYear]
-  );
-  const monthOptions = React.useMemo(
-    () =>
-      months.map(m => ({
-        value: m,
-        label: format(new Date(currentYear, m, 1), "LLLL"),
-      })),
-    [currentYear]
-  );
-  const yearOptions = React.useMemo(
-    () =>
-      years.map(y => ({
-        value: y,
-        label: y.toString(),
-      })),
-    [years]
-  );
+  // Generate years for dropdown (from currentYear down to currentYear-14)
+  const years = Array.from({ length: 15 }, (_, i) => currentYear - i);
+  const monthOptions = months.map(m => ({
+    value: m,
+    label: format(new Date(currentYear, m), "LLLL"),
+  }));
+  const yearOptions = years.map(y => ({
+    value: y,
+    label: y.toString(),
+  }));
 
   // Handlers
-  const handleFromMonth = (option: any) => {
-    setFromMonth(option ? option.value : undefined);
+  const handleFromMonth = (month: number | null) => {
+    setFromMonth(month === null ? undefined : month);
   };
-  const handleFromYear = (option: any) => {
-    setFromYear(option ? option.value : undefined);
+  const handleFromYear = (year: number | null) => {
+    setFromYear(year === null ? undefined : year);
   };
-  const handleToMonth = (option: any) => {
-    setToMonth(option ? option.value : undefined);
+  const handleToMonth = (month: number | null) => {
+    setToMonth(month === null ? undefined : month);
   };
-  const handleToYear = (option: any) => {
-    setToYear(option ? option.value : undefined);
+  const handleToYear = (year: number | null) => {
+    setToYear(year === null ? undefined : year);
   };
 
   const handleApply = () => {
@@ -105,11 +96,13 @@ function DateRangeMonth({
       fromYear !== undefined &&
       onChange
     ) {
-      const start = getFirstDay(fromMonth, fromYear);
+      const startDate = getFirstDay(fromMonth, fromYear);
+      const start = format(startDate, "yyyy-MM-dd");
 
-      let end: Date | null = null;
+      let end: string | null = null;
       if (toMonth !== undefined && toYear !== undefined) {
-        end = getLastDay(toMonth, toYear);
+        const endDate = getLastDay(toMonth, toYear);
+        end = format(endDate, "yyyy-MM-dd");
       }
 
       onChange({ start, end });
@@ -135,7 +128,7 @@ function DateRangeMonth({
             <Select
               options={monthOptions}
               value={fromMonth !== undefined ? monthOptions.find(opt => opt.value === fromMonth) : null}
-              onChange={handleFromMonth}
+              onChange={option => handleFromMonth(option ? option.value : null)}
               placeholder="Month"
               isClearable
               className="w-full"
@@ -143,7 +136,7 @@ function DateRangeMonth({
             <Select
               options={yearOptions}
               value={fromYear !== undefined ? yearOptions.find(opt => opt.value === fromYear) : null}
-              onChange={handleFromYear}
+              onChange={option => handleFromYear(option ? option.value : null)}
               placeholder="Year"
               isClearable
               className="w-full"
@@ -156,7 +149,7 @@ function DateRangeMonth({
             <Select
               options={monthOptions}
               value={toMonth !== undefined ? monthOptions.find(opt => opt.value === toMonth) : null}
-              onChange={handleToMonth}
+              onChange={option => handleToMonth(option ? option.value : null)}
               placeholder="Month"
               isClearable
               isDisabled={fromMonth === undefined || fromYear === undefined}
@@ -165,7 +158,7 @@ function DateRangeMonth({
             <Select
               options={yearOptions}
               value={toYear !== undefined ? yearOptions.find(opt => opt.value === toYear) : null}
-              onChange={handleToYear}
+              onChange={option => handleToYear(option ? option.value : null)}
               placeholder="Year"
               isClearable
               isDisabled={fromMonth === undefined || fromYear === undefined}
@@ -175,12 +168,12 @@ function DateRangeMonth({
         </div>
         <div className="flex gap-2 mt-2 justify-end">
           <Button
-            className="h-8 "
+            className={loading ? " h-8 pointer-events-none" : "h-8"}
             variant="default"
             onClick={handleApply}
             disabled={fromMonth === undefined || fromYear === undefined}
           >
-            Apply
+            {loading ? "Applying..." : "Apply"}
           </Button>
           <Button
             className="bg-red-500 text-white hover:bg-red-600 hover:text-white h-8"
