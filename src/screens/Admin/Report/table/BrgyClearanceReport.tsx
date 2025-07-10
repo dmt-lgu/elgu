@@ -11,7 +11,6 @@ import { format, parse, startOfMonth, endOfMonth, isSameDay } from "date-fns";
 import { getRegionCode, islandRegionMap, regionMapping } from "../utils/mockData";
 import dictImage from "./../../../../assets/logo/dict.png"
 import '../utils/loader.css';
-import { RootState } from '@/redux/store';
 import { useSelector } from 'react-redux';
 import LoaderTable from '../utils/LoaderTable';
 import Loading from '../utils/Loading';
@@ -213,9 +212,9 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
   );
 
   // Loader persistence logic
-  const persistedBrgyTableData = useSelector((state: RootState) => state.brgyClearanceTable.tableData);
-  const persistedBrgyAppliedFilter = useSelector((state: RootState) => state.brgyClearanceTable.appliedFilter);
-  const reduxSelectedIslands = useSelector((state: RootState) => state.reportFilter.selectedIslands || []);
+  const persistedBrgyTableData = useSelector((state: any) => state.brgyClearanceTable.tableData);
+  const persistedBrgyAppliedFilter = useSelector((state: any) => state.brgyClearanceTable.appliedFilter);
+  const reduxSelectedIslands = useSelector((state: any) => state.reportFilter.selectedIslands || []);
   const islandsToUse = selectedIslands && selectedIslands.length > 0 ? selectedIslands : reduxSelectedIslands;
 
   const [showLoader, setShowLoader] = useState(true);
@@ -261,9 +260,9 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
 
     // Filter by islands if any are selected
     if (islandsToUse.length > 0) {
-      const regionsFromIslands = islandsToUse.flatMap(island => islandRegionMap[island] || []);
+      const regionsFromIslands = islandsToUse.flatMap((island:any) => islandRegionMap[island] || []);
       // Convert region codes to internal keys
-      const regionsInternal = regionsFromIslands.map(code => regionMapping[code] || code);
+      const regionsInternal = regionsFromIslands.map((code:any )=> regionMapping[code] || code);
       filtered = filtered.filter((lgu: any) => {
         const regionInternal =
           regionMapping[lgu.region] ||

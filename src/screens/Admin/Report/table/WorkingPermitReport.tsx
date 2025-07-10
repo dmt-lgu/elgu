@@ -11,7 +11,6 @@ import { format, parse, startOfMonth, endOfMonth, isSameDay } from "date-fns";
 import { getRegionCode, islandRegionMap, regionMapping } from "../utils/mockData";
 import dictImage from "./../../../../assets/logo/dict.png"
 import '../utils/loader.css';
-import { RootState } from '@/redux/store';
 import { useSelector } from 'react-redux';
 import LoaderTable from '../utils/LoaderTable';
 import Loading from '../utils/Loading';
@@ -327,9 +326,9 @@ const WorkingPermitReport = forwardRef<HTMLDivElement, WorkingPermitProps>(({
   );
 
   // Loader persistence logic for Working Permit (use workingPermitTable slice)
-  const persistedWPTableData = useSelector((state: RootState) => state.workingPermitTable.tableData);
-  const persistedWPAppliedFilter = useSelector((state: RootState) => state.workingPermitTable.appliedFilter);
-  const reduxSelectedIslands = useSelector((state: RootState) => state.reportFilter.selectedIslands || []);
+  const persistedWPTableData = useSelector((state: any) => state.workingPermitTable.tableData);
+  const persistedWPAppliedFilter = useSelector((state: any) => state.workingPermitTable.appliedFilter);
+  const reduxSelectedIslands = useSelector((state: any) => state.reportFilter.selectedIslands || []);
   const islandsToUse = selectedIslands && selectedIslands.length > 0 ? selectedIslands : reduxSelectedIslands;
 
   const [showLoader, setShowLoader] = useState(true);
@@ -374,8 +373,8 @@ const WorkingPermitReport = forwardRef<HTMLDivElement, WorkingPermitProps>(({
     let filtered = Array.isArray(apiData?.results) ? apiData.results : [];
 
     if (islandsToUse.length > 0) {
-      const regionsFromIslands = islandsToUse.flatMap(island => islandRegionMap[island] || []);
-      const regionsInternal = regionsFromIslands.map(code => regionMapping[code] || code);
+      const regionsFromIslands = islandsToUse.flatMap((island:any) => islandRegionMap[island] || []);
+      const regionsInternal = regionsFromIslands.map((code:any) => regionMapping[code] || code);
       filtered = filtered.filter((lgu: any) => {
         const regionInternal =
           regionMapping[lgu.region] ||

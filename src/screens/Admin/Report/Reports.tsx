@@ -7,7 +7,7 @@ import dictImage from '../../../assets/logo/dict.png';
 import { exportTableReportToPDF } from './utils/reportToPDF';
 import { exportTableReportToExcel } from './utils/reportToExcel';
 import { useSelector, useDispatch } from 'react-redux';
-import { RootState, AppDispatch } from '@/redux/store';
+import {  AppDispatch } from '@/redux/store';
 import { updateFilterField } from '../../../redux/reportFilterSlice';
 import { setTableData, setAppliedFilter } from '../../../redux/businessPermitSlice';
 import ScrollToTopButton from './components/ScrollToTopButton';
@@ -204,17 +204,17 @@ const Reports: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
 
   // Redux state
-  const persistedTableData = useSelector((state: RootState) => state.businessPermitTable.tableData);
-  const persistedAppliedFilter = useSelector((state: RootState) => state.businessPermitTable.appliedFilter);
-  const selectedModules = useSelector((state: RootState) => state.reportFilter.selectedModules);
+  const persistedTableData = useSelector((state: any) => state.businessPermitTable.tableData);
+  const persistedAppliedFilter = useSelector((state: any) => state.businessPermitTable.appliedFilter);
+  const selectedModules = useSelector((state: any) => state.reportFilter.selectedModules);
 
   // --- NEW: Working Permit Redux state ---
-  const persistedWPTableData = useSelector((state: RootState) => state.workingPermitTable.tableData);
-  const persistedWPAppliedFilter = useSelector((state: RootState) => state.workingPermitTable.appliedFilter);
+  const persistedWPTableData = useSelector((state: any) => state.workingPermitTable.tableData);
+  const persistedWPAppliedFilter = useSelector((state: any) => state.workingPermitTable.appliedFilter);
 
   // --- NEW: Barangay Clearance Redux state ---
-  const persistedBrgyTableData = useSelector((state: RootState) => state.brgyClearanceTable.tableData);
-  const persistedBrgyAppliedFilter = useSelector((state: RootState) => state.brgyClearanceTable.appliedFilter);
+  const persistedBrgyTableData = useSelector((state: any) => state.brgyClearanceTable.tableData);
+  const persistedBrgyAppliedFilter = useSelector((state: any) => state.brgyClearanceTable.appliedFilter);
 
   // Local state
   const [appliedFilter, setAppliedFilterState] = useState<AppliedFilter>({

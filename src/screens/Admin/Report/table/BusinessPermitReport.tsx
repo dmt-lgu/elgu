@@ -426,8 +426,8 @@ const BusinessPermitReport = forwardRef<HTMLDivElement, TableReportProps>(({
   );
 
   // Redux persisted data/filter
-  const persistedTableData = useSelector((state: RootState) => state.businessPermitTable.tableData);
-  const persistedAppliedFilter = useSelector((state: RootState) => state.businessPermitTable.appliedFilter);
+  const persistedTableData = useSelector((state: any) => state.businessPermitTable.tableData);
+  const persistedAppliedFilter = useSelector((state: any) => state.businessPermitTable.appliedFilter);
   const reduxSelectedIslands = useSelector((state: RootState) => state.reportFilter.selectedIslands || []);
   const islandsToUse = selectedIslands && selectedIslands.length > 0 ? selectedIslands : reduxSelectedIslands;
 
