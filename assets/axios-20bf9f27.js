@@ -1,0 +1,1 @@
+import{c as e}from"./index-0d38e570.js";import{a}from"./axios-917b1704.js";const s=e("Loader2",[["path",{d:"M21 12a9 9 0 1 1-6.219-8.56",key:"13zald"}]]);a.defaults.baseURL="";a.defaults.headers.get.Accept="application/json";a.defaults.headers.post["Content-Type"]="application/json";export{s as L};
