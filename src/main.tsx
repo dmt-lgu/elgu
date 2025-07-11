@@ -93,8 +93,7 @@ function wait( time:number) {
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <ErrorBoundary>
 
-  
-  <React.StrictMode>
+
     <Provider store={store}>
       <PersistGate loading={null} persistor={persistor}>
       <Suspense fallback={<Loader />}>
@@ -103,5 +102,5 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         
       </PersistGate>
     </Provider>
-  </React.StrictMode></ErrorBoundary>
+</ErrorBoundary>
 );

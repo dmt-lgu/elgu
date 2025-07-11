@@ -11,7 +11,6 @@ import { FilterState } from '../utils/types';
 import { selectRegions } from '@/redux/regionSlice';
 import { selectData, setData } from '@/redux/dataSlice';
 
-
 // Add this type for the formatted state
 interface FormattedFilterState {
   selectedModules: string[];
@@ -23,7 +22,7 @@ interface FormattedFilterState {
 }
 
 // Map group of islands to their regions
-const islandRegionMap:any = {
+const islandRegionMap: any = {
   "Luzon": ["I", "II", "III", "IV-A", "V", "CAR", "IV-B"],
   "Visayas": ["VI", "VII", "VIII"],
   "Mindanao": ["IX", "X", "XI", "XII", "XIII", "BARMM I", "BARMM II"]
@@ -104,13 +103,13 @@ const FilterSection: React.FC = () => {
     }));
   };
 
-  // FIXED: Initialize filterState with serializable values only
+  // Initialize filterState with Redux modules if available, otherwise use first module as default
   const [filterState, setFilterState] = useState<FilterState>({
-    selectedModules: [modules[0]],
-    selectedRegions: data?.locationName || [], // Initialize from Redux data
+    selectedModules: data?.modules && data.modules.length > 0 ? data.modules : [modules[0]],
+    selectedRegions: data?.locationName || [],
     dateRange: {
-      start: null, // This should be null or string, not Date object
-      end: null    // This should be null or string, not Date object
+      start: null,
+      end: null
     }
   });
 
@@ -121,9 +120,17 @@ const FilterSection: React.FC = () => {
   const moduleRef = useRef<HTMLDivElement>(null);
   const regionRef = useRef<HTMLDivElement>(null);
 
-  // Sync filterState.selectedRegions with Redux ONLY on mount or when Redux changes (not on every render)
+  // Sync filterState with Redux data on mount and when Redux changes
   useEffect(() => {
-    // Only update if different
+    // Update modules from Redux
+    if (data?.modules && JSON.stringify(filterState.selectedModules) !== JSON.stringify(data.modules)) {
+      setFilterState(prev => ({
+        ...prev,
+        selectedModules: data.modules
+      }));
+    }
+
+    // Update regions from Redux
     if (
       Array.isArray(data?.locationName) &&
       JSON.stringify(filterState.selectedRegions) !== JSON.stringify(data.locationName)
@@ -135,16 +142,29 @@ const FilterSection: React.FC = () => {
 
       // Update selected islands based on locationName
       const selectedIslandsList = groupOfIslands.filter(island => {
-        const islandRegions:any = islandRegionMap[island] || [];
-        return islandRegions.every((region:any) =>
+        const islandRegions: any = islandRegionMap[island] || [];
+        return islandRegions.every((region: any) =>
           data.locationName.includes(region)
         );
       });
       setSelectedIslands(selectedIslandsList);
     }
-  }, [data?.locationName]); // Only run when data.locationName changes
+  }, [data?.modules, data?.locationName]);
 
-  // Update Redux when filterState.selectedRegions changes, but only if actually different
+  // Update Redux when filterState.selectedModules changes
+  useEffect(() => {
+    if (
+      Array.isArray(filterState.selectedModules) &&
+      JSON.stringify(data?.modules) !== JSON.stringify(filterState.selectedModules)
+    ) {
+      dispatch(setData({
+        ...data,
+        modules: filterState.selectedModules,
+      }));
+    }
+  }, [filterState.selectedModules]);
+
+  // Update Redux when filterState.selectedRegions changes
   useEffect(() => {
     if (
       Array.isArray(filterState.selectedRegions) &&
@@ -157,7 +177,7 @@ const FilterSection: React.FC = () => {
         real: formattedState ? formattedState.selectedRegions : [],
       }));
     }
-  }, [filterState.selectedRegions]); // Only run when selectedRegions changes
+  }, [filterState.selectedRegions]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -173,7 +193,7 @@ const FilterSection: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // --- Other handlers ---
+  // Module handlers
   const toggleModule = (module: string) => {
     setFilterState(prev => ({
       ...prev,
@@ -197,6 +217,7 @@ const FilterSection: React.FC = () => {
     }));
   };
 
+  // Region handlers
   const selectAllRegions = () => {
     const allRegions = Array.from(
       new Set(
@@ -291,7 +312,7 @@ const FilterSection: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isDateOpen]);
 
-  // Redux state for date range - FIXED: Use string values instead of Date objects
+  // Redux state for date range
   const selectedDateType = data.selectedDateType || "";
   const startDate = data.startDate ? new Date(data.startDate) : null;
   const endDate = data.endDate ? new Date(data.endDate) : null;
@@ -303,7 +324,7 @@ const FilterSection: React.FC = () => {
     }));
   };
 
-  // FIXED: Store dates as strings in Redux
+  // Store dates as strings in Redux
   const handleDateRangeChange = (range: { start: Date | null; end: Date | null }) => {
     // Use 'Asia/Manila' for date format
     const formatLocal = (date: Date | null) =>
@@ -311,23 +332,12 @@ const FilterSection: React.FC = () => {
         ? date.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }) // 'YYYY-MM-DD'
         : "";
 
-    // Store as strings in Redux (already correct)
+    // Store as strings in Redux
     dispatch(setData({
       ...data,
       startDate: formatLocal(range.start),
       endDate: formatLocal(range.end)
     }));
-
-    // FIXED: Don't store Date objects in filterState - store strings or keep it separate
-    // Remove this problematic update to filterState.dateRange since it's not being used elsewhere
-    // If you need it, store as strings:
-    // setFilterState(prev => ({
-    //   ...prev,
-    //   dateRange: {
-    //     start: formatLocal(range.start),
-    //     end: formatLocal(range.end)
-    //   }
-    // }));
   };
 
   const deselectAllDates = () => {
@@ -343,15 +353,15 @@ const FilterSection: React.FC = () => {
     // Update selected islands based on selected regions
     const selectedIslandsList = groupOfIslands.filter(island => {
       const islandRegions = islandRegionMap[island] || [];
-      return islandRegions.every((region:any) => filterState.selectedRegions.includes(region));
+      return islandRegions.every((region: any) => filterState.selectedRegions.includes(region));
     });
     
     if (JSON.stringify(selectedIslandsList.sort()) !== JSON.stringify(selectedIslands.sort())) {
       setSelectedIslands(selectedIslandsList);
     }
-  }, [filterState.selectedRegions]); // Only depend on selectedRegions
+  }, [filterState.selectedRegions]);
 
-  // FIXED: Update the getFormattedState function to handle date range properly
+  // Update the getFormattedState function
   const getFormattedState = (): FormattedFilterState => {
     return {
       selectedModules: filterState.selectedModules,
@@ -483,11 +493,10 @@ const FilterSection: React.FC = () => {
                 </div>
                 {/* Regions */}
                 <label className="block text-sm font-bold text-blue-700 mb-2">Regions</label>
-                <div className="grid grid-cols-5 gap-2 mb-4">
-                  
+                <div className="grid grid-cols-4 gap-2 mb-4">
                   {regionGroups.map((col, colIdx) => (
                     <div key={colIdx} className="flex flex-col gap-2">
-                      {col.map((region:any) => (
+                      {col.map((region: any) => (
                         <label key={region} className="flex items-center gap-1 text-secondary-foreground  text-sm">
                           <input
                             type="checkbox"
@@ -495,7 +504,7 @@ const FilterSection: React.FC = () => {
                             onChange={() => toggleRegion(region)}
                             className="accent-blue-600"
                           />
-                          {region}
+                          <span className=' text-xs lg:text-sm'>{region}</span> 
                         </label>
                       ))}
                     </div>

@@ -15,6 +15,8 @@ import reportFilterReducer from './reportFilterSlice';
 import businessPermitTableReducer from './businessPermitSlice';
 import workingPermitTableReducer from './workingPermitTableSlice';
 import brgyClearanceTableReducer from './brgyClearanceTableSlice'; 
+import WpReducer from './wpSlice';
+import BrgyReducer from './brgySlice';
 
 const persistConfig = {
   key: 'root',
@@ -33,6 +35,9 @@ const persistConfig = {
     'transaction',
     'load',
     'status',
+    'wp',
+    'brgy',
+
   ],
 };
 
@@ -46,10 +51,13 @@ const rootReducer = combineReducers({
   transaction: transactionReducer,
   load: loadReducer,
   status: statusReducer,
+  wp:WpReducer,
   reportFilter: reportFilterReducer,
   businessPermitTable: businessPermitTableReducer,
   workingPermitTable: workingPermitTableReducer,
   brgyClearanceTable: brgyClearanceTableReducer, 
+  brgy: BrgyReducer,
+
 });
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);
