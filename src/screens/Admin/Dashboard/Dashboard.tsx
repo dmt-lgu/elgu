@@ -36,18 +36,18 @@ const DashboardPage = () => {
   // Enhanced filter and group logic
   const filterAndGroupResults = (results: any[], municipalities: any[], provinces: any[]) => {
     // 1. If municipalities is not blank, filter by selected municipalities (1 by 1)
-    if (municipalities && municipalities.length > 0) {
+    if (municipalities && municipalities?.length > 0)  {
       const selected = municipalities.map((m: any) => m.value);
       return results.filter((lgu: any) => selected.includes(lgu.lgu));
     }
     // 2. If provinces is not blank, group by province
-    if (provinces && provinces.length > 0) {
+    if (provinces && provinces?.length > 0) {
       const selectedProvinces = provinces.map((p: any) => p.value);
       const grouped: { [province: string]: any } = {};
       results.forEach((lgu: any) => {
         // Extract province from lgu.lgu (e.g., "Aloran, Misamis Occidental" → "Misamis Occidental")
         const parts = lgu.lgu.split(',');
-        const province = parts.length > 1 ? parts[1].trim() : '';
+        const province = parts?.length > 1 ? parts[1].trim() : '';
         if (selectedProvinces.includes(province)) {
           if (!grouped[province]) {
             grouped[province] = {
@@ -101,7 +101,7 @@ const DashboardPage = () => {
 
   const bpChartData: any = useMemo(() => {
   const bpArr = status?.BP;
-  if (!bpArr || !Array.isArray(bpArr) || bpArr.length === 0) return { current: [], breakdown: [] };
+  if (!bpArr || !Array.isArray(bpArr) || bpArr?.length === 0) return { current: [], breakdown: [] };
 
   // Prepare date and region filters
   const startDate = data.startDate ? parseISO(data.startDate) : null;
@@ -143,26 +143,26 @@ const DashboardPage = () => {
 
   // --- 1. Current: latest by date ---
   let current: any[] = [];
-  if (filteredBPArr.length > 0) {
+  if (filteredBPArr?.length > 0) {
     const sorted = [...filteredBPArr].sort((a, b) => (a.date > b.date ? -1 : 1));
     const latest = sorted[0];
     if (latest && latest.data) {
       let filteredData = latest.data;
 
       // Municipality filter (use lgu)
-      if (selectedMunicipalities.length > 0) {
+      if (selectedMunicipalities?.length > 0) {
         const selectedLGUs = selectedMunicipalities.map((m: any) => m.value);
         filteredData = filteredData.filter((item: any) => selectedLGUs.includes(item.lgu));
         current = groupAndSum(filteredData, "lgu");
       }
       // Province filter
-      else if (selectedProvinces.length > 0) {
+      else if (selectedProvinces?.length > 0) {
         const selectedProv = selectedProvinces.map((p: any) => p.value);
         filteredData = filteredData.filter((item: any) => selectedProv.includes(item.province));
         current = groupAndSum(filteredData, "province");
       }
       // Region filter
-      else if (selectedRegions.length > 0) {
+      else if (selectedRegions?.length > 0) {
         filteredData = filteredData.filter((item: any) => selectedRegions.includes(item.region));
         current = groupAndSum(filteredData, "region");
       } else {
@@ -176,21 +176,21 @@ const DashboardPage = () => {
   filteredBPArr.forEach((bp: any) => {
     let filteredData = bp.data;
 
-    if (selectedMunicipalities.length > 0) {
+    if (selectedMunicipalities?.length > 0) {
       const selectedLGUs = selectedMunicipalities.map((m: any) => m.value);
       filteredData = filteredData.filter((item: any) => selectedLGUs.includes(item.lgu));
       breakdown.push({
         date: bp.date,
         data: groupAndSum(filteredData, "lgu"),
       });
-    } else if (selectedProvinces.length > 0) {
+    } else if (selectedProvinces?.length > 0) {
       const selectedProv = selectedProvinces.map((p: any) => p.value);
       filteredData = filteredData.filter((item: any) => selectedProv.includes(item.province));
       breakdown.push({
         date: bp.date,
         data: groupAndSum(filteredData, "province"),
       });
-    } else if (selectedRegions.length > 0) {
+    } else if (selectedRegions?.length > 0) {
       filteredData = filteredData.filter((item: any) => selectedRegions.includes(item.region));
       breakdown.push({
         date: bp.date,
@@ -217,7 +217,7 @@ const DashboardPage = () => {
 
 const wpChartData: any = useMemo(() => {
   const bpArr = wp?.WP;
-  if (!bpArr || !Array.isArray(bpArr) || bpArr.length === 0) return { current: [], breakdown: [] };
+  if (!bpArr || !Array.isArray(bpArr) || bpArr?.length === 0) return { current: [], breakdown: [] };
 
   // Prepare date and region filters
   const startDate = data.startDate ? parseISO(data.startDate) : null;
@@ -259,26 +259,26 @@ const wpChartData: any = useMemo(() => {
 
   // --- 1. Current: latest by date ---
   let current: any[] = [];
-  if (filteredBPArr.length > 0) {
+  if (filteredBPArr?.length > 0) {
     const sorted = [...filteredBPArr].sort((a, b) => (a.date > b.date ? -1 : 1));
     const latest = sorted[0];
     if (latest && latest.data) {
       let filteredData = latest.data;
 
       // Municipality filter (use lgu)
-      if (selectedMunicipalities.length > 0) {
+      if (selectedMunicipalities?.length > 0) {
         const selectedLGUs = selectedMunicipalities.map((m: any) => m.value);
         filteredData = filteredData.filter((item: any) => selectedLGUs.includes(item.lgu));
         current = groupAndSum(filteredData, "lgu");
       }
       // Province filter
-      else if (selectedProvinces.length > 0) {
+      else if (selectedProvinces?.length > 0) {
         const selectedProv = selectedProvinces.map((p: any) => p.value);
         filteredData = filteredData.filter((item: any) => selectedProv.includes(item.province));
         current = groupAndSum(filteredData, "province");
       }
       // Region filter
-      else if (selectedRegions.length > 0) {
+      else if (selectedRegions?.length > 0) {
         filteredData = filteredData.filter((item: any) => selectedRegions.includes(item.region));
         current = groupAndSum(filteredData, "region");
       } else {
@@ -292,21 +292,21 @@ const wpChartData: any = useMemo(() => {
   filteredBPArr.forEach((bp: any) => {
     let filteredData = bp.data;
 
-    if (selectedMunicipalities.length > 0) {
+    if (selectedMunicipalities?.length > 0) {
       const selectedLGUs = selectedMunicipalities.map((m: any) => m.value);
       filteredData = filteredData.filter((item: any) => selectedLGUs.includes(item.lgu));
       breakdown.push({
         date: bp.date,
         data: groupAndSum(filteredData, "lgu"),
       });
-    } else if (selectedProvinces.length > 0) {
+    } else if (selectedProvinces?.length > 0) {
       const selectedProv = selectedProvinces.map((p: any) => p.value);
       filteredData = filteredData.filter((item: any) => selectedProv.includes(item.province));
       breakdown.push({
         date: bp.date,
         data: groupAndSum(filteredData, "province"),
       });
-    } else if (selectedRegions.length > 0) {
+    } else if (selectedRegions?.length > 0) {
       filteredData = filteredData.filter((item: any) => selectedRegions.includes(item.region));
       breakdown.push({
         date: bp.date,
@@ -333,7 +333,7 @@ const wpChartData: any = useMemo(() => {
 
 const brgyChartData: any = useMemo(() => {
   const bpArr = brgy?.BRGY;
-  if (!bpArr || !Array.isArray(bpArr) || bpArr.length === 0) return { current: [], breakdown: [] };
+  if (!bpArr || !Array.isArray(bpArr) || bpArr?.length === 0) return { current: [], breakdown: [] };
 
   // Prepare date and region filters
   const startDate = data.startDate ? parseISO(data.startDate) : null;
@@ -375,26 +375,26 @@ const brgyChartData: any = useMemo(() => {
 
   // --- 1. Current: latest by date ---
   let current: any[] = [];
-  if (filteredBPArr.length > 0) {
+  if (filteredBPArr?.length > 0) {
     const sorted = [...filteredBPArr].sort((a, b) => (a.date > b.date ? -1 : 1));
     const latest = sorted[0];
     if (latest && latest.data) {
       let filteredData = latest.data;
 
       // Municipality filter (use lgu)
-      if (selectedMunicipalities.length > 0) {
+      if (selectedMunicipalities?.length > 0) {
         const selectedLGUs = selectedMunicipalities.map((m: any) => m.value);
         filteredData = filteredData.filter((item: any) => selectedLGUs.includes(item.lgu));
         current = groupAndSum(filteredData, "lgu");
       }
       // Province filter
-      else if (selectedProvinces.length > 0) {
+      else if (selectedProvinces?.length > 0) {
         const selectedProv = selectedProvinces.map((p: any) => p.value);
         filteredData = filteredData.filter((item: any) => selectedProv.includes(item.province));
         current = groupAndSum(filteredData, "province");
       }
       // Region filter
-      else if (selectedRegions.length > 0) {
+      else if (selectedRegions?.length > 0) {
         filteredData = filteredData.filter((item: any) => selectedRegions.includes(item.region));
         current = groupAndSum(filteredData, "region");
       } else {
@@ -408,21 +408,21 @@ const brgyChartData: any = useMemo(() => {
   filteredBPArr.forEach((bp: any) => {
     let filteredData = bp.data;
 
-    if (selectedMunicipalities.length > 0) {
+    if (selectedMunicipalities?.length > 0) {
       const selectedLGUs = selectedMunicipalities.map((m: any) => m.value);
       filteredData = filteredData.filter((item: any) => selectedLGUs.includes(item.lgu));
       breakdown.push({
         date: bp.date,
         data: groupAndSum(filteredData, "lgu"),
       });
-    } else if (selectedProvinces.length > 0) {
+    } else if (selectedProvinces?.length > 0) {
       const selectedProv = selectedProvinces.map((p: any) => p.value);
       filteredData = filteredData.filter((item: any) => selectedProv.includes(item.province));
       breakdown.push({
         date: bp.date,
         data: groupAndSum(filteredData, "province"),
       });
-    } else if (selectedRegions.length > 0) {
+    } else if (selectedRegions?.length > 0) {
       filteredData = filteredData.filter((item: any) => selectedRegions.includes(item.region));
       breakdown.push({
         date: bp.date,
@@ -915,11 +915,11 @@ function getBPLS() {
 
 
 function formatList(arr:any) {
-  if (arr.length === 0) return "";
-  if (arr.length === 1) return arr[0];
-  if (arr.length === 2) return arr.join(" and ");
+  if (arr?.length === 0) return "";
+  if (arr?.length === 1) return arr[0];
+  if (arr?.length === 2) return arr.join(" and ");
   
-  return arr.slice(0, -1).join(", ") + ", and " + arr[arr.length - 1];
+  return arr.slice(0, -1).join(", ") + ", and " + arr[arr?.length - 1];
 }
   return (
     <div className="p-6 sm:p-2 md:p-4 max-w-[1200px] mx-auto  bg-background ">
