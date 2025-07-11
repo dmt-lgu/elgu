@@ -992,7 +992,7 @@ function formatList(arr:any) {
       <StatusChartComponent 
         data={bpChartData?.current || []}
         raw={bpChartData?.breakdown || []}
-        title="Operational vs. Developmental vs. Withdrawal (BPLS)"
+        title="Operational vs. Developmental vs. Withdrawal (Business Permit)"
         period={`${data.startDate} - ${data.endDate}`}
       />: null}
 
