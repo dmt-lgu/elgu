@@ -11,7 +11,6 @@ import { format, parse, startOfMonth, endOfMonth, isSameDay } from "date-fns";
 import { getRegionCode, islandRegionMap, regionMapping } from "../utils/mockData";
 import dictImage from "./../../../../assets/logo/dict.png"
 import '../utils/loader.css';
-import { RootState } from '@/redux/store';
 import { useSelector } from 'react-redux';
 import LoaderTable from '../utils/LoaderTable';
 import Loading from '../utils/Loading';
@@ -181,6 +180,97 @@ function mergeLguProvinceSumAllMonths(
   return Object.values(merged);
 }
 
+// --- Exported filterTableResults for use in reportFilterUtils ---
+export function filterTableResults({
+  apiData,
+  selectedRegions = [],
+  selectedProvinces = [],
+  selectedCities = [],
+  selectedDates = [],
+  selectedIslands = [],
+  lguToRegion = {},
+  dateRange = { start: null, end: null },
+}: {
+  apiData: any;
+  selectedRegions?: string[];
+  selectedProvinces?: string[];
+  selectedCities?: string[];
+  selectedDates?: string[];
+  selectedIslands?: string[];
+  lguToRegion?: Record<string, string>;
+  dateRange?: { start: Date | string | null; end: Date | string | null };
+}) {
+  const normalizedDateRange = normalizeDateRange(dateRange);
+
+  let filtered = Array.isArray(apiData?.results) ? apiData.results : [];
+
+  // Filter by islands if any are selected
+  if (selectedIslands && selectedIslands.length > 0) {
+    const regionsFromIslands = selectedIslands.flatMap(island => islandRegionMap[island] || []);
+    // Convert region codes to internal keys
+    const regionsInternal = regionsFromIslands.map(code => regionMapping[code] || code);
+    filtered = filtered.filter((lgu: any) => {
+      const regionInternal =
+        regionMapping[lgu.region] ||
+        regionMapping[lgu.regionCode] ||
+        lguToRegion[lgu.lgu];
+      return regionsInternal.includes(regionInternal);
+    });
+  } else if (selectedRegions && selectedRegions.length > 0) {
+    filtered = filtered.filter((lgu: any) => {
+      // Map region code to internal key if possible
+      const regionInternal =
+        regionMapping[lgu.region] ||
+        regionMapping[lgu.regionCode] ||
+        lguToRegion[lgu.lgu];
+      return selectedRegions.includes(regionInternal);
+    });
+  }
+
+  if (selectedProvinces && selectedProvinces.length > 0) {
+    filtered = filtered.filter((lgu: any) => {
+      const province = extractProvince(lgu);
+      return (
+        province &&
+        selectedProvinces.some(
+          prov =>
+            prov.trim().toLowerCase() === province.trim().toLowerCase()
+        )
+      );
+    });
+  }
+
+  if (selectedCities && selectedCities.length > 0) {
+    filtered = filtered.filter((lgu: any) => {
+      const city = extractCity(lgu);
+      return (
+        city &&
+        selectedCities.some(
+          c =>
+            c.trim().toLowerCase() === city.trim().toLowerCase()
+        )
+      );
+    });
+  }
+
+  // If "Day" is selected, DO NOT merge, just filter by date range
+  if (selectedDates && selectedDates.includes("Day")) {
+    return filtered.map((lgu: any) => ({
+      ...lgu,
+      monthlyResults: lgu.monthlyResults.filter((month: any) =>
+        isMonthInRange(month.month, normalizedDateRange)
+      ),
+      months: lgu.monthlyResults
+        .filter((month: any) => isMonthInRange(month.month, normalizedDateRange))
+        .map((month: any) => month.month),
+      sum: {}, // Not used in this mode
+    }));
+  }
+
+  // Default: merge and sum duplicates here!
+  return mergeLguProvinceSumAllMonths(filtered, normalizedDateRange);
+}
+
 // --- Loader persistence logic ---
 function isSameFilter(a: any, b: any) {
   if (!a || !b) return false;
@@ -213,9 +303,9 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
   );
 
   // Loader persistence logic
-  const persistedBrgyTableData = useSelector((state: RootState) => state.brgyClearanceTable.tableData);
-  const persistedBrgyAppliedFilter = useSelector((state: RootState) => state.brgyClearanceTable.appliedFilter);
-  const reduxSelectedIslands = useSelector((state: RootState) => state.reportFilter.selectedIslands || []);
+  const persistedBrgyTableData = useSelector((state: any) => state.brgyClearanceTable.tableData);
+  const persistedBrgyAppliedFilter = useSelector((state: any) => state.brgyClearanceTable.appliedFilter);
+  const reduxSelectedIslands = useSelector((state: any) => state.reportFilter.selectedIslands || []);
   const islandsToUse = selectedIslands && selectedIslands.length > 0 ? selectedIslands : reduxSelectedIslands;
 
   const [showLoader, setShowLoader] = useState(true);
@@ -255,83 +345,26 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
     dateRange,
   ]);
 
-  // Get filtered results (table data logic unchanged)
+  // Use the exported filterTableResults function for filtering
   const filteredResults = useMemo(() => {
-    let filtered = Array.isArray(apiData?.results) ? apiData.results : [];
-
-    // Filter by islands if any are selected
-    if (islandsToUse.length > 0) {
-      const regionsFromIslands = islandsToUse.flatMap(island => islandRegionMap[island] || []);
-      // Convert region codes to internal keys
-      const regionsInternal = regionsFromIslands.map(code => regionMapping[code] || code);
-      filtered = filtered.filter((lgu: any) => {
-        const regionInternal =
-          regionMapping[lgu.region] ||
-          regionMapping[lgu.regionCode] ||
-          lguToRegion[lgu.lgu];
-        return regionsInternal.includes(regionInternal);
-      });
-    } else if (selectedRegions.length > 0) {
-      filtered = filtered.filter((lgu: any) => {
-        // Map region code to internal key if possible
-        const regionInternal =
-          regionMapping[lgu.region] ||
-          regionMapping[lgu.regionCode] ||
-          lguToRegion[lgu.lgu];
-        return selectedRegions.includes(regionInternal);
-      });
-    }
-
-    if (selectedProvinces.length > 0) {
-      filtered = filtered.filter((lgu: any) => {
-        const province = extractProvince(lgu);
-        return (
-          province &&
-          selectedProvinces.some(
-            prov =>
-              prov.trim().toLowerCase() === province.trim().toLowerCase()
-          )
-        );
-      });
-    }
-
-    if (selectedCities.length > 0) {
-      filtered = filtered.filter((lgu: any) => {
-        const city = extractCity(lgu);
-        return (
-          city &&
-          selectedCities.some(
-            c =>
-              c.trim().toLowerCase() === city.trim().toLowerCase()
-          )
-        );
-      });
-    }
-
-    // If "Day" is selected, DO NOT merge, just filter by date range
-    if (selectedDates && selectedDates.includes("Day")) {
-      return filtered.map((lgu: any) => ({
-        ...lgu,
-        monthlyResults: lgu.monthlyResults.filter((month: any) =>
-          isMonthInRange(month.month, normalizedDateRange)
-        ),
-        months: lgu.monthlyResults
-          .filter((month: any) => isMonthInRange(month.month, normalizedDateRange))
-          .map((month: any) => month.month),
-        sum: {}, // Not used in this mode
-      }));
-    }
-
-    // Default: merge and sum duplicates here!
-    return mergeLguProvinceSumAllMonths(filtered, normalizedDateRange);
+    return filterTableResults({
+      apiData,
+      selectedRegions,
+      selectedProvinces,
+      selectedCities,
+      selectedDates,
+      selectedIslands: islandsToUse,
+      lguToRegion,
+      dateRange,
+    });
   }, [
     apiData?.results,
     selectedRegions.join("-"),
     selectedProvinces.join("-"),
     selectedCities.join("-"),
     JSON.stringify(lguToRegion),
-    normalizedDateRange?.start?.toISOString?.() ?? "",
-    normalizedDateRange?.end?.toISOString?.() ?? "",
+    dateRange?.start,
+    dateRange?.end,
     selectedDates?.join("-") ?? "",
     islandsToUse.join("-"),
   ]);
