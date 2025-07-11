@@ -914,7 +914,13 @@ function getBPLS() {
   }, []);
 
 
-
+function formatList(arr:any) {
+  if (arr.length === 0) return "";
+  if (arr.length === 1) return arr[0];
+  if (arr.length === 2) return arr.join(" and ");
+  
+  return arr.slice(0, -1).join(", ") + ", and " + arr[arr.length - 1];
+}
   return (
     <div className="p-6 sm:p-2 md:p-4 max-w-[1200px] mx-auto  bg-background ">
       <FilterSection />
@@ -938,17 +944,17 @@ function getBPLS() {
             <StatisticCard 
           title="No. of LGU Operational"
           value={totalOperational}
-          showInfo={`No. of LGU that has Operational Status on Business Permit as of ${data.startDate} - ${data.endDate}`}
+          showInfo={`Total of Operational Status on ${formatList(data?.modules)} as of ${data.startDate} - ${data.endDate}`}
         />
         <StatisticCard 
           title="No. of LGU Developmental"
           value={totalDevelopmental}
-          showInfo={`No. of LGU that has Developmental Status on Business Permit as of ${data.startDate} - ${data.endDate}`}
+          showInfo={`Total of Developmental Status on ${formatList(data?.modules)}  as of ${data.startDate} - ${data.endDate}`}
         />
         <StatisticCard 
           title="No. of LGU Withdraw"
           value={totalWithdraw}
-          showInfo={`No. of LGU that has Withdrawn Status on Business Permit as of ${data.startDate} - ${data.endDate}`}
+          showInfo={`Total of Withdraw Status on ${formatList(data?.modules)}  as of ${data.startDate} - ${data.endDate}`}
         />
 
         </div>
