@@ -36,12 +36,12 @@ const DashboardPage = () => {
   // Enhanced filter and group logic
   const filterAndGroupResults = (results: any[], municipalities: any[], provinces: any[]) => {
     // 1. If municipalities is not blank, filter by selected municipalities (1 by 1)
-    if (municipalities && municipalities.length > 0) {
+    if (Array.isArray(municipalities) && municipalities.length > 0) {
       const selected = municipalities.map((m: any) => m.value);
       return results.filter((lgu: any) => selected.includes(lgu.lgu));
     }
     // 2. If provinces is not blank, group by province
-    if (provinces && provinces.length > 0) {
+    if (Array.isArray(provinces) && provinces.length > 0) {
       const selectedProvinces = provinces.map((p: any) => p.value);
       const grouped: { [province: string]: any } = {};
       results.forEach((lgu: any) => {
