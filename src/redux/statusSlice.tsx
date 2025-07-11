@@ -8,7 +8,8 @@ const initialState: StatusState = {
   value: {
   "BP": [],
   "BPraw": [],
-  "totalStatus":[]
+
+  "totalStatus":[],
 }, // Initial empty list of regions
 };
 

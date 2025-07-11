@@ -179,13 +179,16 @@ const FilterSection: React.FC<FilterSectionProps> = ({
       label: province,
     })), [provinces]);
 
-  useEffect(() => {
+ useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (moduleRef.current && !moduleRef.current.contains(event.target as Node)) {
         setIsModuleOpen(false);
       }
       if (regionRef.current && !regionRef.current.contains(event.target as Node)) {
         setIsRegionOpen(false);
+      }
+      if (dateRef.current && !dateRef.current.contains(event.target as Node)) {
+        setIsDateOpen(false);
       }
     };
 
@@ -195,19 +198,35 @@ const FilterSection: React.FC<FilterSectionProps> = ({
 
   // --- Module Logic ---
   const toggleModule = (module: string) => {
-    const newModules = filterState.selectedModules.includes(module)
-      ? filterState.selectedModules.filter((m: string) => m !== module)
-      : [...filterState.selectedModules, module];
-    dispatch(updateFilterField({ key: 'selectedModules', value: newModules }));
-  };
+  const newModules = filterState.selectedModules.includes(module)
+    ? filterState.selectedModules.filter((m: string) => m !== module)
+    : [...filterState.selectedModules, module];
+  dispatch(updateFilterField({ key: 'selectedModules', value: newModules }));
+  // Notify parent, but skip API
+  onSearch({
+    ...filterState,
+    selectedModules: newModules,
+    skipApi: true,
+  });
+};
 
   const selectAllModules = () => {
-    dispatch(updateFilterField({ key: 'selectedModules', value: [...modules] }));
-  };
+  dispatch(updateFilterField({ key: 'selectedModules', value: [...modules] }));
+  onSearch({
+    ...filterState,
+    selectedModules: [...modules],
+    skipApi: true,
+  });
+};
 
   const deselectAllModules = () => {
-    dispatch(updateFilterField({ key: 'selectedModules', value: [] }));
-  };
+  dispatch(updateFilterField({ key: 'selectedModules', value: [] }));
+  onSearch({
+    ...filterState,
+    selectedModules: [],
+    skipApi: true,
+  });
+};
 
   // --- Province Logic ---
   const selectAllProvinces = () => {
@@ -215,13 +234,17 @@ const FilterSection: React.FC<FilterSectionProps> = ({
     dispatch(updateFilterField({ key: 'selectedProvinces', value: filteredProvinceOptions.map(opt => opt.value) }));
     setSelectedCityOptions([]); // Reset cities when provinces change
     dispatch(updateFilterField({ key: 'selectedCities', value: [] }));
+    // Auto-search when provinces change
+    handleSearchClick();
   };
 
-  const deselectAllProvinces = () => {
+   const deselectAllProvinces = () => {
     setSelectedProvinceOptions([]);
     dispatch(updateFilterField({ key: 'selectedProvinces', value: [] }));
     setSelectedCityOptions([]);
     dispatch(updateFilterField({ key: 'selectedCities', value: [] }));
+    // Auto-search when provinces change
+    handleSearchClick();
   };
 
   // --- City Logic ---
@@ -229,11 +252,15 @@ const FilterSection: React.FC<FilterSectionProps> = ({
     const allCityOptions = getCityOptions(selectedProvinceOptions.map(opt => opt.value), cities);
     setSelectedCityOptions(allCityOptions);
     dispatch(updateFilterField({ key: 'selectedCities', value: allCityOptions.map(opt => opt.value) }));
+    // Auto-search when cities change
+    handleSearchClick();
   };
 
-  const deselectAllCities = () => {
+   const deselectAllCities = () => {
     setSelectedCityOptions([]);
     dispatch(updateFilterField({ key: 'selectedCities', value: [] }));
+    // Auto-search when cities change
+    handleSearchClick();
   };
 
   const isSearchDisabled =
@@ -431,18 +458,32 @@ const handleDateRangeChange = (range: { start: string | null; end: string | null
     dispatch(updateFilterField({ key: 'selectedRegions', value: newRegions }));
   };
 
-  const handleProvinceChange = (options: any) => {
-    setSelectedProvinceOptions(options || []);
-    setSelectedCityOptions([]);
-    dispatch(updateFilterField({ key: 'selectedProvinces', value: (options || []).map((opt: any) => opt.value) }));
-    dispatch(updateFilterField({ key: 'selectedCities', value: [] }));
-  };
+ const handleProvinceChange = (options: any) => {
+  setSelectedProvinceOptions(options || []);
+  setSelectedCityOptions([]);
+  dispatch(updateFilterField({ key: 'selectedProvinces', value: (options || []).map((opt: any) => opt.value) }));
+  dispatch(updateFilterField({ key: 'selectedCities', value: [] }));
+  // Always include selectedModules in the filter
+  onSearch({
+    ...filterState,
+    selectedProvinces: (options || []).map((opt: any) => opt.value),
+    selectedCities: [],
+    selectedModules: filterState.selectedModules, // <-- always include this!
+    skipApi: true,
+  });
+};
 
-  const handleCityChange = (options: any) => {
-    setSelectedCityOptions(options || []);
-    dispatch(updateFilterField({ key: 'selectedCities', value: (options || []).map((opt: any) => opt.value) }));
-  };
-
+const handleCityChange = (options: any) => {
+  setSelectedCityOptions(options || []);
+  dispatch(updateFilterField({ key: 'selectedCities', value: (options || []).map((opt: any) => opt.value) }));
+  // Always include selectedModules in the filter
+  onSearch({
+    ...filterState,
+    selectedCities: (options || []).map((opt: any) => opt.value),
+    selectedModules: filterState.selectedModules, // <-- always include this!
+    skipApi: true,
+  });
+};
   // --- Date Range Logic (Redux) ---
   const selectedDateType = filterState.selectedDateType || ""; // "Day" | "Month" | "Year" | ""
 
@@ -464,14 +505,15 @@ const handleDateRangeChange = (range: { start: string | null; end: string | null
       allRegionInternalKeys.every(key => filterState.selectedRegions.includes(key));
 
     onSearch({
-      selectedRegions: allRegionsSelected ? allRegionInternalKeys : filterState.selectedRegions,
-      selectedProvinces: filterState.selectedProvinces,
-      selectedCities: filterState.selectedCities,
-      dateRange: filterState.dateRange,
-      selectedDateType: filterState.selectedDateType,
-      selectedIslands: filterState.selectedIslands,
-      allRegionsSelected,
-    });
+    selectedRegions: allRegionsSelected ? allRegionInternalKeys : filterState.selectedRegions,
+    selectedProvinces: filterState.selectedProvinces,
+    selectedCities: filterState.selectedCities,
+    dateRange: filterState.dateRange,
+    selectedDateType: filterState.selectedDateType,
+    selectedIslands: filterState.selectedIslands,
+    selectedModules: filterState.selectedModules, // <-- make sure this is included!
+    allRegionsSelected,
+  });
   };
 
   const handleReset = () => {
