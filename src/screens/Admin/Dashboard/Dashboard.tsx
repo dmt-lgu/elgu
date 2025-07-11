@@ -33,17 +33,14 @@ const DashboardPage = () => {
 
   // Enhanced filter and group logic
   const filterAndGroupResults = (results: any[], municipalities: any[], provinces: any[]) => {
-    // 1. If municipalities is not blank, filter by selected municipalities (1 by 1)
     if (Array.isArray(municipalities) && municipalities.length > 0) {
       const selected = municipalities.map((m: any) => m.value);
       return results.filter((lgu: any) => selected.includes(lgu.lgu));
     }
-    // 2. If provinces is not blank, group by province
     if (Array.isArray(provinces) && provinces.length > 0) {
       const selectedProvinces = provinces.map((p: any) => p.value);
       const grouped: { [province: string]: any } = {};
       results.forEach((lgu: any) => {
-        // Extract province from lgu.lgu (e.g., "Aloran, Misamis Occidental" → "Misamis Occidental")
         const parts = lgu.lgu.split(',');
         const province = parts.length > 1 ? parts[1].trim() : '';
         if (selectedProvinces.includes(province)) {
@@ -54,7 +51,6 @@ const DashboardPage = () => {
               monthlyResults: [],
             };
           }
-          // Merge monthlyResults
           lgu.monthlyResults.forEach((m: any, idx: number) => {
             if (!grouped[province].monthlyResults[idx]) {
               grouped[province].monthlyResults[idx] = { ...m };
@@ -71,7 +67,6 @@ const DashboardPage = () => {
       });
       return Object.values(grouped);
     }
-    // 3. If blank, group by region and sum up the values
     const grouped: { [region: string]: any } = {};
     results.forEach((lgu: any) => {
       if (!grouped[lgu.region]) {
@@ -118,7 +113,6 @@ const DashboardPage = () => {
       return dateOk;
     });
 
-    // Helper to group and sum by key
     function groupAndSum(arr: any[], key: string) {
       const grouped: Record<string, any> = {};
       arr.forEach(item => {
@@ -139,7 +133,6 @@ const DashboardPage = () => {
       return Object.values(grouped);
     }
 
-    // --- 1. Current: latest by date ---
     let current: any[] = [];
     if (filteredBPArr.length > 0) {
       const sorted = [...filteredBPArr].sort((a, b) => (a.date > b.date ? -1 : 1));
@@ -147,20 +140,15 @@ const DashboardPage = () => {
       if (latest && latest.data) {
         let filteredData = latest.data;
 
-        // Municipality filter (use lgu)
         if (Array.isArray(selectedMunicipalities) && selectedMunicipalities.length > 0) {
           const selectedLGUs = selectedMunicipalities.map((m: any) => m.value);
           filteredData = filteredData.filter((item: any) => selectedLGUs.includes(item.lgu));
           current = groupAndSum(filteredData, "lgu");
-        }
-        // Province filter
-        else if (Array.isArray(selectedProvinces) && selectedProvinces.length > 0) {
+        } else if (Array.isArray(selectedProvinces) && selectedProvinces.length > 0) {
           const selectedProv = selectedProvinces.map((p: any) => p.value);
           filteredData = filteredData.filter((item: any) => selectedProv.includes(item.province));
           current = groupAndSum(filteredData, "province");
-        }
-        // Region filter
-        else if (Array.isArray(selectedRegions) && selectedRegions.length > 0) {
+        } else if (Array.isArray(selectedRegions) && selectedRegions.length > 0) {
           filteredData = filteredData.filter((item: any) => selectedRegions.includes(item.region));
           current = groupAndSum(filteredData, "region");
         } else {
@@ -169,7 +157,6 @@ const DashboardPage = () => {
       }
     }
 
-    // --- 2. Breakdown: group by date, each with data:[] ---
     let breakdown: any[] = [];
     filteredBPArr.forEach((bp: any) => {
       let filteredData = bp.data;
@@ -216,14 +203,12 @@ const DashboardPage = () => {
     const bpArr = wp?.WP;
     if (!bpArr || !Array.isArray(bpArr) || bpArr.length === 0) return { current: [], breakdown: [] };
 
-    // Prepare date and region filters
     const start = startDate ? parseISO(startDate) : null;
     const end = endDate ? parseISO(endDate) : null;
     const selectedRegions = Array.isArray(real) ? real : real ? [real] : [];
     const selectedProvinces = Array.isArray(province) ? province : [];
     const selectedMunicipalities = Array.isArray(municipalities) ? municipalities : [];
 
-    // Filter BP array by date range
     const filteredBPArr = bpArr.filter((bp: any) => {
       if (!bp.date) return true;
       const bpDate = parseISO(bp.date);
@@ -233,7 +218,6 @@ const DashboardPage = () => {
       return dateOk;
     });
 
-    // Helper to group and sum by key
     function groupAndSum(arr: any[], key: string) {
       const grouped: Record<string, any> = {};
       arr.forEach(item => {
@@ -323,14 +307,12 @@ const DashboardPage = () => {
     const bpArr = brgy?.BRGY;
     if (!bpArr || !Array.isArray(bpArr) || bpArr.length === 0) return { current: [], breakdown: [] };
 
-    // Prepare date and region filters
     const start = startDate ? parseISO(startDate) : null;
     const end = endDate ? parseISO(endDate) : null;
     const selectedRegions = Array.isArray(real) ? real : real ? [real] : [];
     const selectedProvinces = Array.isArray(province) ? province : [];
     const selectedMunicipalities = Array.isArray(municipalities) ? municipalities : [];
 
-    // Filter BP array by date range
     const filteredBPArr = bpArr.filter((bp: any) => {
       if (!bp.date) return true;
       const bpDate = parseISO(bp.date);
@@ -340,7 +322,6 @@ const DashboardPage = () => {
       return dateOk;
     });
 
-    // Helper to group and sum by key
     function groupAndSum(arr: any[], key: string) {
       const grouped: Record<string, any> = {};
       arr.forEach(item => {
@@ -474,7 +455,6 @@ const DashboardPage = () => {
 
   const chartData = useMemo(() => {
     if (!transactionData || !transactionData.results) return [];
-    // Filter or group results
     const filteredResults = filterAndGroupResults(
       transactionData.results,
       municipalities,
@@ -501,7 +481,6 @@ const DashboardPage = () => {
 
   const chartData3 = useMemo(() => {
     if (!transactionData || !transactionData.results) return [];
-    // Filter or group results
     const filteredResults = filterAndGroupResults(
       transactionData.results,
       municipalities,
@@ -536,17 +515,14 @@ const DashboardPage = () => {
     });
   }, [municipalities, province, transactionData]);
 
-  // Filter card statistics by municipalities or province if present
   const filteredCard = useMemo(() => {
     if (!card || !transactionData?.results) return card;
-    // If municipalities or province is selected, filter/group accordingly
     const filteredResults = filterAndGroupResults(
       transactionData.results,
       municipalities,
       province
     );
 
-    // Sum up all relevant fields for the filtered LGUs/provinces/regions
     const totals = {
       totalnewPending: 0,
       totalnewPaid: 0,
@@ -609,19 +585,18 @@ const DashboardPage = () => {
       }
     }).then((response) => {
       const data = response.data.values;
+      if (!Array.isArray(data)) return;
       const records = data.slice(3);
 
-      // Map column indexes for easier maintenance
       const idx = {
         period: 1,
         lgu: 4,
         name: 13,
         province: 14,
-        dictRo: 18, // Use dictRo as region
-        status: 10, // e.g. "Operational", "Developmental", "Training", "Withdraw"
+        dictRo: 18,
+        status: 10,
       };
 
-      // Group by period and dictRo, and sum statuses
       const groupedByMonth: Record<string, Record<string, any>> = {};
       records.forEach((row: any) => {
         const period = row[idx.period];
@@ -654,7 +629,6 @@ const DashboardPage = () => {
         else if (status.includes('withdraw')) groupedByMonth[period][lgu].withdraw += 1;
       });
 
-      // Format result as requested
       const WP = Object.entries(groupedByMonth).map(([date, lgus]) => ({
         date,
         data: Object.values(lgus),
@@ -676,19 +650,18 @@ const DashboardPage = () => {
       }
     }).then((response) => {
       const data = response.data.values;
+      if (!Array.isArray(data)) return;
       const records = data.slice(3);
 
-      // Map column indexes for easier maintenance
       const idx = {
         period: 1,
         lgu: 4,
         name: 13,
         province: 14,
-        dictRo: 18, // Use dictRo as region
-        status: 10, // e.g. "Operational", "Developmental", "Training", "Withdraw"
+        dictRo: 18,
+        status: 10,
       };
 
-      // Group by period and dictRo, and sum statuses
       const groupedByMonth: Record<string, Record<string, any>> = {};
       records.forEach((row: any) => {
         const period = row[idx.period];
@@ -721,7 +694,6 @@ const DashboardPage = () => {
         else if (status.includes('withdraw')) groupedByMonth[period][lgu].withdraw += 1;
       });
 
-      // Format result as requested
       const BRGY = Object.entries(groupedByMonth).map(([date, lgus]) => ({
         date,
         data: Object.values(lgus),
@@ -743,19 +715,18 @@ const DashboardPage = () => {
       }
     }).then((response) => {
       const data = response.data.values;
+      if (!Array.isArray(data)) return;
       const records = data.slice(3);
 
-      // Map column indexes for easier maintenance
       const idx = {
         period: 1,
         lgu: 4,
         name: 13,
         province: 14,
-        dictRo: 19, // Use dictRo as region
-        status: 10, // e.g. "Operational", "Developmental", "Training", "Withdraw"
+        dictRo: 19,
+        status: 10,
       };
 
-      // Group by period and dictRo, and sum statuses
       const groupedByMonth: Record<string, Record<string, any>> = {};
       records.forEach((row: any) => {
         const period = row[idx.period];
@@ -788,7 +759,6 @@ const DashboardPage = () => {
         else if (status.includes('withdraw')) groupedByMonth[period][lgu].withdraw += 1;
       });
 
-      // Format result as requested
       const BP = Object.entries(groupedByMonth).map(([date, lgus]) => ({
         date,
         data: Object.values(lgus),
@@ -813,7 +783,7 @@ const DashboardPage = () => {
     if (modules.includes("Barangay Clearance")) {
       getBRGY();
     }
-  // eslint-disable-next-line
+    // eslint-disable-next-line
   }, []);
 
   function formatList(arr: any) {
