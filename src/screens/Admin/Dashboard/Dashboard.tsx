@@ -660,7 +660,7 @@ function getWP() {
       }
     }).then((response) => {
       const data = response.data.values;
-      const records = data.slice(3);
+      const records = data?.slice(3);
 
       // Map column indexes for easier maintenance
       const idx = {
@@ -737,7 +737,7 @@ function getBRGY() {
       }
     }).then((response) => {
       const data = response.data.values;
-      const records = data.slice(3);
+      const records = data?.slice(3);
 
       // Map column indexes for easier maintenance
       const idx = {
@@ -816,7 +816,7 @@ function getBPLS() {
       }
     }).then((response) => {
       const data = response.data.values;
-      const records = data.slice(3);
+      const records = data?.slice(3);
 
       // Map column indexes for easier maintenance
       const idx = {
@@ -919,7 +919,7 @@ function formatList(arr:any) {
   if (arr?.length === 1) return arr[0];
   if (arr?.length === 2) return arr.join(" and ");
   
-  return arr.slice(0, -1).join(", ") + ", and " + arr[arr?.length - 1];
+  return arr?.slice(0, -1).join(", ") + ", and " + arr[arr?.length - 1];
 }
   return (
     <div className="p-6 sm:p-2 md:p-4 max-w-[1200px] mx-auto  bg-background ">
