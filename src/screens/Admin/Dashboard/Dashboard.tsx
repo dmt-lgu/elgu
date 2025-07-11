@@ -1,47 +1,47 @@
-import { useMemo, useEffect } from 'react';
+import {  useMemo, useEffect } from 'react';
 import FilterSection from './components/FilterSection';
 import StatisticCard from './components/StatisticCard';
+
+
 import TransactionChart from './components/TransChartComponent';
 import { selectCard } from '@/redux/cardSlice';
 import { selectTransaction } from '@/redux/transactionSlice';
-import { useSelector, useDispatch } from 'react-redux';
-import { selectData } from '@/redux/dataSlice';
+import { useSelector,useDispatch } from 'react-redux';
+import { selectData} from '@/redux/dataSlice';
+
 import axios from './../../../plugin/axios2';
+
+
 import TransactionChart2 from './components/TransChartComponent2';
 import { selectStatus, setStatus } from '@/redux/statusSlice';
+
 import { parseISO, isAfter, isBefore, isEqual } from 'date-fns';
 import StatusChartComponent from './components/StatusChartComponent';
-import { setWp, selectWp } from '@/redux/wpSlice';
+import { setWp,selectWp } from '@/redux/wpSlice';
 import { setBrgy, selectBrgy } from '@/redux/brgySlice';
+
+
 
 const DashboardPage = () => {
   const card = useSelector(selectCard);
   const status = useSelector(selectStatus);
-  const wp = useSelector(selectWp);
+  const wp = useSelector(selectWp)
   const brgy = useSelector(selectBrgy);
-  const data = useSelector(selectData) || {};
+  const data = useSelector(selectData);
   const transactionData = useSelector(selectTransaction);
   const dispatch = useDispatch();
 
-  // Always provide defaults for destructured fields
-  const {
-    modules = [],
-    province = [],
-    municipalities = [],
-    real = [],
-    startDate = "",
-    endDate = "",
-  } = data;
+  
 
   // Enhanced filter and group logic
   const filterAndGroupResults = (results: any[], municipalities: any[], provinces: any[]) => {
     // 1. If municipalities is not blank, filter by selected municipalities (1 by 1)
-    if (Array.isArray(municipalities) && municipalities.length > 0) {
+    if (municipalities && municipalities.length > 0) {
       const selected = municipalities.map((m: any) => m.value);
       return results.filter((lgu: any) => selected.includes(lgu.lgu));
     }
     // 2. If provinces is not blank, group by province
-    if (Array.isArray(provinces) && provinces.length > 0) {
+    if (provinces && provinces.length > 0) {
       const selectedProvinces = provinces.map((p: any) => p.value);
       const grouped: { [province: string]: any } = {};
       results.forEach((lgu: any) => {
@@ -100,375 +100,423 @@ const DashboardPage = () => {
   };
 
   const bpChartData: any = useMemo(() => {
-    const bpArr = status?.BP;
-    if (!bpArr || !Array.isArray(bpArr) || bpArr.length === 0) return { current: [], breakdown: [] };
+  const bpArr = status?.BP;
+  if (!bpArr || !Array.isArray(bpArr) || bpArr.length === 0) return { current: [], breakdown: [] };
 
-    // Prepare date and region filters
-    const start = startDate ? parseISO(startDate) : null;
-    const end = endDate ? parseISO(endDate) : null;
-    const selectedRegions = Array.isArray(real) ? real : real ? [real] : [];
-    const selectedProvinces = Array.isArray(province) ? province : [];
-    const selectedMunicipalities = Array.isArray(municipalities) ? municipalities : [];
+  // Prepare date and region filters
+  const startDate = data.startDate ? parseISO(data.startDate) : null;
+  const endDate = data.endDate ? parseISO(data.endDate) : null;
+  const selectedRegions = Array.isArray(data.real) ? data.real : data.real ? [data.real] : [];
+  const selectedProvinces = Array.isArray(data.province) ? data.province : [];
+  const selectedMunicipalities = Array.isArray(data.municipalities) ? data.municipalities : [];
 
-    // Filter BP array by date range
-    const filteredBPArr = bpArr.filter((bp: any) => {
-      if (!bp.date) return true;
-      const bpDate = parseISO(bp.date);
-      let dateOk = true;
-      if (start) dateOk = isAfter(bpDate, start) || isEqual(bpDate, start);
-      if (end) dateOk = dateOk && (isBefore(bpDate, end) || isEqual(bpDate, end));
-      return dateOk;
-    });
+  // Filter BP array by date range
+  const filteredBPArr = bpArr.filter((bp: any) => {
+    if (!bp.date) return true;
+    const bpDate = parseISO(bp.date);
+    let dateOk = true;
+    if (startDate) dateOk = isAfter(bpDate, startDate) || isEqual(bpDate, startDate);
+    if (endDate) dateOk = dateOk && (isBefore(bpDate, endDate) || isEqual(bpDate, endDate));
+    return dateOk;
+  });
 
-    function groupAndSum(arr: any[], key: string) {
-      const grouped: Record<string, any> = {};
-      arr.forEach(item => {
-        const groupKey = item[key];
-        if (!groupKey) return;
-        if (!grouped[groupKey]) {
-          grouped[groupKey] = {
-            name: groupKey,
-            operational: 0,
-            developmental: 0,
-            withdraw: 0,
-          };
-        }
-        grouped[groupKey].operational += item.operational ?? 0;
-        grouped[groupKey].developmental += item.developmental ?? 0;
-        grouped[groupKey].withdraw += item.withdraw ?? 0;
-      });
-      return Object.values(grouped);
-    }
-
-    // --- 1. Current: latest by date ---
-    let current: any[] = [];
-    if (filteredBPArr.length > 0) {
-      const sorted = [...filteredBPArr].sort((a, b) => (a.date > b.date ? -1 : 1));
-      const latest = sorted[0];
-      if (latest && latest.data) {
-        let filteredData = latest.data;
-
-        if (Array.isArray(selectedMunicipalities) && selectedMunicipalities.length > 0) {
-          const selectedLGUs = selectedMunicipalities.map((m: any) => m.value);
-          filteredData = filteredData.filter((item: any) => selectedLGUs.includes(item.lgu));
-          current = groupAndSum(filteredData, "lgu");
-        } else if (Array.isArray(selectedProvinces) && selectedProvinces.length > 0) {
-          const selectedProv = selectedProvinces.map((p: any) => p.value);
-          filteredData = filteredData.filter((item: any) => selectedProv.includes(item.province));
-          current = groupAndSum(filteredData, "province");
-        } else if (Array.isArray(selectedRegions) && selectedRegions.length > 0) {
-          filteredData = filteredData.filter((item: any) => selectedRegions.includes(item.region));
-          current = groupAndSum(filteredData, "region");
-        } else {
-          current = groupAndSum(filteredData, "region");
-        }
+  // Helper to group and sum by key
+  function groupAndSum(arr: any[], key: string) {
+    const grouped: Record<string, any> = {};
+    arr.forEach(item => {
+      const groupKey = item[key];
+      if (!groupKey) return;
+      if (!grouped[groupKey]) {
+        grouped[groupKey] = {
+          name: groupKey,
+          operational: 0,
+          developmental: 0,
+          withdraw: 0,
+        };
       }
-    }
+      grouped[groupKey].operational += item.operational ?? 0;
+      grouped[groupKey].developmental += item.developmental ?? 0;
+      grouped[groupKey].withdraw += item.withdraw ?? 0;
+    });
+    return Object.values(grouped);
+  }
 
-    // --- 2. Breakdown: group by date, each with data:[] ---
-    let breakdown: any[] = [];
-    filteredBPArr.forEach((bp: any) => {
-      let filteredData = bp.data;
+  // --- 1. Current: latest by date ---
+  let current: any[] = [];
+  if (filteredBPArr.length > 0) {
+    const sorted = [...filteredBPArr].sort((a, b) => (a.date > b.date ? -1 : 1));
+    const latest = sorted[0];
+    if (latest && latest.data) {
+      let filteredData = latest.data;
 
-      if (Array.isArray(selectedMunicipalities) && selectedMunicipalities.length > 0) {
+      // Municipality filter (use lgu)
+      if (selectedMunicipalities.length > 0) {
         const selectedLGUs = selectedMunicipalities.map((m: any) => m.value);
         filteredData = filteredData.filter((item: any) => selectedLGUs.includes(item.lgu));
-        breakdown.push({
-          date: bp.date,
-          data: groupAndSum(filteredData, "lgu"),
-        });
-      } else if (Array.isArray(selectedProvinces) && selectedProvinces.length > 0) {
+        current = groupAndSum(filteredData, "lgu");
+      }
+      // Province filter
+      else if (selectedProvinces.length > 0) {
         const selectedProv = selectedProvinces.map((p: any) => p.value);
         filteredData = filteredData.filter((item: any) => selectedProv.includes(item.province));
-        breakdown.push({
-          date: bp.date,
-          data: groupAndSum(filteredData, "province"),
-        });
-      } else if (Array.isArray(selectedRegions) && selectedRegions.length > 0) {
+        current = groupAndSum(filteredData, "province");
+      }
+      // Region filter
+      else if (selectedRegions.length > 0) {
         filteredData = filteredData.filter((item: any) => selectedRegions.includes(item.region));
-        breakdown.push({
-          date: bp.date,
-          data: groupAndSum(filteredData, "region"),
-        });
+        current = groupAndSum(filteredData, "region");
       } else {
-        breakdown.push({
-          date: bp.date,
-          data: groupAndSum(filteredData, "region"),
-        });
+        current = groupAndSum(filteredData, "region");
       }
-    });
+    }
+  }
 
-    return { current, breakdown };
-  }, [
-    status,
-    startDate,
-    endDate,
-    real,
-    province,
-    municipalities,
-  ]);
+  // --- 2. Breakdown: group by date, each with data:[] ---
+  let breakdown: any[] = [];
+  filteredBPArr.forEach((bp: any) => {
+    let filteredData = bp.data;
 
-  // Repeat the same pattern for wpChartData and brgyChartData
-  const wpChartData: any = useMemo(() => {
-    const bpArr = wp?.WP;
-    if (!bpArr || !Array.isArray(bpArr) || bpArr.length === 0) return { current: [], breakdown: [] };
-
-    const start = startDate ? parseISO(startDate) : null;
-    const end = endDate ? parseISO(endDate) : null;
-    const selectedRegions = Array.isArray(real) ? real : real ? [real] : [];
-    const selectedProvinces = Array.isArray(province) ? province : [];
-    const selectedMunicipalities = Array.isArray(municipalities) ? municipalities : [];
-
-    const filteredBPArr = bpArr.filter((bp: any) => {
-      if (!bp.date) return true;
-      const bpDate = parseISO(bp.date);
-      let dateOk = true;
-      if (start) dateOk = isAfter(bpDate, start) || isEqual(bpDate, start);
-      if (end) dateOk = dateOk && (isBefore(bpDate, end) || isEqual(bpDate, end));
-      return dateOk;
-    });
-
-    function groupAndSum(arr: any[], key: string) {
-      const grouped: Record<string, any> = {};
-      arr.forEach(item => {
-        const groupKey = item[key];
-        if (!groupKey) return;
-        if (!grouped[groupKey]) {
-          grouped[groupKey] = {
-            name: groupKey,
-            operational: 0,
-            developmental: 0,
-            withdraw: 0,
-          };
-        }
-        grouped[groupKey].operational += item.operational ?? 0;
-        grouped[groupKey].developmental += item.developmental ?? 0;
-        grouped[groupKey].withdraw += item.withdraw ?? 0;
+    if (selectedMunicipalities.length > 0) {
+      const selectedLGUs = selectedMunicipalities.map((m: any) => m.value);
+      filteredData = filteredData.filter((item: any) => selectedLGUs.includes(item.lgu));
+      breakdown.push({
+        date: bp.date,
+        data: groupAndSum(filteredData, "lgu"),
       });
-      return Object.values(grouped);
+    } else if (selectedProvinces.length > 0) {
+      const selectedProv = selectedProvinces.map((p: any) => p.value);
+      filteredData = filteredData.filter((item: any) => selectedProv.includes(item.province));
+      breakdown.push({
+        date: bp.date,
+        data: groupAndSum(filteredData, "province"),
+      });
+    } else if (selectedRegions.length > 0) {
+      filteredData = filteredData.filter((item: any) => selectedRegions.includes(item.region));
+      breakdown.push({
+        date: bp.date,
+        data: groupAndSum(filteredData, "region"),
+      });
+    } else {
+      breakdown.push({
+        date: bp.date,
+        data: groupAndSum(filteredData, "region"),
+      });
     }
+  });
 
-    let current: any[] = [];
-    if (filteredBPArr.length > 0) {
-      const sorted = [...filteredBPArr].sort((a, b) => (a.date > b.date ? -1 : 1));
-      const latest = sorted[0];
-      if (latest && latest.data) {
-        let filteredData = latest.data;
+  return { current, breakdown };
+}, [
+  status,
+  data.startDate,
+  data.endDate,
+  data.real,
+  data.province,
+  data.municipalities,
+]);
 
-        if (Array.isArray(selectedMunicipalities) && selectedMunicipalities.length > 0) {
-          const selectedLGUs = selectedMunicipalities.map((m: any) => m.value);
-          filteredData = filteredData.filter((item: any) => selectedLGUs.includes(item.lgu));
-          current = groupAndSum(filteredData, "lgu");
-        } else if (Array.isArray(selectedProvinces) && selectedProvinces.length > 0) {
-          const selectedProv = selectedProvinces.map((p: any) => p.value);
-          filteredData = filteredData.filter((item: any) => selectedProv.includes(item.province));
-          current = groupAndSum(filteredData, "province");
-        } else if (Array.isArray(selectedRegions) && selectedRegions.length > 0) {
-          filteredData = filteredData.filter((item: any) => selectedRegions.includes(item.region));
-          current = groupAndSum(filteredData, "region");
-        } else {
-          current = groupAndSum(filteredData, "region");
-        }
+
+const wpChartData: any = useMemo(() => {
+  const bpArr = wp?.WP;
+  if (!bpArr || !Array.isArray(bpArr) || bpArr.length === 0) return { current: [], breakdown: [] };
+
+  // Prepare date and region filters
+  const startDate = data.startDate ? parseISO(data.startDate) : null;
+  const endDate = data.endDate ? parseISO(data.endDate) : null;
+  const selectedRegions = Array.isArray(data.real) ? data.real : data.real ? [data.real] : [];
+  const selectedProvinces = Array.isArray(data.province) ? data.province : [];
+  const selectedMunicipalities = Array.isArray(data.municipalities) ? data.municipalities : [];
+
+  // Filter BP array by date range
+  const filteredBPArr = bpArr.filter((bp: any) => {
+    if (!bp.date) return true;
+    const bpDate = parseISO(bp.date);
+    let dateOk = true;
+    if (startDate) dateOk = isAfter(bpDate, startDate) || isEqual(bpDate, startDate);
+    if (endDate) dateOk = dateOk && (isBefore(bpDate, endDate) || isEqual(bpDate, endDate));
+    return dateOk;
+  });
+
+  // Helper to group and sum by key
+  function groupAndSum(arr: any[], key: string) {
+    const grouped: Record<string, any> = {};
+    arr.forEach(item => {
+      const groupKey = item[key];
+      if (!groupKey) return;
+      if (!grouped[groupKey]) {
+        grouped[groupKey] = {
+          name: groupKey,
+          operational: 0,
+          developmental: 0,
+          withdraw: 0,
+        };
       }
-    }
+      grouped[groupKey].operational += item.operational ?? 0;
+      grouped[groupKey].developmental += item.developmental ?? 0;
+      grouped[groupKey].withdraw += item.withdraw ?? 0;
+    });
+    return Object.values(grouped);
+  }
 
-    let breakdown: any[] = [];
-    filteredBPArr.forEach((bp: any) => {
-      let filteredData = bp.data;
+  // --- 1. Current: latest by date ---
+  let current: any[] = [];
+  if (filteredBPArr.length > 0) {
+    const sorted = [...filteredBPArr].sort((a, b) => (a.date > b.date ? -1 : 1));
+    const latest = sorted[0];
+    if (latest && latest.data) {
+      let filteredData = latest.data;
 
-      if (Array.isArray(selectedMunicipalities) && selectedMunicipalities.length > 0) {
+      // Municipality filter (use lgu)
+      if (selectedMunicipalities.length > 0) {
         const selectedLGUs = selectedMunicipalities.map((m: any) => m.value);
         filteredData = filteredData.filter((item: any) => selectedLGUs.includes(item.lgu));
-        breakdown.push({
-          date: bp.date,
-          data: groupAndSum(filteredData, "lgu"),
-        });
-      } else if (Array.isArray(selectedProvinces) && selectedProvinces.length > 0) {
+        current = groupAndSum(filteredData, "lgu");
+      }
+      // Province filter
+      else if (selectedProvinces.length > 0) {
         const selectedProv = selectedProvinces.map((p: any) => p.value);
         filteredData = filteredData.filter((item: any) => selectedProv.includes(item.province));
-        breakdown.push({
-          date: bp.date,
-          data: groupAndSum(filteredData, "province"),
-        });
-      } else if (Array.isArray(selectedRegions) && selectedRegions.length > 0) {
+        current = groupAndSum(filteredData, "province");
+      }
+      // Region filter
+      else if (selectedRegions.length > 0) {
         filteredData = filteredData.filter((item: any) => selectedRegions.includes(item.region));
-        breakdown.push({
-          date: bp.date,
-          data: groupAndSum(filteredData, "region"),
-        });
+        current = groupAndSum(filteredData, "region");
       } else {
-        breakdown.push({
-          date: bp.date,
-          data: groupAndSum(filteredData, "region"),
-        });
+        current = groupAndSum(filteredData, "region");
       }
-    });
-    return { current, breakdown };
-  }, [
-    wp,
-    startDate,
-    endDate,
-    real,
-    province,
-    municipalities,
-  ]);
+    }
+  }
 
-  const brgyChartData: any = useMemo(() => {
-    const bpArr = brgy?.BRGY;
-    if (!bpArr || !Array.isArray(bpArr) || bpArr.length === 0) return { current: [], breakdown: [] };
+  // --- 2. Breakdown: group by date, each with data:[] ---
+  let breakdown: any[] = [];
+  filteredBPArr.forEach((bp: any) => {
+    let filteredData = bp.data;
 
-    const start = startDate ? parseISO(startDate) : null;
-    const end = endDate ? parseISO(endDate) : null;
-    const selectedRegions = Array.isArray(real) ? real : real ? [real] : [];
-    const selectedProvinces = Array.isArray(province) ? province : [];
-    const selectedMunicipalities = Array.isArray(municipalities) ? municipalities : [];
-
-    const filteredBPArr = bpArr.filter((bp: any) => {
-      if (!bp.date) return true;
-      const bpDate = parseISO(bp.date);
-      let dateOk = true;
-      if (start) dateOk = isAfter(bpDate, start) || isEqual(bpDate, start);
-      if (end) dateOk = dateOk && (isBefore(bpDate, end) || isEqual(bpDate, end));
-      return dateOk;
-    });
-
-    function groupAndSum(arr: any[], key: string) {
-      const grouped: Record<string, any> = {};
-      arr.forEach(item => {
-        const groupKey = item[key];
-        if (!groupKey) return;
-        if (!grouped[groupKey]) {
-          grouped[groupKey] = {
-            name: groupKey,
-            operational: 0,
-            developmental: 0,
-            withdraw: 0,
-          };
-        }
-        grouped[groupKey].operational += item.operational ?? 0;
-        grouped[groupKey].developmental += item.developmental ?? 0;
-        grouped[groupKey].withdraw += item.withdraw ?? 0;
+    if (selectedMunicipalities.length > 0) {
+      const selectedLGUs = selectedMunicipalities.map((m: any) => m.value);
+      filteredData = filteredData.filter((item: any) => selectedLGUs.includes(item.lgu));
+      breakdown.push({
+        date: bp.date,
+        data: groupAndSum(filteredData, "lgu"),
       });
-      return Object.values(grouped);
+    } else if (selectedProvinces.length > 0) {
+      const selectedProv = selectedProvinces.map((p: any) => p.value);
+      filteredData = filteredData.filter((item: any) => selectedProv.includes(item.province));
+      breakdown.push({
+        date: bp.date,
+        data: groupAndSum(filteredData, "province"),
+      });
+    } else if (selectedRegions.length > 0) {
+      filteredData = filteredData.filter((item: any) => selectedRegions.includes(item.region));
+      breakdown.push({
+        date: bp.date,
+        data: groupAndSum(filteredData, "region"),
+      });
+    } else {
+      breakdown.push({
+        date: bp.date,
+        data: groupAndSum(filteredData, "region"),
+      });
     }
+  });
+  // console.log("wpChartData", current);
+  return { current, breakdown };
+}, [
+  status,
+  data.startDate,
+  data.endDate,
+  data.real,
+  data.province,
+  data.municipalities,
+]);
 
-    let current: any[] = [];
-    if (filteredBPArr.length > 0) {
-      const sorted = [...filteredBPArr].sort((a, b) => (a.date > b.date ? -1 : 1));
-      const latest = sorted[0];
-      if (latest && latest.data) {
-        let filteredData = latest.data;
 
-        if (Array.isArray(selectedMunicipalities) && selectedMunicipalities.length > 0) {
-          const selectedLGUs = selectedMunicipalities.map((m: any) => m.value);
-          filteredData = filteredData.filter((item: any) => selectedLGUs.includes(item.lgu));
-          current = groupAndSum(filteredData, "lgu");
-        } else if (Array.isArray(selectedProvinces) && selectedProvinces.length > 0) {
-          const selectedProv = selectedProvinces.map((p: any) => p.value);
-          filteredData = filteredData.filter((item: any) => selectedProv.includes(item.province));
-          current = groupAndSum(filteredData, "province");
-        } else if (Array.isArray(selectedRegions) && selectedRegions.length > 0) {
-          filteredData = filteredData.filter((item: any) => selectedRegions.includes(item.region));
-          current = groupAndSum(filteredData, "region");
-        } else {
-          current = groupAndSum(filteredData, "region");
-        }
+const brgyChartData: any = useMemo(() => {
+  const bpArr = brgy?.BRGY;
+  if (!bpArr || !Array.isArray(bpArr) || bpArr.length === 0) return { current: [], breakdown: [] };
+
+  // Prepare date and region filters
+  const startDate = data.startDate ? parseISO(data.startDate) : null;
+  const endDate = data.endDate ? parseISO(data.endDate) : null;
+  const selectedRegions = Array.isArray(data.real) ? data.real : data.real ? [data.real] : [];
+  const selectedProvinces = Array.isArray(data.province) ? data.province : [];
+  const selectedMunicipalities = Array.isArray(data.municipalities) ? data.municipalities : [];
+
+  // Filter BP array by date range
+  const filteredBPArr = bpArr.filter((bp: any) => {
+    if (!bp.date) return true;
+    const bpDate = parseISO(bp.date);
+    let dateOk = true;
+    if (startDate) dateOk = isAfter(bpDate, startDate) || isEqual(bpDate, startDate);
+    if (endDate) dateOk = dateOk && (isBefore(bpDate, endDate) || isEqual(bpDate, endDate));
+    return dateOk;
+  });
+
+  // Helper to group and sum by key
+  function groupAndSum(arr: any[], key: string) {
+    const grouped: Record<string, any> = {};
+    arr.forEach(item => {
+      const groupKey = item[key];
+      if (!groupKey) return;
+      if (!grouped[groupKey]) {
+        grouped[groupKey] = {
+          name: groupKey,
+          operational: 0,
+          developmental: 0,
+          withdraw: 0,
+        };
       }
-    }
+      grouped[groupKey].operational += item.operational ?? 0;
+      grouped[groupKey].developmental += item.developmental ?? 0;
+      grouped[groupKey].withdraw += item.withdraw ?? 0;
+    });
+    return Object.values(grouped);
+  }
 
-    let breakdown: any[] = [];
-    filteredBPArr.forEach((bp: any) => {
-      let filteredData = bp.data;
+  // --- 1. Current: latest by date ---
+  let current: any[] = [];
+  if (filteredBPArr.length > 0) {
+    const sorted = [...filteredBPArr].sort((a, b) => (a.date > b.date ? -1 : 1));
+    const latest = sorted[0];
+    if (latest && latest.data) {
+      let filteredData = latest.data;
 
-      if (Array.isArray(selectedMunicipalities) && selectedMunicipalities.length > 0) {
+      // Municipality filter (use lgu)
+      if (selectedMunicipalities.length > 0) {
         const selectedLGUs = selectedMunicipalities.map((m: any) => m.value);
         filteredData = filteredData.filter((item: any) => selectedLGUs.includes(item.lgu));
-        breakdown.push({
-          date: bp.date,
-          data: groupAndSum(filteredData, "lgu"),
-        });
-      } else if (Array.isArray(selectedProvinces) && selectedProvinces.length > 0) {
+        current = groupAndSum(filteredData, "lgu");
+      }
+      // Province filter
+      else if (selectedProvinces.length > 0) {
         const selectedProv = selectedProvinces.map((p: any) => p.value);
         filteredData = filteredData.filter((item: any) => selectedProv.includes(item.province));
-        breakdown.push({
-          date: bp.date,
-          data: groupAndSum(filteredData, "province"),
-        });
-      } else if (Array.isArray(selectedRegions) && selectedRegions.length > 0) {
-        filteredData = filteredData.filter((item: any) => selectedRegions.includes(item.region));
-        breakdown.push({
-          date: bp.date,
-          data: groupAndSum(filteredData, "region"),
-        });
-      } else {
-        breakdown.push({
-          date: bp.date,
-          data: groupAndSum(filteredData, "region"),
-        });
+        current = groupAndSum(filteredData, "province");
       }
-    });
-    return { current, breakdown };
-  }, [
-    brgy,
-    startDate,
-    endDate,
-    real,
-    province,
-    municipalities,
-  ]);
+      // Region filter
+      else if (selectedRegions.length > 0) {
+        filteredData = filteredData.filter((item: any) => selectedRegions.includes(item.region));
+        current = groupAndSum(filteredData, "region");
+      } else {
+        current = groupAndSum(filteredData, "region");
+      }
+    }
+  }
+
+  // --- 2. Breakdown: group by date, each with data:[] ---
+  let breakdown: any[] = [];
+  filteredBPArr.forEach((bp: any) => {
+    let filteredData = bp.data;
+
+    if (selectedMunicipalities.length > 0) {
+      const selectedLGUs = selectedMunicipalities.map((m: any) => m.value);
+      filteredData = filteredData.filter((item: any) => selectedLGUs.includes(item.lgu));
+      breakdown.push({
+        date: bp.date,
+        data: groupAndSum(filteredData, "lgu"),
+      });
+    } else if (selectedProvinces.length > 0) {
+      const selectedProv = selectedProvinces.map((p: any) => p.value);
+      filteredData = filteredData.filter((item: any) => selectedProv.includes(item.province));
+      breakdown.push({
+        date: bp.date,
+        data: groupAndSum(filteredData, "province"),
+      });
+    } else if (selectedRegions.length > 0) {
+      filteredData = filteredData.filter((item: any) => selectedRegions.includes(item.region));
+      breakdown.push({
+        date: bp.date,
+        data: groupAndSum(filteredData, "region"),
+      });
+    } else {
+      breakdown.push({
+        date: bp.date,
+        data: groupAndSum(filteredData, "region"),
+      });
+    }
+  });
+  return { current, breakdown };
+}, [
+  status,
+  data.startDate,
+  data.endDate,
+  data.real,
+  data.province,
+  data.municipalities,
+]);
 
   // --- Calculate totals from all chart data sources ---
   const totalOperational = useMemo(() => {
     let total = 0;
-
-    if (Array.isArray(modules) && modules.includes("Business Permit")) {
-      total += bpChartData?.current.reduce((sum: any, item: any) => sum + (item.operational ?? 0), 0);
+    
+    // Add BP data if module is enabled
+    if (data.modules?.includes("Business Permit")) {
+      total += bpChartData?.current.reduce((sum:any, item:any) => sum + (item.operational ?? 0), 0);
     }
-    if (Array.isArray(modules) && modules.includes("Working Permit")) {
-      total += wpChartData?.current.reduce((sum: any, item: any) => sum + (item.operational ?? 0), 0);
+    
+    // Add WP data if module is enabled
+    if (data.modules?.includes("Working Permit")) {
+      total += wpChartData?.current.reduce((sum:any, item:any) => sum + (item.operational ?? 0), 0);
     }
-    if (Array.isArray(modules) && modules.includes("Barangay Clearance")) {
-      total += brgyChartData?.current.reduce((sum: any, item: any) => sum + (item.operational ?? 0), 0);
+    
+    // Add BRGY data if module is enabled
+    if (data.modules?.includes("Barangay Clearance")) {
+      total += brgyChartData?.current.reduce((sum:any, item:any) => sum + (item.operational ?? 0), 0);
     }
+    
     return total;
-  }, [bpChartData, wpChartData, brgyChartData, modules]);
+  }, [bpChartData, wpChartData, brgyChartData, data.modules]);
 
   const totalDevelopmental = useMemo(() => {
     let total = 0;
-
-    if (Array.isArray(modules) && modules.includes("Business Permit")) {
-      total += bpChartData?.current.reduce((sum: any, item: any) => sum + (item.developmental ?? 0), 0);
+    
+    // Add BP data if module is enabled
+    if (data.modules?.includes("Business Permit")) {
+      total += bpChartData?.current.reduce((sum:any, item:any) => sum + (item.developmental ?? 0), 0);
     }
-    if (Array.isArray(modules) && modules.includes("Working Permit")) {
-      total += wpChartData?.current.reduce((sum: any, item: any) => sum + (item.developmental ?? 0), 0);
+    
+    // Add WP data if module is enabled
+    if (data.modules?.includes("Working Permit")) {
+      total += wpChartData?.current.reduce((sum:any, item:any) => sum + (item.developmental ?? 0), 0);
     }
-    if (Array.isArray(modules) && modules.includes("Barangay Clearance")) {
-      total += brgyChartData?.current.reduce((sum: any, item: any) => sum + (item.developmental ?? 0), 0);
+    
+    // Add BRGY data if module is enabled
+    if (data.modules?.includes("Barangay Clearance")) {
+      total += brgyChartData?.current.reduce((sum:any, item:any) => sum + (item.developmental ?? 0), 0);
     }
+    
     return total;
-  }, [bpChartData, wpChartData, brgyChartData, modules]);
+  }, [bpChartData, wpChartData, brgyChartData, data.modules]);
 
   const totalWithdraw = useMemo(() => {
     let total = 0;
-
-    if (Array.isArray(modules) && modules.includes("Business Permit")) {
-      total += bpChartData?.current.reduce((sum: any, item: any) => sum + (item.withdraw ?? 0), 0);
+    
+    // Add BP data if module is enabled
+    if (data.modules?.includes("Business Permit")) {
+      total += bpChartData?.current.reduce((sum:any, item:any) => sum + (item.withdraw ?? 0), 0);
     }
-    if (Array.isArray(modules) && modules.includes("Working Permit")) {
-      total += wpChartData?.current.reduce((sum: any, item: any) => sum + (item.withdraw ?? 0), 0);
+    
+    // Add WP data if module is enabled
+    if (data.modules?.includes("Working Permit")) {
+      total += wpChartData?.current.reduce((sum:any, item:any) => sum + (item.withdraw ?? 0), 0);
     }
-    if (Array.isArray(modules) && modules.includes("Barangay Clearance")) {
-      total += brgyChartData?.current.reduce((sum: any, item: any) => sum + (item.withdraw ?? 0), 0);
+    
+    // Add BRGY data if module is enabled
+    if (data.modules?.includes("Barangay Clearance")) {
+      total += brgyChartData?.current.reduce((sum:any, item:any) => sum + (item.withdraw ?? 0), 0);
     }
+    
     return total;
-  }, [bpChartData, wpChartData, brgyChartData, modules]);
+  }, [bpChartData, wpChartData, brgyChartData, data.modules]);
+
 
   const chartData = useMemo(() => {
     if (!transactionData || !transactionData.results) return [];
+    // Filter or group results
     const filteredResults = filterAndGroupResults(
       transactionData.results,
-      municipalities,
-      province
+      data.municipalities,
+      data.province
     );
 
     return filteredResults.map((lgu: any) => {
@@ -487,52 +535,57 @@ const DashboardPage = () => {
         pendingFemale,
       };
     });
-  }, [municipalities, province, transactionData]);
+  }, [data, transactionData]);
 
-  const chartData3 = useMemo(() => {
-    if (!transactionData || !transactionData.results) return [];
-    const filteredResults = filterAndGroupResults(
-      transactionData.results,
-      municipalities,
-      province
-    );
+const chartData3 = useMemo(() => {
+  if (!transactionData || !transactionData.results) return [];
+  // Filter or group results
+  const filteredResults = filterAndGroupResults(
+    transactionData.results,
+    data.municipalities,
+    data.province
+  );
 
-    return filteredResults.map((lgu: any) => {
-      let newPaid = 0, newPending = 0, newPaidViaEgov = 0, newPaidLinkBiz = 0;
-      let renewPaid = 0, renewPending = 0, renewPaidViaEgov = 0, renewPaidLinkBiz = 0;
-      lgu.monthlyResults.forEach((m: any) => {
-        newPaid += m.newPaid ?? 0;
-        newPending += m.newPending ?? 0;
-        newPaidViaEgov += m.newPaidViaEgov ?? 0;
-        newPaidLinkBiz += m.newPaidViaLinkBiz ?? 0;
-        renewPaid += m.renewPaid ?? 0;
-        renewPending += m.renewPending ?? 0;
-        renewPaidViaEgov += m.renewPaidViaEgov ?? 0;
-        renewPaidLinkBiz += m.renewPaidViaLinkBiz ?? 0;
-      });
-
-      return {
-        name: lgu.lgu,
-        newPaid,
-        newPending,
-        newPaidViaEgov,
-        newPaidLinkBiz,
-        renewPaid,
-        renewPending,
-        renewPaidViaEgov,
-        renewPaidLinkBiz,
-      };
+  return filteredResults.map((lgu: any) => {
+    let newPaid = 0, newPending = 0, newPaidViaEgov = 0, newPaidLinkBiz = 0;
+    let renewPaid = 0, renewPending = 0, renewPaidViaEgov = 0, renewPaidLinkBiz = 0;
+    lgu.monthlyResults.forEach((m: any) => {
+      newPaid += m.newPaid ?? 0;
+      newPending += m.newPending ?? 0;
+      newPaidViaEgov += m.newPaidViaEgov ?? 0;
+      newPaidLinkBiz += m.newPaidViaLinkBiz ?? 0;
+      renewPaid += m.renewPaid ?? 0;
+      renewPending += m.renewPending ?? 0;
+      renewPaidViaEgov += m.renewPaidViaEgov ?? 0;
+      renewPaidLinkBiz += m.renewPaidViaLinkBiz ?? 0;
     });
-  }, [municipalities, province, transactionData]);
 
+    return {
+      name: lgu.lgu,
+      newPaid,
+      newPending,
+      newPaidViaEgov,
+      newPaidLinkBiz,
+      renewPaid,
+      renewPending,
+      renewPaidViaEgov,
+      renewPaidLinkBiz,
+    };
+  });
+}, [data, transactionData]);
+
+
+  // Filter card statistics by data.municipalities or data.province if present
   const filteredCard = useMemo(() => {
     if (!card || !transactionData?.results) return card;
+    // If municipalities or province is selected, filter/group accordingly
     const filteredResults = filterAndGroupResults(
       transactionData.results,
-      municipalities,
-      province
+      data.municipalities,
+      data.province
     );
 
+    // Sum up all relevant fields for the filtered LGUs/provinces/regions
     const totals = {
       totalnewPending: 0,
       totalnewPaid: 0,
@@ -562,7 +615,7 @@ const DashboardPage = () => {
     });
 
     return { ...card, ...totals };
-  }, [card, transactionData, municipalities, province]);
+  }, [card, transactionData, data.municipalities, data.province]);
 
 
 
