@@ -319,7 +319,7 @@ const wpChartData: any = useMemo(() => {
       });
     }
   });
-  console.log("wpChartData", current);
+  // console.log("wpChartData", current);
   return { current, breakdown };
 }, [
   status,
@@ -717,7 +717,7 @@ function getWP() {
 
    
 
-      console.log("WP result", result);
+      // console.log("WP result", result);
 
 
        dispatch(setWp({
@@ -897,20 +897,17 @@ function getBPLS() {
 
   useEffect(() => {
 
-
     if (data.modules?.includes("Business Permit")) {
-      console.log("Business Permit module is enabled");
+      // console.log("Business Permit module is enabled");
       getBPLS();
     }
 
     if (data.modules?.includes("Working Permit") ) {
-      
-      console.log("Working Permit module is enabled");
+      // console.log("Working Permit module is enabled");
       getWP();
     }
     if (data.modules?.includes("Barangay Clearance")) {
-      
-      console.log("Barangay Clearance module is enabled");
+      // console.log("Barangay Clearance module is enabled");
       getBRGY();
     }
     
