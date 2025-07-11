@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import Select from 'react-select';
-import { Check, ChevronDown } from 'lucide-react';
+import { Check, ChevronDown, Loader2Icon } from 'lucide-react';
 import DateRangeDay from './DateRangeDay';
 import DateRangeMonth from './DateRangeMonth';
 import DateRangeYear from './DateRangeYear';
@@ -458,32 +458,32 @@ const handleDateRangeChange = (range: { start: string | null; end: string | null
     dispatch(updateFilterField({ key: 'selectedRegions', value: newRegions }));
   };
 
- const handleProvinceChange = (options: any) => {
-  setSelectedProvinceOptions(options || []);
-  setSelectedCityOptions([]);
-  dispatch(updateFilterField({ key: 'selectedProvinces', value: (options || []).map((opt: any) => opt.value) }));
-  dispatch(updateFilterField({ key: 'selectedCities', value: [] }));
-  // Always include selectedModules in the filter
-  onSearch({
-    ...filterState,
-    selectedProvinces: (options || []).map((opt: any) => opt.value),
-    selectedCities: [],
-    selectedModules: filterState.selectedModules, // <-- always include this!
-    skipApi: true,
-  });
-};
+  const handleProvinceChange = (options: any) => {
+    setSelectedProvinceOptions(options || []);
+    setSelectedCityOptions([]);
+    dispatch(updateFilterField({ key: 'selectedProvinces', value: (options || []).map((opt: any) => opt.value) }));
+    dispatch(updateFilterField({ key: 'selectedCities', value: [] }));
+    // Always include selectedModules in the filter
+    onSearch({
+      ...filterState,
+      selectedProvinces: (options || []).map((opt: any) => opt.value),
+      selectedCities: [],
+      selectedModules: filterState.selectedModules, // <-- always include this!
+      skipApi: true,
+    });
+  };
 
-const handleCityChange = (options: any) => {
-  setSelectedCityOptions(options || []);
-  dispatch(updateFilterField({ key: 'selectedCities', value: (options || []).map((opt: any) => opt.value) }));
-  // Always include selectedModules in the filter
-  onSearch({
-    ...filterState,
-    selectedCities: (options || []).map((opt: any) => opt.value),
-    selectedModules: filterState.selectedModules, // <-- always include this!
-    skipApi: true,
-  });
-};
+  const handleCityChange = (options: any) => {
+    setSelectedCityOptions(options || []);
+    dispatch(updateFilterField({ key: 'selectedCities', value: (options || []).map((opt: any) => opt.value) }));
+    // Always include selectedModules in the filter
+    onSearch({
+      ...filterState,
+      selectedCities: (options || []).map((opt: any) => opt.value),
+      selectedModules: filterState.selectedModules, // <-- always include this!
+      skipApi: true,
+    });
+  };
   // --- Date Range Logic (Redux) ---
   const selectedDateType = filterState.selectedDateType || ""; // "Day" | "Month" | "Year" | ""
 
@@ -900,6 +900,7 @@ const handleCityChange = (options: any) => {
               disabled={!loading || !isActive}
               type="button"
             >
+              <Loader2Icon className="inline w-4 h-4 animate-spin ml-1" />
               Cancel
             </Button>
           ) : (

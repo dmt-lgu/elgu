@@ -58,6 +58,9 @@ function areFiltersEqual(a: any, b: any) {
   });
 }
 
+
+
+
 function ensureDate(val: Date | string | null | undefined): Date | null {
   if (!val) return null;
   if (val instanceof Date) return val;
@@ -219,6 +222,7 @@ function useReportData({
 }
 
 const Reports: React.FC = () => {
+  const [cancelled, setCancelled] = useState(false);
   const dispatch = useDispatch<AppDispatch>();
 
   // Redux state
@@ -339,37 +343,39 @@ const Reports: React.FC = () => {
 
   // For loading state, combine only those modules that are selected
   const loading =
-    (selectedModules.includes(BP) && bpReport.loading) ||
-    (selectedModules.includes(WP) && wpReport.loading) ||
-    (selectedModules.includes(BC) && bcReport.loading);
-
+   !cancelled && (
+      (selectedModules.includes(BP) && bpReport.loading) ||
+      (selectedModules.includes(WP) && wpReport.loading) ||
+      (selectedModules.includes(BC) && bcReport.loading)
+    );
   // For table data, use the conditional hook results
-  const tableData = bpReport.data;
+  const bpTableData = bpReport.data;
   const wpTableData = wpReport.data;
   const bcTableData = bcReport.data;
 
   const getFilteredResults = (moduleKey: string) => {
-  let rawData: any[] = [];
-  if (moduleKey === BP) {
-    rawData = hasSearched ? tableData : persistedTableData;
-  } else if (moduleKey === WP) {
-    rawData = hasSearched ? wpTableData : persistedWPTableData;
-  } else if (moduleKey === BC) {
-    rawData = hasSearched ? bcTableData : persistedBrgyTableData;
-  }
-  // Use the new shared utility for correct filtering per module
-  return getModuleFilteredResults({
-    moduleKey,
-    apiData: rawData,
-    selectedRegions: appliedFilter.selectedRegions,
-    selectedProvinces: appliedFilter.selectedProvinces,
-    selectedCities: appliedFilter.selectedCities,
-    selectedDates: appliedFilter.selectedDateType ? [appliedFilter.selectedDateType] : [],
-    selectedIslands: appliedFilter.selectedIslands,
-    lguToRegion,
-    dateRange: appliedFilter.dateRange,
-  });
-};
+    let rawData: any = null;
+    // Always prefer the latest fetched data if available, else fallback to persisted
+    if (moduleKey === BP) {
+      rawData = bpTableData || persistedTableData;
+    } else if (moduleKey === WP) {
+      rawData = wpTableData || persistedWPTableData;
+    } else if (moduleKey === BC) {
+      rawData = bcTableData || persistedBrgyTableData;
+    }
+    // Use the new shared utility for correct filtering per module
+    return getModuleFilteredResults({
+      moduleKey,
+      apiData: rawData,
+      selectedRegions: appliedFilter.selectedRegions,
+      selectedProvinces: appliedFilter.selectedProvinces,
+      selectedCities: appliedFilter.selectedCities,
+      selectedDates: appliedFilter.selectedDateType ? [appliedFilter.selectedDateType] : [],
+      selectedIslands: appliedFilter.selectedIslands,
+      lguToRegion,
+      dateRange: appliedFilter.dateRange,
+    });
+  };
 
   // --- PDF/Excel Export Handler ---
   const handleDownload = async (type: "pdf" | "excel", permitTypes?: ("business" | "working" | "barangay")[]) => {
@@ -477,50 +483,54 @@ const Reports: React.FC = () => {
 
   // Search handler
   const handleSearch = (filters: any) => {
-    const normalizedDateRange = {
-      start: filters.dateRange?.start
-        ? typeof filters.dateRange.start === "string"
-          ? filters.dateRange.start
-          : filters.dateRange.start instanceof Date
-            ? filters.dateRange.start.toISOString().slice(0, 10)
-            : null
-        : null,
-      end: filters.dateRange?.end
-        ? typeof filters.dateRange.end === "string"
-          ? filters.dateRange.end
-          : filters.dateRange.end instanceof Date
-            ? filters.dateRange.end.toISOString().slice(0, 10)
-            : null
-        : null,
-    };
+    setCancelled(false);
+  const normalizedDateRange = {
+    start: filters.dateRange?.start
+      ? typeof filters.dateRange.start === "string"
+        ? filters.dateRange.start
+        : filters.dateRange.start instanceof Date
+          ? filters.dateRange.start.toISOString().slice(0, 10)
+          : null
+      : null,
+    end: filters.dateRange?.end
+      ? typeof filters.dateRange.end === "string"
+        ? filters.dateRange.end
+        : filters.dateRange.end instanceof Date
+          ? filters.dateRange.end.toISOString().slice(0, 10)
+          : null
+      : null,
+  };
 
-    const normalizedFilters = {
-      ...filters,
-      dateRange: normalizedDateRange,
-      selectedModules: (filters.selectedModules || []).slice().sort(),
-    };
+  const normalizedFilters = {
+    ...filters,
+    dateRange: normalizedDateRange,
+    selectedModules: (filters.selectedModules || []).slice().sort(),
+  };
 
-    // If skipApi is true, only update filter state (for local filtering)
-    if (filters.skipApi) {
+  // If skipApi is true, only update filter state (for local filtering)
+  if (filters.skipApi) {
     setAppliedFilterState(normalizedFilters);
-    dispatch(setAppliedFilter(normalizedFilters));
     setHasSearched(false);
+    // Update all module filters for local filtering
+    dispatch(setAppliedFilter(normalizedFilters)); // BP
+    dispatch(setWorkingPermitAppliedFilter(normalizedFilters)); // WP
+    dispatch(setBrgyClearanceAppliedFilter(normalizedFilters)); // BC
     return;
   }
 
-    if (areFiltersEqual(normalizedFilters, lastAppliedFilters)) {
+  if (areFiltersEqual(normalizedFilters, lastAppliedFilters)) {
     return;
   }
 
-    setAppliedFilterState(normalizedFilters);
+  setAppliedFilterState(normalizedFilters);
   setHasSearched(true);
   setLastAppliedFilters(normalizedFilters);
   dispatch(setAppliedFilter(normalizedFilters));
-    if (searchAbortController.current) {
-      searchAbortController.current.abort();
-    }
-    searchAbortController.current = new AbortController();
-  };
+  if (searchAbortController.current) {
+    searchAbortController.current.abort();
+  }
+  searchAbortController.current = new AbortController();
+};
 
   // Reset handler
   const handleReset = () => {
@@ -558,6 +568,8 @@ const Reports: React.FC = () => {
       searchAbortController.current.abort();
       searchAbortController.current = null;
     }
+    setHasSearched(false); 
+    setCancelled(true); // <-- Set cancelled to true
     Swal.fire({
       icon: "info",
       title: "Search Cancelled",
@@ -597,7 +609,7 @@ const Reports: React.FC = () => {
             selectedCities={appliedFilter.selectedCities}
             selectedDates={appliedFilter.selectedDateType ? [appliedFilter.selectedDateType] : []}
             selectedIslands={appliedFilter.selectedIslands}
-            apiData={tableData}
+            apiData={bpTableData}
             loading={!!loading || lguRegionLoading}
             lguToRegion={lguToRegion}
             hasSearched={hasSearched}
@@ -613,7 +625,7 @@ const Reports: React.FC = () => {
             selectedCities={appliedFilter.selectedCities}
             selectedDates={appliedFilter.selectedDateType ? [appliedFilter.selectedDateType] : []}
             selectedIslands={appliedFilter.selectedIslands}
-            apiData={wpTableData}
+            apiData={wpTableData || persistedWPTableData}  
             loading={!!loading || lguRegionLoading}
             lguToRegion={lguToRegion}
             hasSearched={hasSearched}
@@ -629,7 +641,7 @@ const Reports: React.FC = () => {
             selectedCities={appliedFilter.selectedCities}
             selectedDates={appliedFilter.selectedDateType ? [appliedFilter.selectedDateType] : []}
             selectedIslands={appliedFilter.selectedIslands}
-            apiData={bcTableData}
+            apiData={bcTableData || persistedBrgyTableData} 
             loading={!!loading || lguRegionLoading}
             lguToRegion={lguToRegion}
             hasSearched={hasSearched}
