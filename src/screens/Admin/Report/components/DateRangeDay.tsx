@@ -11,6 +11,17 @@ interface DateRangePickerProps {
   onChange?: (range: DateRange) => void;
 }
 
+// Utility: always return yyyy-MM-dd or null
+function normalizeDate(val: string | null | undefined): string | null {
+  if (!val || val === "") return null;
+  // Accept yyyy-MM-dd only
+  if (/^\d{4}-\d{2}-\d{2}$/.test(val)) return val;
+  // Try to parse and format
+  const d = new Date(val);
+  if (isNaN(d.getTime())) return null;
+  return d.toISOString().slice(0, 10);
+}
+
 const DateRangeDay: React.FC<DateRangePickerProps> = ({ value, onChange }) => {
   // Last applied values
   const [_appliedStart, setAppliedStart] = useState<string | null>(value?.start ?? null);
@@ -28,32 +39,21 @@ const DateRangeDay: React.FC<DateRangePickerProps> = ({ value, onChange }) => {
     setDraftEnd(value?.end ?? null);
   }, [value?.start, value?.end]);
 
-const handleDraftStartChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-  setDraftStart(e.target.value || null);
-};
-
-  const handleDraftEndChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const date = e.target.value ? e.target.value : null;
-    setDraftEnd(date);
+  const handleDraftStartChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setDraftStart(e.target.value || null);
   };
 
-  const normalizeDate = (val: string | null | undefined) => {
-  if (!val || val === "") return null;
-  // Only accept yyyy-mm-dd format
-  if (/^\d{4}-\d{2}-\d{2}$/.test(val)) return val;
-  // Try to parse and format
-  const d = new Date(val);
-  if (isNaN(d.getTime())) return null;
-  return d.toISOString().slice(0, 10);
-};
+  const handleDraftEndChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setDraftEnd(e.target.value || null);
+  };
 
-const handleApply = () => {
-  const start = normalizeDate(draftStart);
-  const end = normalizeDate(draftEnd);
-  setAppliedStart(start);
-  setAppliedEnd(end);
-  onChange?.({ start, end });
-};
+  const handleApply = () => {
+    const start = normalizeDate(draftStart);
+    const end = normalizeDate(draftEnd);
+    setAppliedStart(start);
+    setAppliedEnd(end);
+    onChange?.({ start, end });
+  };
 
   const handleClear = () => {
     setDraftStart(null);
