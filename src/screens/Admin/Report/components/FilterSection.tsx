@@ -564,7 +564,7 @@ const handleDateRangeChange = (range: { start: string | null; end: string | null
             <ChevronDown size={18} className={`text-secondary-foreground  transition-transform ${isModuleOpen ? 'transform rotate-180' : ''}`} />
           </button>
           {isModuleOpen && (
-            <div className="w-[250px] absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-md shadow-lg z-10">
+            <div className="w-[250px] md:w-full absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-md shadow-lg z-10">
               <div className="flex justify-between p-2 border-b border-gray-200 ">
                 <button
                   onClick={selectAllModules}
@@ -628,7 +628,7 @@ const handleDateRangeChange = (range: { start: string | null; end: string | null
           </button>
           {isRegionOpen && (
             <div
-              className="w-[350px] absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-md shadow-lg z-10"
+              className="w-[350px] md:w-full absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-md shadow-lg z-10"
               role="dialog"
               aria-modal="true"
               aria-label="Region Filter"
@@ -656,7 +656,7 @@ const handleDateRangeChange = (range: { start: string | null; end: string | null
               <div className="max-h-[400px] overflow-y-auto p-3">
                 {/* Group of Islands */}
                 <div className="mb-4">
-                  <label className="block text-sm font-bold text-blue-700 mb-2">
+                   <label className="block text-sm font-bold text-blue-700 mb-2">
                     Group of Islands
                   </label>
                   <div className="flex gap-6 mb-2">
@@ -700,7 +700,8 @@ const handleDateRangeChange = (range: { start: string | null; end: string | null
                         aria-checked={filterState.selectedRegions.includes(internalKey)}
                         aria-label={`Toggle region ${regionCode}`}
                       />
-                      {regionCode}
+                        <span className=' text-xs lg:text-sm'> {regionCode}</span> 
+                     
                     </label>
                   ))}
                 </div>
@@ -826,7 +827,7 @@ const handleDateRangeChange = (range: { start: string | null; end: string | null
             <ChevronDown size={18} className={`text-secondary-foreground transition-transform ${isDateOpen ? "rotate-180" : ""}`} />
           </button>
           {isDateOpen && (
-            <div className="absolute w-96 left-0 bg-white right-0 mt-2 border border-border rounded-md shadow-lg z-20 p-4">
+            <div className="absolute w-96 md:w-full left-0 bg-white right-0 mt-2 border border-border rounded-md shadow-lg z-20 p-4">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[15px] font-semibold">Date Range</span>
                 <button
