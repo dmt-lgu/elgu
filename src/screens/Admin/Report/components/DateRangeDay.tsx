@@ -37,11 +37,23 @@ const handleDraftStartChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setDraftEnd(date);
   };
 
-  const handleApply = () => {
-    setAppliedStart(draftStart);
-    setAppliedEnd(draftEnd);
-    onChange?.({ start: draftStart, end: draftEnd });
-  };
+  const normalizeDate = (val: string | null | undefined) => {
+  if (!val || val === "") return null;
+  // Only accept yyyy-mm-dd format
+  if (/^\d{4}-\d{2}-\d{2}$/.test(val)) return val;
+  // Try to parse and format
+  const d = new Date(val);
+  if (isNaN(d.getTime())) return null;
+  return d.toISOString().slice(0, 10);
+};
+
+const handleApply = () => {
+  const start = normalizeDate(draftStart);
+  const end = normalizeDate(draftEnd);
+  setAppliedStart(start);
+  setAppliedEnd(end);
+  onChange?.({ start, end });
+};
 
   const handleClear = () => {
     setDraftStart(null);
