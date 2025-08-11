@@ -11,10 +11,10 @@ export const mainStats: StatisticData[] = [
 
 export const modules = [
   "Business Permit",
-  // "Building Permit",
-  // "Certificate of Occupancy",
   "Working Permit",
   "Barangay Clearance",
+  "Building Permit",
+  "Certificate of Occupancy",
 ];
 
 export const category = [
