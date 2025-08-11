@@ -156,10 +156,10 @@ function mergeLguProvinceSumAllMonths(
     }
     // Filter months in range
     const filteredMonths = Array.isArray(lgu.monthlyResults)
-  ? lgu.monthlyResults.filter((month: any) =>
-      isMonthInRange(month.month, dateRange)
-    )
-  : [];
+      ? lgu.monthlyResults.filter((month: any) =>
+          isMonthInRange(month.month, dateRange)
+        )
+      : [];
     filteredMonths.forEach((month: any) => {
       merged[key].months.push(month.month);
       Object.keys(month).forEach(k => {
@@ -181,8 +181,6 @@ function mergeLguProvinceSumAllMonths(
 
   return Object.values(merged);
 }
-
-
 
 // --- Exported filterTableResults for use in reportFilterUtils ---
 export function filterTableResults({
@@ -256,7 +254,7 @@ export function filterTableResults({
         city &&
         selectedCities.some(
           c =>
-           c.trim().toLowerCase() === city.trim().toLowerCase()
+            c.trim().toLowerCase() === city.trim().toLowerCase()
         )
       );
     });
@@ -313,49 +311,50 @@ const CertificateOfOccupancyReport = forwardRef<HTMLDivElement, CertificateOfOcc
 
   // Loader persistence logic
   const persistedCoTableData = useSelector((state: any) => state.certificateOfOccupancy.tableData);
-const persistedCoAppliedFilter = useSelector((state: any) => state.certificateOfOccupancy.appliedFilter);
+  const persistedCoAppliedFilter = useSelector((state: any) => state.certificateOfOccupancy.appliedFilter);
   const reduxSelectedIslands = useSelector((state: any) => state.reportFilter.selectedIslands || []);
   const islandsToUse = selectedIslands && selectedIslands.length > 0 ? selectedIslands : reduxSelectedIslands;
 
   const [showLoader, setShowLoader] = useState(true);
   useEffect(() => {
-  setShowLoader(loading);
-}, [loading]);
+    setShowLoader(loading);
+  }, [loading]);
 
   useEffect(() => {
-  if (
-    persistedCoTableData &&
-    persistedCoAppliedFilter &&
-    isSameFilter(
-      {
-        selectedRegions,
-        selectedProvinces,
-        selectedCities,
-        selectedIslands: islandsToUse,
-        dateRange,
-      },
-      {
-        selectedRegions: persistedCoAppliedFilter.selectedRegions,
-        selectedProvinces: persistedCoAppliedFilter.selectedProvinces,
-        selectedCities: persistedCoAppliedFilter.selectedCities,
-        selectedIslands: persistedCoAppliedFilter.selectedIslands,
-        dateRange: persistedCoAppliedFilter.dateRange,
-      }
-    )
-  ) {
-    setShowLoader(false);
-  } else {
-    setShowLoader(true);
-  }
-}, [
-  persistedCoTableData,
-  persistedCoAppliedFilter,
-  selectedRegions,
-  selectedProvinces,
-  selectedCities,
-  islandsToUse,
-  dateRange,
-]);
+    if (
+      persistedCoTableData &&
+      persistedCoAppliedFilter &&
+      isSameFilter(
+        {
+          selectedRegions,
+          selectedProvinces,
+          selectedCities,
+          selectedIslands: islandsToUse,
+          dateRange,
+        },
+        {
+          selectedRegions: persistedCoAppliedFilter.selectedRegions,
+          selectedProvinces: persistedCoAppliedFilter.selectedProvinces,
+          selectedCities: persistedCoAppliedFilter.selectedCities,
+          selectedIslands: persistedCoAppliedFilter.selectedIslands,
+          dateRange: persistedCoAppliedFilter.dateRange,
+        }
+      )
+    ) {
+      setShowLoader(false);
+    } else {
+      setShowLoader(true);
+    }
+  }, [
+    persistedCoTableData,
+    persistedCoAppliedFilter,
+    selectedRegions,
+    selectedProvinces,
+    selectedCities,
+    islandsToUse,
+    dateRange,
+  ]);
+
   // Use the exported filterTableResults function for filtering
   const filteredResults = useMemo(() => {
     return filterTableResults({
@@ -404,113 +403,108 @@ const persistedCoAppliedFilter = useSelector((state: any) => state.certificateOf
   const regionMappingGrouped = useMemo(() => groupResultsByRegion(filteredResults, lguToRegion), [filteredResults, JSON.stringify(lguToRegion)]);
 
   const tableRowsReport = useMemo(() => {
-  const rows: React.ReactNode[] = [];
-  Object.entries(regionMappingGrouped).forEach(([region, lguList]) => {
-    lguList.forEach((lgu: any, idx: number) => {
-      // Month/Year mode: merged row, sum totalCount for all months in range
-      if (lgu.sum && Object.keys(lgu.sum).length > 0) {
-        // Sum coPending and coPaid from all months in the range
-        const totalPending = typeof lgu.sum.coPending === "number"
-          ? lgu.sum.coPending
-          : (Array.isArray(lgu.monthlyResults)
-              ? lgu.monthlyResults.reduce(
-                  (sum: number, month: any) =>
-                    typeof month.coPending === "number" ? sum + month.coPending : sum,
-                  0
-                )
-              : 0);
-        const totalPaid = typeof lgu.sum.coPaid === "number"
-          ? lgu.sum.coPaid
-          : (Array.isArray(lgu.monthlyResults)
-              ? lgu.monthlyResults.reduce(
-                  (sum: number, month: any) =>
-                    typeof month.coPaid === "number" ? sum + month.coPaid : sum,
-                  0
-                )
-              : 0);
+    const rows: React.ReactNode[] = [];
+    Object.entries(regionMappingGrouped).forEach(([region, lguList]) => {
+      lguList.forEach((lgu: any, idx: number) => {
+        // Month/Year mode: merged row, sum totalCount for all months in range
+        if (lgu.sum && Object.keys(lgu.sum).length > 0) {
+          // Sum coPending and coPaid from all months in the range
+          const totalPending = typeof lgu.sum.coPending === "number"
+            ? lgu.sum.coPending
+            : (Array.isArray(lgu.monthlyResults)
+                ? lgu.monthlyResults.reduce(
+                    (sum: number, month: any) =>
+                      typeof month.coPending === "number" ? sum + month.coPending : sum,
+                    0
+                  )
+                : 0);
+          const totalPaid = typeof lgu.sum.coPaid === "number"
+            ? lgu.sum.coPaid
+            : (Array.isArray(lgu.monthlyResults)
+                ? lgu.monthlyResults.reduce(
+                    (sum: number, month: any) =>
+                      typeof month.coPaid === "number" ? sum + month.coPaid : sum,
+                    0
+                  )
+                : 0);
 
-        rows.push(
-          <TableRow key={`${region}-${lgu.lgu}`}>
-            {idx === 0 && (
-              <TableCell
-                className="border px-2 py-1 text-center text-sm font-bold bg-card left-0 z-10 align-middle"
-                rowSpan={lguList.length}
-              >
-                {getRegionCode(region)}
+          rows.push(
+            <TableRow key={`${region}-${lgu.lgu}`}>
+              {idx === 0 && (
+                <TableCell
+                  className="border px-2 py-1 text-center text-sm font-bold bg-card left-0 z-10 align-middle"
+                  rowSpan={lguList.length}
+                >
+                  {getRegionCode(region)}
+                </TableCell>
+              )}
+              <TableCell className="border px-2 py-1 text-center font-bold">
+                {lgu.lgu}
+                <span className="text-base font-normal text-gray-500">
+                  {lgu.province ? `(${lgu.province})` : ""}
+                </span>
+                <br />
+                <span className="text-[10px] font-normal text-blue-800">
+                  {lgu.months && lgu.months.length > 0 && (
+                    lgu.months.length === 1
+                      ? `(${formatMonthYear(lgu.months[0])})`
+                      : `(${formatMonthYear(lgu.months[0])} - ${formatMonthYear(lgu.months[lgu.months.length - 1])})`
+                  )}
+                </span>
               </TableCell>
-            )}
-            <TableCell className="border px-2 py-1 text-center font-bold">
-              {lgu.lgu}
-              <span className="text-base font-normal text-gray-500">
-                {lgu.province ? `(${lgu.province})` : ""}
-              </span>
-              <br />
-              <span className="text-[10px] font-normal text-blue-800">
-                {lgu.months && lgu.months.length > 0 && (
-                  lgu.months.length === 1
-                    ? `(${formatMonthYear(lgu.months[0])})`
-                    : `(${formatMonthYear(lgu.months[0])} - ${formatMonthYear(lgu.months[lgu.months.length - 1])})`
-                )}
-              </span>
-            </TableCell>
-            <TableCell className="border px-2 py-1 text-center text-[10px]">
-              {totalPending}
-            </TableCell>
-            <TableCell className="border px-2 py-1 text-center text-[10px]">
-              {totalPaid}
-            </TableCell>
-          </TableRow>
-        );
-        return; // Early return, skip to next lgu
-      }
-      // Day mode: render per monthlyResults
-      lgu.monthlyResults.forEach((month: any, mIdx: number) => {
-        rows.push(
-          <TableRow key={`${region}-${lgu.lgu}-${month.month}-${mIdx}`}>
-            {idx === 0 && mIdx === 0 && (
-              <TableCell className="text-base border px-2 py-1 text-center font-bold bg-card left-0 z-10 align-middle"
-                rowSpan={lguList.reduce((acc, lgu) => acc + (lgu.monthlyResults?.length || 1), 0)}>
-                {getRegionCode(region)}
+              <TableCell className="border px-2 py-1 text-center text-[10px]">
+                {totalPending}
               </TableCell>
-            )}
-            <TableCell className="border px-2 py-1 text-center font-bold">
-              {lgu.lgu}
-              <span className="text-base font-normal text-gray-500">
-                {lgu.province ? `(${lgu.province})` : ""}
-              </span>
-              <br />
-              <span className="text-[10px] font-normal text-blue-800">
-                ({formatMonthYear(month.month)})
-              </span>
-            </TableCell>
-            <TableCell className="border px-2 py-1 text-center">
-              {typeof month.coPending !== "undefined"
-                ? month.coPending
-                : ""}
-            </TableCell>
-            <TableCell className="border px-2 py-1 text-center">
-              {typeof month.coPaid !== "undefined"
-                ? month.coPaid
-                : ""}
-            </TableCell>
-          </TableRow>
-        );
+              <TableCell className="border px-2 py-1 text-center text-[10px]">
+                {totalPaid}
+              </TableCell>
+            </TableRow>
+          );
+          return; // Early return, skip to next lgu
+        }
+        // Day mode: render per monthlyResults
+        lgu.monthlyResults.forEach((month: any, mIdx: number) => {
+          rows.push(
+            <TableRow key={`${region}-${lgu.lgu}-${month.month}-${mIdx}`}>
+              {idx === 0 && mIdx === 0 && (
+                <TableCell className="text-base border px-2 py-1 text-center font-bold bg-card left-0 z-10 align-middle"
+                  rowSpan={lguList.reduce((acc, lgu) => acc + (lgu.monthlyResults?.length || 1), 0)}>
+                  {getRegionCode(region)}
+                </TableCell>
+              )}
+              <TableCell className="border px-2 py-1 text-center font-bold">
+                {lgu.lgu}
+                <span className="text-base font-normal text-gray-500">
+                  {lgu.province ? `(${lgu.province})` : ""}
+                </span>
+                <br />
+                <span className="text-[10px] font-normal text-blue-800">
+                  ({formatMonthYear(month.month)})
+                </span>
+              </TableCell>
+              <TableCell className="border px-2 py-1 text-center">
+                {typeof month.coPending !== "undefined"
+                  ? month.coPending
+                  : ""}
+              </TableCell>
+              <TableCell className="border px-2 py-1 text-center">
+                {typeof month.coPaid !== "undefined"
+                  ? month.coPaid
+                  : ""}
+              </TableCell>
+            </TableRow>
+          );
+        });
       });
     });
-  });
-  return rows;
-}, [regionMappingGrouped]);
-
-// ...inside the CertificateOfOccupancyReport component, before the return statement...
-console.log("API Data for Certificate of Occupancy:", apiData);
-console.log("Filtered Results:", filteredResults);
-
+    return rows;
+  }, [regionMappingGrouped]);
 
   return (
     <div ref={ref} className="bg-card p-4 rounded-md border text-secondary-foreground border-border shadow-sm">
-     {(hasSearched && (showLoader || loading)) && (
-  <Loading />
-)}
+      {(hasSearched && (showLoader || loading)) && (
+        <Loading />
+      )}
       <div>
         <div className='flex justify-center mb-4 p-5'>
           <img src={dictImage} alt="dict logo" className='w-80 h-full'/>
@@ -535,84 +529,84 @@ console.log("Filtered Results:", filteredResults);
             </TableRow>
           </TableHeader>
           <TableBody className="[&>tr:nth-child(odd)]:bg-accent">
- {hasSearched && (showLoader || loading) ? (
-  <TableRow>
-    <TableCell colSpan={4} className="text-center py-4 border">
-      <LoaderTable />
-    </TableCell>
-  </TableRow>
-) : (
-    filteredResults.length === 0 ? (
-      hasSearched ? (
-        (selectedRegions.length > 0 || (normalizedDateRange?.start && normalizedDateRange?.end)) ? (
-          <TableRow>
-            <TableCell colSpan={4} className="text-center py-4 border">
-              <span className='font-bold text-lg text-muted-foreground'>
-                No results found, Please try again!
-              </span>
-            </TableCell>
-          </TableRow>
-        ) : (
-          <TableRow>
-            <TableCell colSpan={4} className="text-center py-4 border">
-              <span className='font-bold text-sm text-muted-foreground'>
-                Please select regions and date range you want to view.
-              </span>
-            </TableCell>
-          </TableRow>
-        )
-      ) : (
-        <TableRow>
-          <TableCell colSpan={4} className="text-center py-4 border">
-            <span className='font-bold text-sm text-muted-foreground'>
-              Please select regions and date range you want to view.
-            </span>
-          </TableCell>
-        </TableRow>
-      )
-    ) : (
-      tableRowsReport
-    )
-  )}
-  <TableRow className="!bg-[#3a4554] hover:!bg-[#3a4554] font-bold text-white border">
-    <TableCell className="border px-2 py-1" colSpan={2}>
-      GRAND TOTAL FOR <br />
-      <span className='text-[8px] font-normal text-gray-300'>
-        ({dateRangeLabel})
-      </span>
-    </TableCell>
-    <TableCell className="border px-2 py-1 text-center">
-  {(loading || showLoader)
-    ? 0
-    : filteredResults.reduce((sum: number, lgu: any) => {
-        if (typeof lgu.sum?.coPending === "number") return sum + lgu.sum.coPending;
-        if (lgu.monthlyResults && Array.isArray(lgu.monthlyResults)) {
-          return sum + lgu.monthlyResults.reduce(
-            (mSum: number, month: any) => mSum + (typeof month.coPending === "number" ? month.coPending : 0),
-            0
-          );
-        }
-        return sum;
-      }, 0)
-  }
-</TableCell>
-    <TableCell className="border px-2 py-1 text-center">
-  {(loading || showLoader)
-    ? 0
-    : filteredResults.reduce((sum: number, lgu: any) => {
-        if (typeof lgu.sum?.coPaid === "number") return sum + lgu.sum.coPaid;
-        if (lgu.monthlyResults && Array.isArray(lgu.monthlyResults)) {
-          return sum + lgu.monthlyResults.reduce(
-            (mSum: number, month: any) => mSum + (typeof month.coPaid === "number" ? month.coPaid : 0),
-            0
-          );
-        }
-        return sum;
-      }, 0)
-  }
-</TableCell>
-  </TableRow>
-</TableBody>
+            {hasSearched && (showLoader || loading) ? (
+              <TableRow>
+                <TableCell colSpan={4} className="text-center py-4 border">
+                  <LoaderTable />
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredResults.length === 0 ? (
+                hasSearched ? (
+                  (selectedRegions.length > 0 || (normalizedDateRange?.start && normalizedDateRange?.end)) ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center py-4 border">
+                        <span className='font-bold text-lg text-muted-foreground'>
+                          No results found, Please try again!
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center py-4 border">
+                        <span className='font-bold text-sm text-muted-foreground'>
+                          Please select regions and date range you want to view.
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  )
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center py-4 border">
+                      <span className='font-bold text-sm text-muted-foreground'>
+                        Please select regions and date range you want to view.
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                )
+              ) : (
+                tableRowsReport
+              )
+            )}
+            <TableRow className="!bg-[#3a4554] hover:!bg-[#3a4554] font-bold text-white border">
+              <TableCell className="border px-2 py-1" colSpan={2}>
+                GRAND TOTAL FOR <br />
+                <span className='text-[8px] font-normal text-gray-300'>
+                  ({dateRangeLabel})
+                </span>
+              </TableCell>
+              <TableCell className="border px-2 py-1 text-center">
+                {(loading || showLoader)
+                  ? 0
+                  : filteredResults.reduce((sum: number, lgu: any) => {
+                      if (typeof lgu.sum?.coPending === "number") return sum + lgu.sum.coPending;
+                      if (lgu.monthlyResults && Array.isArray(lgu.monthlyResults)) {
+                        return sum + lgu.monthlyResults.reduce(
+                          (mSum: number, month: any) => mSum + (typeof month.coPending === "number" ? month.coPending : 0),
+                          0
+                        );
+                      }
+                      return sum;
+                    }, 0)
+                }
+              </TableCell>
+              <TableCell className="border px-2 py-1 text-center">
+                {(loading || showLoader)
+                  ? 0
+                  : filteredResults.reduce((sum: number, lgu: any) => {
+                      if (typeof lgu.sum?.coPaid === "number") return sum + lgu.sum.coPaid;
+                      if (lgu.monthlyResults && Array.isArray(lgu.monthlyResults)) {
+                        return sum + lgu.monthlyResults.reduce(
+                          (mSum: number, month: any) => mSum + (typeof month.coPaid === "number" ? month.coPaid : 0),
+                          0
+                        );
+                      }
+                      return sum;
+                    }, 0)
+                }
+              </TableCell>
+            </TableRow>
+          </TableBody>
         </Table>
       </div>
     </div>

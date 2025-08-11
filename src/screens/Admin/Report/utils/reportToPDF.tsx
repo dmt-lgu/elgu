@@ -45,8 +45,8 @@ interface ExportTableReportToPDFParams {
   isDayMode?: boolean;
   isBarangayClearance?: boolean;
   moduleLabel?: string;
-  selectedDateType?: string; // "Day" | "Month" | "Year"
-  selectedModules?: string[]; // ["Business Permit", ...]
+  selectedDateType?: string;
+  selectedModules?: string[];
 }
 
 /**

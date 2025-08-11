@@ -387,18 +387,18 @@ const Reports: React.FC = () => {
   });
 
   const coReport = useReportData({
-  moduleKey: CO,
-  apiUrl: `${import.meta.env.VITE_URL}/api/bpco/transaction-count-co`,
-  appliedFilter,
-  lguToRegion,
-  reduxTableData: persistedCoTableData,
-  reduxAppliedFilter: persistedCoAppliedFilter,
-  setReduxTableData: (data) => dispatch(setcertificateOfOccupancy(data)),
-  setReduxAppliedFilter: (filter) => dispatch(setCertificateOfOccupancyAppliedFilter(filter)), // <-- FIXED
-  hasSearched,
-  abortSignal: searchAbortController.current?.signal,
-  skipLoading: !selectedModules.includes(CO) || !hasSearched, // <-- FIXED
-});
+    moduleKey: CO,
+    apiUrl: `${import.meta.env.VITE_URL}/api/bpco/transaction-count-co`,
+    appliedFilter,
+    lguToRegion,
+    reduxTableData: persistedCoTableData,
+    reduxAppliedFilter: persistedCoAppliedFilter,
+    setReduxTableData: (data) => dispatch(setcertificateOfOccupancy(data)),
+    setReduxAppliedFilter: (filter) => dispatch(setCertificateOfOccupancyAppliedFilter(filter)),
+    hasSearched,
+    abortSignal: searchAbortController.current?.signal,
+    skipLoading: !selectedModules.includes(CO) || !hasSearched,
+  });
 
   // For loading state, combine only those modules that are selected
   const loading =
@@ -419,15 +419,17 @@ const Reports: React.FC = () => {
 
   const getFilteredResults = (moduleKey: string) => {
     let rawData: any = null;
-    // Always prefer the latest fetched data if available, else fallback to persisted
     if (moduleKey === BP) {
       rawData = bpTableData || persistedTableData;
     } else if (moduleKey === WP) {
       rawData = wpTableData || persistedWPTableData;
     } else if (moduleKey === BC) {
       rawData = bcTableData || persistedBrgyTableData;
+    } else if (moduleKey === BLDG) {
+      rawData = bldgTableData || persistedBldgTableData;
+    } else if (moduleKey === CO) {
+      rawData = coTableData || persistedCoTableData;
     }
-    // Use the new shared utility for correct filtering per module
     return getModuleFilteredResults({
       moduleKey,
       apiData: rawData,
@@ -442,17 +444,20 @@ const Reports: React.FC = () => {
   };
 
   // --- PDF/Excel Export Handler ---
- const handleDownload = async (type: "pdf" | "excel", permitTypes?: ("business" | "working" | "barangay" | "building" | "certificate")[]) => {
-  const modulesToExport = permitTypes
-    ? permitTypes.map((type) => {
-        if (type === "business") return BP;
-        if (type === "working") return WP;
-        if (type === "barangay") return BC;
-        if (type === "building") return BLDG;
-        if (type === "certificate") return CO;
-        return "";
-      }).filter(Boolean)
-    : selectedModules;
+ const handleDownload = async (
+    type: "pdf" | "excel",
+    permitTypes?: ("business" | "working" | "barangay" | "building" | "certificate")[]
+  ) => {
+    const modulesToExport = permitTypes
+      ? permitTypes.map((type) => {
+          if (type === "business") return BP;
+          if (type === "working") return WP;
+          if (type === "barangay") return BC;
+          if (type === "building") return BLDG;
+          if (type === "certificate") return CO;
+          return "";
+        }).filter(Boolean)
+      : selectedModules;
 
     // Business Permit
     if (modulesToExport.includes(BP)) {
@@ -472,6 +477,8 @@ const Reports: React.FC = () => {
           isDayMode: false,
           isBarangayClearance: false,
           moduleLabel: "Business Permit",
+          selectedDateType: appliedFilter.selectedDateType,
+          selectedModules: [BP],
         });
       }
       if (type === "excel") {
@@ -481,6 +488,9 @@ const Reports: React.FC = () => {
           dateRangeLabel,
           fileLabel: "business-permit-report",
           isDayMode: false,
+          moduleLabel: "Business Permit",
+          selectedDateType: appliedFilter.selectedDateType,
+          selectedModules: [BP],
         });
       }
     }
@@ -503,6 +513,8 @@ const Reports: React.FC = () => {
           isDayMode: false,
           isBarangayClearance: false,
           moduleLabel: "Working Permit",
+          selectedDateType: appliedFilter.selectedDateType,
+          selectedModules: [WP],
         });
       }
       if (type === "excel") {
@@ -512,6 +524,9 @@ const Reports: React.FC = () => {
           dateRangeLabel,
           fileLabel: "working-permit-report",
           isDayMode: false,
+          moduleLabel: "Working Permit",
+          selectedDateType: appliedFilter.selectedDateType,
+          selectedModules: [WP],
         });
       }
     }
@@ -533,6 +548,8 @@ const Reports: React.FC = () => {
           fileLabel: "barangay-clearance-report",
           isDayMode: false,
           moduleLabel: "Barangay Clearance",
+          selectedDateType: appliedFilter.selectedDateType,
+          selectedModules: [BC],
         });
       }
       if (type === "excel") {
@@ -542,40 +559,84 @@ const Reports: React.FC = () => {
           dateRangeLabel,
           fileLabel: "barangay-clearance-report",
           isDayMode: false,
+          moduleLabel: "Barangay Clearance",
+          selectedDateType: appliedFilter.selectedDateType,
+          selectedModules: [BC],
         });
       }
     }
 
+    // Building Permit
     if (modulesToExport.includes(BLDG)) {
-    const filteredResults = getFilteredResults(BLDG);
-    const dateRangeLabel = getDateRangeLabel(
-      normalizedDateRange.start,
-      normalizedDateRange.end,
-      appliedFilter.selectedDateType
-    );
-    if (type === "pdf") {
-      await exportTableReportToPDF({
-        filteredResults,
-        lguToRegion,
-        dateRangeLabel,
-        logoUrl: dictImage,
-        fileLabel: "building-permit-report",
-        isDayMode: false,
-        isBarangayClearance: false,
-        moduleLabel: "Building Permit",
-      });
+      const filteredResults = getFilteredResults(BLDG);
+      const dateRangeLabel = getDateRangeLabel(
+        normalizedDateRange.start,
+        normalizedDateRange.end,
+        appliedFilter.selectedDateType
+      );
+      if (type === "pdf") {
+        await exportTableReportToPDF({
+          filteredResults,
+          lguToRegion,
+          dateRangeLabel,
+          logoUrl: dictImage,
+          fileLabel: "building-permit-report",
+          isDayMode: false,
+          isBarangayClearance: false,
+          moduleLabel: "Building Permit",
+          selectedDateType: appliedFilter.selectedDateType,
+          selectedModules: [BLDG],
+        });
+      }
+      if (type === "excel") {
+        exportTableReportToExcel({
+          filteredResults,
+          lguToRegion,
+          dateRangeLabel,
+          fileLabel: "building-permit-report",
+          isDayMode: false,
+          moduleLabel: "Building Permit",
+          selectedDateType: appliedFilter.selectedDateType,
+          selectedModules: [BLDG],
+        });
+      }
     }
-    if (type === "excel") {
-      exportTableReportToExcel({
-        filteredResults,
-        lguToRegion,
-        dateRangeLabel,
-        fileLabel: "building-permit-report",
-        isDayMode: false,
-      });
-    }
-  }
 
+    // Certificate of Occupancy
+    if (modulesToExport.includes(CO)) {
+      const filteredResults = getFilteredResults(CO);
+      const dateRangeLabel = getDateRangeLabel(
+        normalizedDateRange.start,
+        normalizedDateRange.end,
+        appliedFilter.selectedDateType
+      );
+      if (type === "pdf") {
+        await exportTableReportToPDF({
+          filteredResults,
+          lguToRegion,
+          dateRangeLabel,
+          logoUrl: dictImage,
+          fileLabel: "certificate-of-occupancy-report",
+          isDayMode: false,
+          isBarangayClearance: false,
+          moduleLabel: "Certificate of Occupancy",
+          selectedDateType: appliedFilter.selectedDateType,
+          selectedModules: [CO],
+        });
+      }
+      if (type === "excel") {
+        exportTableReportToExcel({
+          filteredResults,
+          lguToRegion,
+          dateRangeLabel,
+          fileLabel: "certificate-of-occupancy-report",
+          isDayMode: false,
+          moduleLabel: "Certificate of Occupancy",
+          selectedDateType: appliedFilter.selectedDateType,
+          selectedModules: [CO],
+        });
+      }
+    }
   };
 
   // Search handler
@@ -614,7 +675,6 @@ const Reports: React.FC = () => {
     dispatch(setBrgyClearanceAppliedFilter(normalizedFilters)); // BC
     dispatch(setbuildingPermiAppliedFilter(normalizedFilters)); // BLDG
     dispatch(setCertificateOfOccupancyAppliedFilter(normalizedFilters)); // CO
-    
     return;
   }
 
@@ -660,6 +720,12 @@ const Reports: React.FC = () => {
     // --- NEW: Reset Barangay Clearance Redux state ---
     dispatch(setBrgyClearanceTableData(null));
     dispatch(setBrgyClearanceAppliedFilter(null));
+    // --- NEW: Reset Building Permit Redux state ---
+    dispatch(setbuildingPermitData(null));
+    dispatch(setbuildingPermiAppliedFilter(null));
+    // --- NEW: Reset Certificate of Occupancy Redux state ---
+    dispatch(setcertificateOfOccupancy(null));
+    dispatch(setCertificateOfOccupancyAppliedFilter(null));
   };
 
   // Cancel search handler
@@ -726,7 +792,7 @@ const Reports: React.FC = () => {
             selectedCities={appliedFilter.selectedCities}
             selectedDates={appliedFilter.selectedDateType ? [appliedFilter.selectedDateType] : []}
             selectedIslands={appliedFilter.selectedIslands}
-            apiData={wpTableData || persistedWPTableData}  
+            apiData={wpTableData || persistedWPTableData}
             loading={!!loading || lguRegionLoading}
             lguToRegion={lguToRegion}
             hasSearched={hasSearched}
@@ -742,7 +808,7 @@ const Reports: React.FC = () => {
             selectedCities={appliedFilter.selectedCities}
             selectedDates={appliedFilter.selectedDateType ? [appliedFilter.selectedDateType] : []}
             selectedIslands={appliedFilter.selectedIslands}
-            apiData={bcTableData || persistedBrgyTableData} 
+            apiData={bcTableData || persistedBrgyTableData}
             loading={!!loading || lguRegionLoading}
             lguToRegion={lguToRegion}
             hasSearched={hasSearched}
@@ -766,7 +832,7 @@ const Reports: React.FC = () => {
           />
         )}
 
-        {selectedModules.includes(CO) && (
+         {selectedModules.includes(CO) && (
           <CertificateOfOccupancyReport
             selectedRegions={appliedFilter.selectedRegions}
             dateRange={appliedFilter.dateRange}
@@ -774,7 +840,7 @@ const Reports: React.FC = () => {
             selectedCities={appliedFilter.selectedCities}
             selectedDates={appliedFilter.selectedDateType ? [appliedFilter.selectedDateType] : []}
             selectedIslands={appliedFilter.selectedIslands}
-            apiData={coTableData}
+            apiData={coTableData || persistedCoTableData}
             loading={!!loading || lguRegionLoading}
             lguToRegion={lguToRegion}
             hasSearched={hasSearched}
