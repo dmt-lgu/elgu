@@ -9,13 +9,13 @@ import {
 } from "@/components/ui/table";
 import { format, parse, startOfMonth, endOfMonth, isSameDay } from "date-fns";
 import { getRegionCode, islandRegionMap, regionMapping } from "../utils/mockData";
-import dictImage from "./../../../../assets/logo/dict.png"
+import dictImage from "./../../../../assets/logo/dict.png";
 import '../utils/loader.css';
 import { useSelector } from 'react-redux';
 import LoaderTable from '../utils/LoaderTable';
 import Loading from '../utils/Loading';
 
-interface BrgyCleranceProps {
+interface BuildingPermitProps {
   selectedRegions: string[];
   dateRange: { start: Date | string | null; end: Date | string | null };
   apiData: any;
@@ -29,7 +29,6 @@ interface BrgyCleranceProps {
   onTableDataChange?: (hasData: boolean) => void;
 }
 
-// --- Utility: Normalize a date value to Date or null ---
 function ensureDate(d: Date | string | null | undefined): Date | null {
   if (!d) return null;
   if (d instanceof Date) return d;
@@ -40,7 +39,6 @@ function ensureDate(d: Date | string | null | undefined): Date | null {
   return null;
 }
 
-// --- Utility: Normalize a DateRange object ---
 function normalizeDateRange(dr: { start: Date | string | null; end: Date | string | null }) {
   return {
     start: ensureDate(dr?.start),
@@ -48,7 +46,6 @@ function normalizeDateRange(dr: { start: Date | string | null; end: Date | strin
   };
 }
 
-// Helper: Format month string to "Month YYYY"
 function formatMonthYear(monthStr: string): string {
   if (!monthStr) return "";
   let date;
@@ -62,7 +59,6 @@ function formatMonthYear(monthStr: string): string {
   return format(date, "MMMM yyyy");
 }
 
-// Helper: Group results by region (always use internal key)
 function groupResultsByRegion(results: any[], lguToRegion: Record<string, string>) {
   const grouped: Record<string, any[]> = {};
   results.forEach(lgu => {
@@ -77,7 +73,6 @@ function groupResultsByRegion(results: any[], lguToRegion: Record<string, string
   return grouped;
 }
 
-// Helper: Check if date range is a full month range
 function isFullMonthRange(start: Date, end: Date) {
   return (
     isSameDay(start, startOfMonth(start)) &&
@@ -85,7 +80,6 @@ function isFullMonthRange(start: Date, end: Date) {
   );
 }
 
-// Helper: Check if a month is in the selected range
 function isMonthInRange(monthStr: string, range: { start: Date | null; end: Date | null }) {
   if (!range.start && !range.end) return true;
   const monthDate = monthStr.length === 7
@@ -107,7 +101,6 @@ function isMonthInRange(monthStr: string, range: { start: Date | null; end: Date
   return true;
 }
 
-// Helper: Extract province from lgu.province or from lgu.lgu string
 function extractProvince(lgu: any): string | undefined {
   if (lgu.province && typeof lgu.province === "string" && lgu.province.trim() !== "") {
     return lgu.province.trim();
@@ -121,7 +114,6 @@ function extractProvince(lgu: any): string | undefined {
   return undefined;
 }
 
-// Helper: Extract city/municipality from lgu.lgu or lgu.city
 function extractCity(lgu: any): string | undefined {
   if (lgu.city && typeof lgu.city === "string" && lgu.city.trim() !== "") {
     return lgu.city.trim();
@@ -136,7 +128,6 @@ function extractCity(lgu: any): string | undefined {
   return undefined;
 }
 
-// Merge LGU+province and sum all months in range (for Month/Year selection)
 function mergeLguProvinceSumAllMonths(
   results: any[],
   dateRange: { start: Date | null; end: Date | null }
@@ -154,10 +145,11 @@ function mergeLguProvinceSumAllMonths(
         months: [],
       };
     }
-    // Filter months in range
-    const filteredMonths = lgu.monthlyResults.filter((month: any) =>
-      isMonthInRange(month.month, dateRange)
-    );
+    const filteredMonths = Array.isArray(lgu.monthlyResults)
+      ? lgu.monthlyResults.filter((month: any) =>
+          isMonthInRange(month.month, dateRange)
+        )
+      : [];
     filteredMonths.forEach((month: any) => {
       merged[key].months.push(month.month);
       Object.keys(month).forEach(k => {
@@ -165,14 +157,12 @@ function mergeLguProvinceSumAllMonths(
           merged[key].sum[k] = (merged[key].sum[k] || 0) + month[k];
         }
       });
-      // For totalCount, sum it up for merged row
       if (typeof month.totalCount === "number") {
         merged[key].totalCount = (merged[key].totalCount || 0) + month.totalCount;
       }
     });
   });
 
-  // Clean up months (unique)
   Object.values(merged).forEach((item: any) => {
     item.months = Array.from(new Set(item.months));
   });
@@ -180,7 +170,6 @@ function mergeLguProvinceSumAllMonths(
   return Object.values(merged);
 }
 
-// --- Exported filterTableResults for use in reportFilterUtils ---
 export function filterTableResults({
   apiData,
   selectedRegions = [],
@@ -204,10 +193,12 @@ export function filterTableResults({
 
   let filtered = Array.isArray(apiData?.results) ? apiData.results : [];
 
-  // Filter by islands if any are selected
+  filtered = filtered.filter(
+    (lgu: any) => Array.isArray(lgu.monthlyResults)
+  );
+
   if (selectedIslands && selectedIslands.length > 0) {
     const regionsFromIslands = selectedIslands.flatMap(island => islandRegionMap[island] || []);
-    // Convert region codes to internal keys
     const regionsInternal = regionsFromIslands.map(code => regionMapping[code] || code);
     filtered = filtered.filter((lgu: any) => {
       const regionInternal =
@@ -218,7 +209,6 @@ export function filterTableResults({
     });
   } else if (selectedRegions && selectedRegions.length > 0) {
     filtered = filtered.filter((lgu: any) => {
-      // Map region code to internal key if possible
       const regionInternal =
         regionMapping[lgu.region] ||
         regionMapping[lgu.regionCode] ||
@@ -253,7 +243,6 @@ export function filterTableResults({
     });
   }
 
-  // If "Day" is selected, DO NOT merge, just filter by date range
   if (selectedDates && selectedDates.includes("Day")) {
     return filtered.map((lgu: any) => ({
       ...lgu,
@@ -263,15 +252,13 @@ export function filterTableResults({
       months: lgu.monthlyResults
         .filter((month: any) => isMonthInRange(month.month, normalizedDateRange))
         .map((month: any) => month.month),
-      sum: {}, // Not used in this mode
+      sum: {},
     }));
   }
 
-  // Default: merge and sum duplicates here!
   return mergeLguProvinceSumAllMonths(filtered, normalizedDateRange);
 }
 
-// --- Loader persistence logic ---
 function isSameFilter(a: any, b: any) {
   if (!a || !b) return false;
   return (
@@ -283,7 +270,7 @@ function isSameFilter(a: any, b: any) {
   );
 }
 
-const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
+const BuildingPermitReport = forwardRef<HTMLDivElement, BuildingPermitProps>(({
   selectedRegions,
   dateRange,
   apiData,
@@ -296,24 +283,25 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
   hasSearched = false,
   onTableDataChange,
 }, ref) => {
-  // Normalize dateRange at the top of the component
   const normalizedDateRange = useMemo(
     () => normalizeDateRange(dateRange),
     [dateRange?.start, dateRange?.end]
   );
 
-  // Loader persistence logic
-  const persistedBrgyTableData = useSelector((state: any) => state.brgyClearanceTable.tableData);
-  const persistedBrgyAppliedFilter = useSelector((state: any) => state.brgyClearanceTable.appliedFilter);
+  const persistedBldgTableData = useSelector((state: any) => state.buildingPermit.tableData);
+  const persistedBldgAppliedFilter = useSelector((state: any) => state.buildingPermit.appliedFilter);
   const reduxSelectedIslands = useSelector((state: any) => state.reportFilter.selectedIslands || []);
   const islandsToUse = selectedIslands && selectedIslands.length > 0 ? selectedIslands : reduxSelectedIslands;
 
   const [showLoader, setShowLoader] = useState(true);
+  useEffect(() => {
+    setShowLoader(loading);
+  }, [loading]);
 
   useEffect(() => {
     if (
-      persistedBrgyTableData &&
-      persistedBrgyAppliedFilter &&
+      persistedBldgTableData &&
+      persistedBldgAppliedFilter &&
       isSameFilter(
         {
           selectedRegions,
@@ -323,11 +311,11 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
           dateRange,
         },
         {
-          selectedRegions: persistedBrgyAppliedFilter.selectedRegions,
-          selectedProvinces: persistedBrgyAppliedFilter.selectedProvinces,
-          selectedCities: persistedBrgyAppliedFilter.selectedCities,
-          selectedIslands: persistedBrgyAppliedFilter.selectedIslands,
-          dateRange: persistedBrgyAppliedFilter.dateRange,
+          selectedRegions: persistedBldgAppliedFilter.selectedRegions,
+          selectedProvinces: persistedBldgAppliedFilter.selectedProvinces,
+          selectedCities: persistedBldgAppliedFilter.selectedCities,
+          selectedIslands: persistedBldgAppliedFilter.selectedIslands,
+          dateRange: persistedBldgAppliedFilter.dateRange,
         }
       )
     ) {
@@ -336,8 +324,8 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
       setShowLoader(true);
     }
   }, [
-    persistedBrgyTableData,
-    persistedBrgyAppliedFilter,
+    persistedBldgTableData,
+    persistedBldgAppliedFilter,
     selectedRegions,
     selectedProvinces,
     selectedCities,
@@ -345,7 +333,6 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
     dateRange,
   ]);
 
-  // Use the exported filterTableResults function for filtering
   const filteredResults = useMemo(() => {
     return filterTableResults({
       apiData,
@@ -369,14 +356,12 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
     islandsToUse.join("-"),
   ]);
 
-  // Notify parent if table has data (for enabling Download button)
   useEffect(() => {
     if (onTableDataChange) {
       onTableDataChange(filteredResults.length > 0);
     }
   }, [filteredResults.length, onTableDataChange]);
 
-  // Format date range label
   let dateRangeLabel = "";
   if (normalizedDateRange?.start && normalizedDateRange?.end) {
     if (isFullMonthRange(normalizedDateRange.start, normalizedDateRange.end)) {
@@ -396,18 +381,26 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
     const rows: React.ReactNode[] = [];
     Object.entries(regionMappingGrouped).forEach(([region, lguList]) => {
       lguList.forEach((lgu: any, idx: number) => {
-        // Month/Year mode: merged row, sum totalCount for all months in range
         if (lgu.sum && Object.keys(lgu.sum).length > 0) {
-          // Sum totalCount from all months in the range (already computed in mergeLguProvinceSumAllMonths)
-          const totalCount = typeof lgu.totalCount === "number"
-            ? lgu.totalCount
+          const totalPending = typeof lgu.sum.buildingPending === "number"
+            ? lgu.sum.buildingPending
             : (Array.isArray(lgu.monthlyResults)
                 ? lgu.monthlyResults.reduce(
                     (sum: number, month: any) =>
-                      typeof month.totalCount === "number" ? sum + month.totalCount : sum,
+                      typeof month.buildingPending === "number" ? sum + month.buildingPending : sum,
                     0
                   )
                 : 0);
+          const totalPaid = typeof lgu.sum.buildingPaid === "number"
+            ? lgu.sum.buildingPaid
+            : (Array.isArray(lgu.monthlyResults)
+                ? lgu.monthlyResults.reduce(
+                    (sum: number, month: any) =>
+                      typeof month.buildingPaid === "number" ? sum + month.buildingPaid : sum,
+                    0
+                  )
+                : 0);
+
           rows.push(
             <TableRow key={`${region}-${lgu.lgu}`}>
               {idx === 0 && (
@@ -418,28 +411,30 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
                   {getRegionCode(region)}
                 </TableCell>
               )}
-             <TableCell className="border px-2 py-1 text-center font-bold">
-              {lgu.lgu}
-              <span className="text-base font-normal text-gray-500">
-                {lgu.province ? `(${lgu.province})` : ""}
-              </span>
-              <br />
-              <span className="text-[10px] font-normal text-blue-800">
-                {lgu.months && lgu.months.length > 0 && (
-                  lgu.months.length === 1
-                    ? `(${formatMonthYear(lgu.months[0])})`
-                    : `(${formatMonthYear(lgu.months[0])} - ${formatMonthYear(lgu.months[lgu.months.length - 1])})`
-                )}
-              </span>
-            </TableCell>
+              <TableCell className="border px-2 py-1 text-center font-bold">
+                {lgu.lgu}
+                <span className="text-base font-normal text-gray-500">
+                  {lgu.province ? `(${lgu.province})` : ""}
+                </span>
+                <br />
+                <span className="text-[10px] font-normal text-blue-800">
+                  {lgu.months && lgu.months.length > 0 && (
+                    lgu.months.length === 1
+                      ? `(${formatMonthYear(lgu.months[0])})`
+                      : `(${formatMonthYear(lgu.months[0])} - ${formatMonthYear(lgu.months[lgu.months.length - 1])})`
+                  )}
+                </span>
+              </TableCell>
               <TableCell className="border px-2 py-1 text-center text-[10px]">
-                {totalCount}
+                {totalPending}
+              </TableCell>
+              <TableCell className="border px-2 py-1 text-center text-[10px]">
+                {totalPaid}
               </TableCell>
             </TableRow>
           );
-          return; // Early return, skip to next lgu
+          return;
         }
-        // Day mode: render per monthlyResults
         lgu.monthlyResults.forEach((month: any, mIdx: number) => {
           rows.push(
             <TableRow key={`${region}-${lgu.lgu}-${month.month}-${mIdx}`}>
@@ -460,8 +455,13 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
                 </span>
               </TableCell>
               <TableCell className="border px-2 py-1 text-center">
-                {typeof month.totalCount !== "undefined"
-                  ? month.totalCount
+                {typeof month.buildingPending !== "undefined"
+                  ? month.buildingPending
+                  : ""}
+              </TableCell>
+              <TableCell className="border px-2 py-1 text-center">
+                {typeof month.buildingPaid !== "undefined"
+                  ? month.buildingPaid
                   : ""}
               </TableCell>
             </TableRow>
@@ -474,7 +474,7 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
 
   return (
     <div ref={ref} className="bg-card p-4 rounded-md border text-secondary-foreground border-border shadow-sm">
-     {(hasSearched && (showLoader || loading)) && (
+      {(hasSearched && (showLoader || loading)) && (
         <Loading />
       )}
       <div>
@@ -484,8 +484,8 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
         <Table className="w-full border-collapse text-[10px]">
           <TableHeader>
             <TableRow>
-              <TableHead colSpan={3} className="bg-[#9ec6f7] text-black text-center font-bold text-base border top-0">
-                Barangay Clearance
+              <TableHead colSpan={4} className="bg-[#9ec6f7] text-black text-center font-bold text-base border top-0">
+                Building Permit
                 {dateRangeLabel && (
                   <div className="text-xs text-gray-700 mt-1 font-bold">
                     {dateRangeLabel}
@@ -496,13 +496,14 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
             <TableRow>
               <TableHead className="bg-[#9ec6f7] text-black font-bold border px-2 py-1 text-center align-middle text-base">Region</TableHead>
               <TableHead className="bg-[#9ec6f7] text-black font-bold border px-2 py-1 text-center align-middle text-base">LGU</TableHead>
-              <TableHead className="bg-[#9ec6f7] text-black font-bold border px-2 py-1 text-center align-middle text-base">Total Results</TableHead>
+              <TableHead className="bg-[#9ec6f7] text-black font-bold border px-2 py-1 text-center align-middle text-base">Pending</TableHead>
+              <TableHead className="bg-[#9ec6f7] text-black font-bold border px-2 py-1 text-center align-middle text-base">Paid</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody className="[&>tr:nth-child(odd)]:bg-accent">
             {hasSearched && (showLoader || loading) ? (
               <TableRow>
-                <TableCell colSpan={3} className="text-center py-4 border">
+                <TableCell colSpan={4} className="text-center py-4 border">
                   <LoaderTable />
                 </TableCell>
               </TableRow>
@@ -511,7 +512,7 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
                 hasSearched ? (
                   (selectedRegions.length > 0 || (normalizedDateRange?.start && normalizedDateRange?.end)) ? (
                     <TableRow>
-                      <TableCell colSpan={3} className="text-center py-4 border">
+                      <TableCell colSpan={4} className="text-center py-4 border">
                         <span className='font-bold text-lg text-muted-foreground'>
                           No results found, Please try again!
                         </span>
@@ -519,7 +520,7 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
                     </TableRow>
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={3} className="text-center py-4 border">
+                      <TableCell colSpan={4} className="text-center py-4 border">
                         <span className='font-bold text-sm text-muted-foreground'>
                           Please select regions and date range you want to view.
                         </span>
@@ -528,7 +529,7 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
                   )
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={3} className="text-center py-4 border">
+                    <TableCell colSpan={4} className="text-center py-4 border">
                       <span className='font-bold text-sm text-muted-foreground'>
                         Please select regions and date range you want to view.
                       </span>
@@ -550,12 +551,25 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
                 {(loading || showLoader)
                   ? 0
                   : filteredResults.reduce((sum: number, lgu: any) => {
-                      if (typeof lgu.totalCount === "number") {
-                        return sum + lgu.totalCount;
-                      }
-                      if (Array.isArray(lgu.monthlyResults)) {
+                      if (typeof lgu.sum?.buildingPending === "number") return sum + lgu.sum.buildingPending;
+                      if (lgu.monthlyResults && Array.isArray(lgu.monthlyResults)) {
                         return sum + lgu.monthlyResults.reduce(
-                          (mSum: number, month: any) => mSum + (typeof month.totalCount === "number" ? month.totalCount : 0),
+                          (mSum: number, month: any) => mSum + (typeof month.buildingPending === "number" ? month.buildingPending : 0),
+                          0
+                        );
+                      }
+                      return sum;
+                    }, 0)
+                }
+              </TableCell>
+              <TableCell className="border px-2 py-1 text-center">
+                {(loading || showLoader)
+                  ? 0
+                  : filteredResults.reduce((sum: number, lgu: any) => {
+                      if (typeof lgu.sum?.buildingPaid === "number") return sum + lgu.sum.buildingPaid;
+                      if (lgu.monthlyResults && Array.isArray(lgu.monthlyResults)) {
+                        return sum + lgu.monthlyResults.reduce(
+                          (mSum: number, month: any) => mSum + (typeof month.buildingPaid === "number" ? month.buildingPaid : 0),
                           0
                         );
                       }
@@ -571,4 +585,4 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
   );
 });
 
-export default BrgyClearanceReport;
+export default BuildingPermitReport;

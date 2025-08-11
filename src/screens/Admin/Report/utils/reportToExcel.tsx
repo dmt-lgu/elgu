@@ -1,18 +1,23 @@
 import * as XLSX from "xlsx";
 import { regionKeyToCode } from "./mockData";
 
+
 export function exportTableReportToExcel({
   filteredResults,
   lguToRegion,
   dateRangeLabel,
   fileLabel = "report",
   isDayMode = false,
+  moduleLabel,
 }: {
   filteredResults: any[];
   lguToRegion: Record<string, string>;
   dateRangeLabel: string;
   fileLabel?: string;
   isDayMode?: boolean;
+  moduleLabel?: string;
+  selectedModules?: string[];
+  selectedDateType?: string;
 }) {
   function formatMonthYear(monthStr: string): string {
     if (!monthStr) return "";
@@ -151,10 +156,22 @@ export function exportTableReportToExcel({
 
   rows.push(grandTotals);
 
-  // Add date range row above header
+  // Add moduleLabel row above date range row if present
+  const moduleRow = moduleLabel ? [moduleLabel] : null;
+  if (moduleRow) while (moduleRow.length < columns.length) moduleRow.push("");
   const dateRow = [dateRangeLabel];
   while (dateRow.length < columns.length) dateRow.push("");
-  const data = [dateRow, columns, ...rows];
+  const data = moduleLabel
+    ? [moduleRow, dateRow, columns, ...rows]
+    : [dateRow, columns, ...rows];
+
+  // Merge the moduleLabel row and date range row across all columns
+  if (moduleLabel) {
+    merges.unshift({ s: { r: 0, c: 0 }, e: { r: 0, c: columns.length - 1 } });
+    merges.unshift({ s: { r: 1, c: 0 }, e: { r: 1, c: columns.length - 1 } });
+  } else {
+    merges.unshift({ s: { r: 0, c: 0 }, e: { r: 0, c: columns.length - 1 } });
+  }
 
   // Merge the date range row across all columns
   const dateMerge = { s: { r: 0, c: 0 }, e: { r: 0, c: columns.length - 1 } };
@@ -177,7 +194,7 @@ export function exportTableReportToExcel({
     }
   }
 
-  const wb = XLSX.utils.book_new();
+   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Report");
 
   XLSX.writeFile(wb, `${fileLabel}.xlsx`);

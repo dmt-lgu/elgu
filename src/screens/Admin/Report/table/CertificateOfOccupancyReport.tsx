@@ -15,7 +15,7 @@ import { useSelector } from 'react-redux';
 import LoaderTable from '../utils/LoaderTable';
 import Loading from '../utils/Loading';
 
-interface BrgyCleranceProps {
+interface CertificateOfOccupancyProps {
   selectedRegions: string[];
   dateRange: { start: Date | string | null; end: Date | string | null };
   apiData: any;
@@ -155,9 +155,11 @@ function mergeLguProvinceSumAllMonths(
       };
     }
     // Filter months in range
-    const filteredMonths = lgu.monthlyResults.filter((month: any) =>
-      isMonthInRange(month.month, dateRange)
-    );
+    const filteredMonths = Array.isArray(lgu.monthlyResults)
+      ? lgu.monthlyResults.filter((month: any) =>
+          isMonthInRange(month.month, dateRange)
+        )
+      : [];
     filteredMonths.forEach((month: any) => {
       merged[key].months.push(month.month);
       Object.keys(month).forEach(k => {
@@ -203,6 +205,11 @@ export function filterTableResults({
   const normalizedDateRange = normalizeDateRange(dateRange);
 
   let filtered = Array.isArray(apiData?.results) ? apiData.results : [];
+
+  // Filter out LGUs without a valid monthlyResults array
+  filtered = filtered.filter(
+    (lgu: any) => Array.isArray(lgu.monthlyResults)
+  );
 
   // Filter by islands if any are selected
   if (selectedIslands && selectedIslands.length > 0) {
@@ -283,7 +290,7 @@ function isSameFilter(a: any, b: any) {
   );
 }
 
-const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
+const CertificateOfOccupancyReport = forwardRef<HTMLDivElement, CertificateOfOccupancyProps>(({
   selectedRegions,
   dateRange,
   apiData,
@@ -303,17 +310,20 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
   );
 
   // Loader persistence logic
-  const persistedBrgyTableData = useSelector((state: any) => state.brgyClearanceTable.tableData);
-  const persistedBrgyAppliedFilter = useSelector((state: any) => state.brgyClearanceTable.appliedFilter);
+  const persistedCoTableData = useSelector((state: any) => state.certificateOfOccupancy.tableData);
+  const persistedCoAppliedFilter = useSelector((state: any) => state.certificateOfOccupancy.appliedFilter);
   const reduxSelectedIslands = useSelector((state: any) => state.reportFilter.selectedIslands || []);
   const islandsToUse = selectedIslands && selectedIslands.length > 0 ? selectedIslands : reduxSelectedIslands;
 
   const [showLoader, setShowLoader] = useState(true);
+  useEffect(() => {
+    setShowLoader(loading);
+  }, [loading]);
 
   useEffect(() => {
     if (
-      persistedBrgyTableData &&
-      persistedBrgyAppliedFilter &&
+      persistedCoTableData &&
+      persistedCoAppliedFilter &&
       isSameFilter(
         {
           selectedRegions,
@@ -323,11 +333,11 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
           dateRange,
         },
         {
-          selectedRegions: persistedBrgyAppliedFilter.selectedRegions,
-          selectedProvinces: persistedBrgyAppliedFilter.selectedProvinces,
-          selectedCities: persistedBrgyAppliedFilter.selectedCities,
-          selectedIslands: persistedBrgyAppliedFilter.selectedIslands,
-          dateRange: persistedBrgyAppliedFilter.dateRange,
+          selectedRegions: persistedCoAppliedFilter.selectedRegions,
+          selectedProvinces: persistedCoAppliedFilter.selectedProvinces,
+          selectedCities: persistedCoAppliedFilter.selectedCities,
+          selectedIslands: persistedCoAppliedFilter.selectedIslands,
+          dateRange: persistedCoAppliedFilter.dateRange,
         }
       )
     ) {
@@ -336,8 +346,8 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
       setShowLoader(true);
     }
   }, [
-    persistedBrgyTableData,
-    persistedBrgyAppliedFilter,
+    persistedCoTableData,
+    persistedCoAppliedFilter,
     selectedRegions,
     selectedProvinces,
     selectedCities,
@@ -398,16 +408,26 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
       lguList.forEach((lgu: any, idx: number) => {
         // Month/Year mode: merged row, sum totalCount for all months in range
         if (lgu.sum && Object.keys(lgu.sum).length > 0) {
-          // Sum totalCount from all months in the range (already computed in mergeLguProvinceSumAllMonths)
-          const totalCount = typeof lgu.totalCount === "number"
-            ? lgu.totalCount
+          // Sum coPending and coPaid from all months in the range
+          const totalPending = typeof lgu.sum.coPending === "number"
+            ? lgu.sum.coPending
             : (Array.isArray(lgu.monthlyResults)
                 ? lgu.monthlyResults.reduce(
                     (sum: number, month: any) =>
-                      typeof month.totalCount === "number" ? sum + month.totalCount : sum,
+                      typeof month.coPending === "number" ? sum + month.coPending : sum,
                     0
                   )
                 : 0);
+          const totalPaid = typeof lgu.sum.coPaid === "number"
+            ? lgu.sum.coPaid
+            : (Array.isArray(lgu.monthlyResults)
+                ? lgu.monthlyResults.reduce(
+                    (sum: number, month: any) =>
+                      typeof month.coPaid === "number" ? sum + month.coPaid : sum,
+                    0
+                  )
+                : 0);
+
           rows.push(
             <TableRow key={`${region}-${lgu.lgu}`}>
               {idx === 0 && (
@@ -418,22 +438,25 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
                   {getRegionCode(region)}
                 </TableCell>
               )}
-             <TableCell className="border px-2 py-1 text-center font-bold">
-              {lgu.lgu}
-              <span className="text-base font-normal text-gray-500">
-                {lgu.province ? `(${lgu.province})` : ""}
-              </span>
-              <br />
-              <span className="text-[10px] font-normal text-blue-800">
-                {lgu.months && lgu.months.length > 0 && (
-                  lgu.months.length === 1
-                    ? `(${formatMonthYear(lgu.months[0])})`
-                    : `(${formatMonthYear(lgu.months[0])} - ${formatMonthYear(lgu.months[lgu.months.length - 1])})`
-                )}
-              </span>
-            </TableCell>
+              <TableCell className="border px-2 py-1 text-center font-bold">
+                {lgu.lgu}
+                <span className="text-base font-normal text-gray-500">
+                  {lgu.province ? `(${lgu.province})` : ""}
+                </span>
+                <br />
+                <span className="text-[10px] font-normal text-blue-800">
+                  {lgu.months && lgu.months.length > 0 && (
+                    lgu.months.length === 1
+                      ? `(${formatMonthYear(lgu.months[0])})`
+                      : `(${formatMonthYear(lgu.months[0])} - ${formatMonthYear(lgu.months[lgu.months.length - 1])})`
+                  )}
+                </span>
+              </TableCell>
               <TableCell className="border px-2 py-1 text-center text-[10px]">
-                {totalCount}
+                {totalPending}
+              </TableCell>
+              <TableCell className="border px-2 py-1 text-center text-[10px]">
+                {totalPaid}
               </TableCell>
             </TableRow>
           );
@@ -460,8 +483,13 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
                 </span>
               </TableCell>
               <TableCell className="border px-2 py-1 text-center">
-                {typeof month.totalCount !== "undefined"
-                  ? month.totalCount
+                {typeof month.coPending !== "undefined"
+                  ? month.coPending
+                  : ""}
+              </TableCell>
+              <TableCell className="border px-2 py-1 text-center">
+                {typeof month.coPaid !== "undefined"
+                  ? month.coPaid
                   : ""}
               </TableCell>
             </TableRow>
@@ -474,7 +502,7 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
 
   return (
     <div ref={ref} className="bg-card p-4 rounded-md border text-secondary-foreground border-border shadow-sm">
-     {(hasSearched && (showLoader || loading)) && (
+      {(hasSearched && (showLoader || loading)) && (
         <Loading />
       )}
       <div>
@@ -484,8 +512,8 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
         <Table className="w-full border-collapse text-[10px]">
           <TableHeader>
             <TableRow>
-              <TableHead colSpan={3} className="bg-[#9ec6f7] text-black text-center font-bold text-base border top-0">
-                Barangay Clearance
+              <TableHead colSpan={4} className="bg-[#9ec6f7] text-black text-center font-bold text-base border top-0">
+                Certificate of Occupancy
                 {dateRangeLabel && (
                   <div className="text-xs text-gray-700 mt-1 font-bold">
                     {dateRangeLabel}
@@ -496,13 +524,14 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
             <TableRow>
               <TableHead className="bg-[#9ec6f7] text-black font-bold border px-2 py-1 text-center align-middle text-base">Region</TableHead>
               <TableHead className="bg-[#9ec6f7] text-black font-bold border px-2 py-1 text-center align-middle text-base">LGU</TableHead>
-              <TableHead className="bg-[#9ec6f7] text-black font-bold border px-2 py-1 text-center align-middle text-base">Total Results</TableHead>
+              <TableHead className="bg-[#9ec6f7] text-black font-bold border px-2 py-1 text-center align-middle text-base">Pending</TableHead>
+              <TableHead className="bg-[#9ec6f7] text-black font-bold border px-2 py-1 text-center align-middle text-base">Paid</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody className="[&>tr:nth-child(odd)]:bg-accent">
             {hasSearched && (showLoader || loading) ? (
               <TableRow>
-                <TableCell colSpan={3} className="text-center py-4 border">
+                <TableCell colSpan={4} className="text-center py-4 border">
                   <LoaderTable />
                 </TableCell>
               </TableRow>
@@ -511,7 +540,7 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
                 hasSearched ? (
                   (selectedRegions.length > 0 || (normalizedDateRange?.start && normalizedDateRange?.end)) ? (
                     <TableRow>
-                      <TableCell colSpan={3} className="text-center py-4 border">
+                      <TableCell colSpan={4} className="text-center py-4 border">
                         <span className='font-bold text-lg text-muted-foreground'>
                           No results found, Please try again!
                         </span>
@@ -519,7 +548,7 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
                     </TableRow>
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={3} className="text-center py-4 border">
+                      <TableCell colSpan={4} className="text-center py-4 border">
                         <span className='font-bold text-sm text-muted-foreground'>
                           Please select regions and date range you want to view.
                         </span>
@@ -528,7 +557,7 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
                   )
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={3} className="text-center py-4 border">
+                    <TableCell colSpan={4} className="text-center py-4 border">
                       <span className='font-bold text-sm text-muted-foreground'>
                         Please select regions and date range you want to view.
                       </span>
@@ -550,12 +579,25 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
                 {(loading || showLoader)
                   ? 0
                   : filteredResults.reduce((sum: number, lgu: any) => {
-                      if (typeof lgu.totalCount === "number") {
-                        return sum + lgu.totalCount;
-                      }
-                      if (Array.isArray(lgu.monthlyResults)) {
+                      if (typeof lgu.sum?.coPending === "number") return sum + lgu.sum.coPending;
+                      if (lgu.monthlyResults && Array.isArray(lgu.monthlyResults)) {
                         return sum + lgu.monthlyResults.reduce(
-                          (mSum: number, month: any) => mSum + (typeof month.totalCount === "number" ? month.totalCount : 0),
+                          (mSum: number, month: any) => mSum + (typeof month.coPending === "number" ? month.coPending : 0),
+                          0
+                        );
+                      }
+                      return sum;
+                    }, 0)
+                }
+              </TableCell>
+              <TableCell className="border px-2 py-1 text-center">
+                {(loading || showLoader)
+                  ? 0
+                  : filteredResults.reduce((sum: number, lgu: any) => {
+                      if (typeof lgu.sum?.coPaid === "number") return sum + lgu.sum.coPaid;
+                      if (lgu.monthlyResults && Array.isArray(lgu.monthlyResults)) {
+                        return sum + lgu.monthlyResults.reduce(
+                          (mSum: number, month: any) => mSum + (typeof month.coPaid === "number" ? month.coPaid : 0),
                           0
                         );
                       }
@@ -571,4 +613,4 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
   );
 });
 
-export default BrgyClearanceReport;
+export default CertificateOfOccupancyReport;

@@ -17,6 +17,8 @@ import workingPermitTableReducer from './workingPermitTableSlice';
 import brgyClearanceTableReducer from './brgyClearanceTableSlice'; 
 import WpReducer from './wpSlice';
 import BrgyReducer from './brgySlice';
+import buildingPermitReducer from './buildingPermitSlice';
+import certificateOfOccupancyReducer from './CertificateOfOccupancySlice';
 
 const persistConfig = {
   key: 'root',
@@ -37,6 +39,8 @@ const persistConfig = {
     'status',
     'wp',
     'brgy',
+    'buildingPermit',
+    'certificateOfOccupancy', 
 
   ],
 };
@@ -57,6 +61,9 @@ const rootReducer = combineReducers({
   workingPermitTable: workingPermitTableReducer,
   brgyClearanceTable: brgyClearanceTableReducer, 
   brgy: BrgyReducer,
+  buildingPermit: buildingPermitReducer,
+  certificateOfOccupancy: certificateOfOccupancyReducer,
+
 
 });
 

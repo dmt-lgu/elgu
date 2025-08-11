@@ -27,6 +27,10 @@ import {
   setBrgyClearanceAppliedFilter,
 } from '@/redux/brgyClearanceTableSlice';
 import { getModuleFilteredResults } from './utils/reportFilterUtils';
+import BuildingPermitReport from './table/BuildingPermitReport';
+import { setbuildingPermiAppliedFilter, setbuildingPermitData } from '@/redux/buildingPermitSlice';
+import CertificateOfOccupancyReport from './table/CertificateOfOccupancyReport';
+import { setcertificateOfOccupancy, setCertificateOfOccupancyAppliedFilter } from '@/redux/CertificateOfOccupancySlice';
 
 type DateRange = { start: string | null; end: string | null };
 
@@ -42,6 +46,8 @@ type AppliedFilter = {
 const BP = "Business Permit";
 const WP = "Working Permit";
 const BC = "Barangay Clearance";
+const BLDG = "Building Permit";
+const CO = "Certificate of Occupancy";
 
 // Helper: deep filter equality
 function areFiltersEqual(a: any, b: any) {
@@ -57,6 +63,9 @@ function areFiltersEqual(a: any, b: any) {
     selectedModules: (b.selectedModules || []).slice().sort(),
   });
 }
+
+
+
 
 function ensureDate(val: Date | string | null | undefined): Date | null {
   if (!val) return null;
@@ -92,6 +101,7 @@ function useReportData({
   hasSearched,
   abortSignal,
   skipLoading, 
+
 }: {
   moduleKey: string;
   apiUrl: string;
@@ -183,6 +193,14 @@ function useReportData({
           setReduxTableData(response.data);
           setReduxAppliedFilter(currentFilter);
         }
+        if (moduleKey === BLDG) {
+          setReduxTableData(response.data);
+          setReduxAppliedFilter(currentFilter);
+        }
+        if (moduleKey === CO) {
+          setReduxTableData(response.data);
+          setReduxAppliedFilter(currentFilter);
+        }
       })
       .catch((err: any) => {
         if (err?.name === "CanceledError" || err?.code === "ERR_CANCELED" || err?.message === "canceled") {
@@ -198,6 +216,13 @@ function useReportData({
           if (moduleKey === BC) {
             setReduxTableData(null);
           }
+          if (moduleKey === BLDG) {
+            setReduxTableData(null);
+          }
+          if (moduleKey === CO) {
+            setReduxTableData(null);
+          }
+
         }
       })
       .finally(() => {
@@ -219,6 +244,7 @@ function useReportData({
 }
 
 const Reports: React.FC = () => {
+  const [cancelled, setCancelled] = useState(false);
   const dispatch = useDispatch<AppDispatch>();
 
   // Redux state
@@ -234,6 +260,15 @@ const Reports: React.FC = () => {
   const persistedBrgyTableData = useSelector((state: RootState) => state.brgyClearanceTable.tableData);
   const persistedBrgyAppliedFilter = useSelector((state: RootState) => state.brgyClearanceTable.appliedFilter);
 
+  // --- NEW: Building Permit Redux state ---
+  const persistedBldgTableData = useSelector((state: any) => state.buildingPermit.tableData);
+  const persistedBldgAppliedFilter = useSelector((state: any) => state.buildingPermit.appliedFilter);
+
+  // --- NEW: Certificate of Occupancy Redux state ---
+  const persistedCoTableData = useSelector((state: any) => state.certificateOfOccupancy.tableData);
+  const persistedCoAppliedFilter = useSelector((state: any) => state.certificateOfOccupancy.appliedFilter);
+
+  
   // Local state
   const [appliedFilter, setAppliedFilterState] = useState<AppliedFilter>({
     selectedRegions: [],
@@ -337,47 +372,89 @@ const Reports: React.FC = () => {
     skipLoading: !selectedModules.includes(BC) || !hasSearched,
   });
 
+  const bldgReport = useReportData({
+    moduleKey: BLDG,
+    apiUrl: `${import.meta.env.VITE_URL}/api/bpco/transaction-count-bp`,
+    appliedFilter,
+    lguToRegion,
+    reduxTableData: persistedBldgTableData,
+    reduxAppliedFilter: persistedBldgAppliedFilter,
+    setReduxTableData: (data) => dispatch(setbuildingPermitData(data)),
+    setReduxAppliedFilter: (filter) => dispatch(setbuildingPermiAppliedFilter(filter)),
+    hasSearched,
+    abortSignal: searchAbortController.current?.signal,
+    skipLoading: !selectedModules.includes(BLDG) || !hasSearched,
+  });
+
+  const coReport = useReportData({
+    moduleKey: CO,
+    apiUrl: `${import.meta.env.VITE_URL}/api/bpco/transaction-count-co`,
+    appliedFilter,
+    lguToRegion,
+    reduxTableData: persistedCoTableData,
+    reduxAppliedFilter: persistedCoAppliedFilter,
+    setReduxTableData: (data) => dispatch(setcertificateOfOccupancy(data)),
+    setReduxAppliedFilter: (filter) => dispatch(setCertificateOfOccupancyAppliedFilter(filter)),
+    hasSearched,
+    abortSignal: searchAbortController.current?.signal,
+    skipLoading: !selectedModules.includes(CO) || !hasSearched,
+  });
+
   // For loading state, combine only those modules that are selected
   const loading =
-    (selectedModules.includes(BP) && bpReport.loading) ||
-    (selectedModules.includes(WP) && wpReport.loading) ||
-    (selectedModules.includes(BC) && bcReport.loading);
-
+   !cancelled && (
+      (selectedModules.includes(BP) && bpReport.loading) ||
+      (selectedModules.includes(WP) && wpReport.loading) ||
+      (selectedModules.includes(BC) && bcReport.loading) ||
+      (selectedModules.includes(BLDG) && bldgReport.loading) 
+      || (selectedModules.includes(CO) && coReport.loading)
+    );
   // For table data, use the conditional hook results
-  const tableData = bpReport.data;
+  const bpTableData = bpReport.data;
   const wpTableData = wpReport.data;
   const bcTableData = bcReport.data;
+  const bldgTableData = bldgReport.data;
+  const coTableData = coReport.data; 
+
 
   const getFilteredResults = (moduleKey: string) => {
-  let rawData: any[] = [];
-  if (moduleKey === BP) {
-    rawData = hasSearched ? tableData : persistedTableData;
-  } else if (moduleKey === WP) {
-    rawData = hasSearched ? wpTableData : persistedWPTableData;
-  } else if (moduleKey === BC) {
-    rawData = hasSearched ? bcTableData : persistedBrgyTableData;
-  }
-  // Use the new shared utility for correct filtering per module
-  return getModuleFilteredResults({
-    moduleKey,
-    apiData: rawData,
-    selectedRegions: appliedFilter.selectedRegions,
-    selectedProvinces: appliedFilter.selectedProvinces,
-    selectedCities: appliedFilter.selectedCities,
-    selectedDates: appliedFilter.selectedDateType ? [appliedFilter.selectedDateType] : [],
-    selectedIslands: appliedFilter.selectedIslands,
-    lguToRegion,
-    dateRange: appliedFilter.dateRange,
-  });
-};
+    let rawData: any = null;
+    if (moduleKey === BP) {
+      rawData = bpTableData || persistedTableData;
+    } else if (moduleKey === WP) {
+      rawData = wpTableData || persistedWPTableData;
+    } else if (moduleKey === BC) {
+      rawData = bcTableData || persistedBrgyTableData;
+    } else if (moduleKey === BLDG) {
+      rawData = bldgTableData || persistedBldgTableData;
+    } else if (moduleKey === CO) {
+      rawData = coTableData || persistedCoTableData;
+    }
+    return getModuleFilteredResults({
+      moduleKey,
+      apiData: rawData,
+      selectedRegions: appliedFilter.selectedRegions,
+      selectedProvinces: appliedFilter.selectedProvinces,
+      selectedCities: appliedFilter.selectedCities,
+      selectedDates: appliedFilter.selectedDateType ? [appliedFilter.selectedDateType] : [],
+      selectedIslands: appliedFilter.selectedIslands,
+      lguToRegion,
+      dateRange: appliedFilter.dateRange,
+    });
+  };
 
   // --- PDF/Excel Export Handler ---
-  const handleDownload = async (type: "pdf" | "excel", permitTypes?: ("business" | "working" | "barangay")[]) => {
+ const handleDownload = async (
+    type: "pdf" | "excel",
+    permitTypes?: ("business" | "working" | "barangay" | "building" | "certificate")[]
+  ) => {
     const modulesToExport = permitTypes
       ? permitTypes.map((type) => {
           if (type === "business") return BP;
           if (type === "working") return WP;
           if (type === "barangay") return BC;
+          if (type === "building") return BLDG;
+          if (type === "certificate") return CO;
           return "";
         }).filter(Boolean)
       : selectedModules;
@@ -400,6 +477,8 @@ const Reports: React.FC = () => {
           isDayMode: false,
           isBarangayClearance: false,
           moduleLabel: "Business Permit",
+          selectedDateType: appliedFilter.selectedDateType,
+          selectedModules: [BP],
         });
       }
       if (type === "excel") {
@@ -409,6 +488,9 @@ const Reports: React.FC = () => {
           dateRangeLabel,
           fileLabel: "business-permit-report",
           isDayMode: false,
+          moduleLabel: "Business Permit",
+          selectedDateType: appliedFilter.selectedDateType,
+          selectedModules: [BP],
         });
       }
     }
@@ -431,6 +513,8 @@ const Reports: React.FC = () => {
           isDayMode: false,
           isBarangayClearance: false,
           moduleLabel: "Working Permit",
+          selectedDateType: appliedFilter.selectedDateType,
+          selectedModules: [WP],
         });
       }
       if (type === "excel") {
@@ -440,6 +524,9 @@ const Reports: React.FC = () => {
           dateRangeLabel,
           fileLabel: "working-permit-report",
           isDayMode: false,
+          moduleLabel: "Working Permit",
+          selectedDateType: appliedFilter.selectedDateType,
+          selectedModules: [WP],
         });
       }
     }
@@ -461,6 +548,8 @@ const Reports: React.FC = () => {
           fileLabel: "barangay-clearance-report",
           isDayMode: false,
           moduleLabel: "Barangay Clearance",
+          selectedDateType: appliedFilter.selectedDateType,
+          selectedModules: [BC],
         });
       }
       if (type === "excel") {
@@ -470,6 +559,81 @@ const Reports: React.FC = () => {
           dateRangeLabel,
           fileLabel: "barangay-clearance-report",
           isDayMode: false,
+          moduleLabel: "Barangay Clearance",
+          selectedDateType: appliedFilter.selectedDateType,
+          selectedModules: [BC],
+        });
+      }
+    }
+
+    // Building Permit
+    if (modulesToExport.includes(BLDG)) {
+      const filteredResults = getFilteredResults(BLDG);
+      const dateRangeLabel = getDateRangeLabel(
+        normalizedDateRange.start,
+        normalizedDateRange.end,
+        appliedFilter.selectedDateType
+      );
+      if (type === "pdf") {
+        await exportTableReportToPDF({
+          filteredResults,
+          lguToRegion,
+          dateRangeLabel,
+          logoUrl: dictImage,
+          fileLabel: "building-permit-report",
+          isDayMode: false,
+          isBarangayClearance: false,
+          moduleLabel: "Building Permit",
+          selectedDateType: appliedFilter.selectedDateType,
+          selectedModules: [BLDG],
+        });
+      }
+      if (type === "excel") {
+        exportTableReportToExcel({
+          filteredResults,
+          lguToRegion,
+          dateRangeLabel,
+          fileLabel: "building-permit-report",
+          isDayMode: false,
+          moduleLabel: "Building Permit",
+          selectedDateType: appliedFilter.selectedDateType,
+          selectedModules: [BLDG],
+        });
+      }
+    }
+
+    // Certificate of Occupancy
+    if (modulesToExport.includes(CO)) {
+      const filteredResults = getFilteredResults(CO);
+      const dateRangeLabel = getDateRangeLabel(
+        normalizedDateRange.start,
+        normalizedDateRange.end,
+        appliedFilter.selectedDateType
+      );
+      if (type === "pdf") {
+        await exportTableReportToPDF({
+          filteredResults,
+          lguToRegion,
+          dateRangeLabel,
+          logoUrl: dictImage,
+          fileLabel: "certificate-of-occupancy-report",
+          isDayMode: false,
+          isBarangayClearance: false,
+          moduleLabel: "Certificate of Occupancy",
+          selectedDateType: appliedFilter.selectedDateType,
+          selectedModules: [CO],
+        });
+      }
+      if (type === "excel") {
+        exportTableReportToExcel({
+          filteredResults,
+          lguToRegion,
+          dateRangeLabel,
+          fileLabel: "certificate-of-occupancy-report",
+          isDayMode: false,
+          moduleLabel: "Certificate of Occupancy",
+          selectedDateType: appliedFilter.selectedDateType,
+          selectedModules: [CO],
         });
       }
     }
@@ -477,50 +641,56 @@ const Reports: React.FC = () => {
 
   // Search handler
   const handleSearch = (filters: any) => {
-    const normalizedDateRange = {
-      start: filters.dateRange?.start
-        ? typeof filters.dateRange.start === "string"
-          ? filters.dateRange.start
-          : filters.dateRange.start instanceof Date
-            ? filters.dateRange.start.toISOString().slice(0, 10)
-            : null
-        : null,
-      end: filters.dateRange?.end
-        ? typeof filters.dateRange.end === "string"
-          ? filters.dateRange.end
-          : filters.dateRange.end instanceof Date
-            ? filters.dateRange.end.toISOString().slice(0, 10)
-            : null
-        : null,
-    };
+    setCancelled(false);
+  const normalizedDateRange = {
+    start: filters.dateRange?.start
+      ? typeof filters.dateRange.start === "string"
+        ? filters.dateRange.start
+        : filters.dateRange.start instanceof Date
+          ? filters.dateRange.start.toISOString().slice(0, 10)
+          : null
+      : null,
+    end: filters.dateRange?.end
+      ? typeof filters.dateRange.end === "string"
+        ? filters.dateRange.end
+        : filters.dateRange.end instanceof Date
+          ? filters.dateRange.end.toISOString().slice(0, 10)
+          : null
+      : null,
+  };
 
-    const normalizedFilters = {
-      ...filters,
-      dateRange: normalizedDateRange,
-      selectedModules: (filters.selectedModules || []).slice().sort(),
-    };
+  const normalizedFilters = {
+    ...filters,
+    dateRange: normalizedDateRange,
+    selectedModules: (filters.selectedModules || []).slice().sort(),
+  };
 
-    // If skipApi is true, only update filter state (for local filtering)
-    if (filters.skipApi) {
+  // If skipApi is true, only update filter state (for local filtering)
+  if (filters.skipApi) {
     setAppliedFilterState(normalizedFilters);
-    dispatch(setAppliedFilter(normalizedFilters));
     setHasSearched(false);
+    // Update all module filters for local filtering
+    dispatch(setAppliedFilter(normalizedFilters)); // BP
+    dispatch(setWorkingPermitAppliedFilter(normalizedFilters)); // WP
+    dispatch(setBrgyClearanceAppliedFilter(normalizedFilters)); // BC
+    dispatch(setbuildingPermiAppliedFilter(normalizedFilters)); // BLDG
+    dispatch(setCertificateOfOccupancyAppliedFilter(normalizedFilters)); // CO
     return;
   }
 
-    if (areFiltersEqual(normalizedFilters, lastAppliedFilters)) {
+  if (areFiltersEqual(normalizedFilters, lastAppliedFilters)) {
     return;
   }
 
-    setAppliedFilterState(normalizedFilters);
+  setAppliedFilterState(normalizedFilters);
   setHasSearched(true);
   setLastAppliedFilters(normalizedFilters);
   dispatch(setAppliedFilter(normalizedFilters));
-    if (searchAbortController.current) {
-      searchAbortController.current.abort();
-    }
-    searchAbortController.current = new AbortController();
-  };
+  if (searchAbortController.current) {
+    searchAbortController.current.abort();
+  }
+  searchAbortController.current = new AbortController();
+};
 
   // Reset handler
   const handleReset = () => {
@@ -550,6 +720,12 @@ const Reports: React.FC = () => {
     // --- NEW: Reset Barangay Clearance Redux state ---
     dispatch(setBrgyClearanceTableData(null));
     dispatch(setBrgyClearanceAppliedFilter(null));
+    // --- NEW: Reset Building Permit Redux state ---
+    dispatch(setbuildingPermitData(null));
+    dispatch(setbuildingPermiAppliedFilter(null));
+    // --- NEW: Reset Certificate of Occupancy Redux state ---
+    dispatch(setcertificateOfOccupancy(null));
+    dispatch(setCertificateOfOccupancyAppliedFilter(null));
   };
 
   // Cancel search handler
@@ -558,6 +734,8 @@ const Reports: React.FC = () => {
       searchAbortController.current.abort();
       searchAbortController.current = null;
     }
+    setHasSearched(false); 
+    setCancelled(true); // <-- Set cancelled to true
     Swal.fire({
       icon: "info",
       title: "Search Cancelled",
@@ -566,6 +744,7 @@ const Reports: React.FC = () => {
       showConfirmButton: false,
     });
   };
+  
 
   return (
     <div
@@ -597,7 +776,7 @@ const Reports: React.FC = () => {
             selectedCities={appliedFilter.selectedCities}
             selectedDates={appliedFilter.selectedDateType ? [appliedFilter.selectedDateType] : []}
             selectedIslands={appliedFilter.selectedIslands}
-            apiData={tableData}
+            apiData={bpTableData}
             loading={!!loading || lguRegionLoading}
             lguToRegion={lguToRegion}
             hasSearched={hasSearched}
@@ -613,7 +792,7 @@ const Reports: React.FC = () => {
             selectedCities={appliedFilter.selectedCities}
             selectedDates={appliedFilter.selectedDateType ? [appliedFilter.selectedDateType] : []}
             selectedIslands={appliedFilter.selectedIslands}
-            apiData={wpTableData}
+            apiData={wpTableData || persistedWPTableData}
             loading={!!loading || lguRegionLoading}
             lguToRegion={lguToRegion}
             hasSearched={hasSearched}
@@ -629,13 +808,46 @@ const Reports: React.FC = () => {
             selectedCities={appliedFilter.selectedCities}
             selectedDates={appliedFilter.selectedDateType ? [appliedFilter.selectedDateType] : []}
             selectedIslands={appliedFilter.selectedIslands}
-            apiData={bcTableData}
+            apiData={bcTableData || persistedBrgyTableData}
             loading={!!loading || lguRegionLoading}
             lguToRegion={lguToRegion}
             hasSearched={hasSearched}
             onTableDataChange={setHasTableData}
           />
         )}
+        
+        {selectedModules.includes(BLDG) && (
+          <BuildingPermitReport
+            selectedRegions={appliedFilter.selectedRegions}
+            dateRange={appliedFilter.dateRange}
+            selectedProvinces={appliedFilter.selectedProvinces}
+            selectedCities={appliedFilter.selectedCities}
+            selectedDates={appliedFilter.selectedDateType ? [appliedFilter.selectedDateType] : []}
+            selectedIslands={appliedFilter.selectedIslands}
+            apiData={bldgTableData || persistedBldgTableData}
+            loading={!!loading || lguRegionLoading}
+            lguToRegion={lguToRegion}
+            hasSearched={hasSearched}
+            onTableDataChange={setHasTableData}
+          />
+        )}
+
+         {selectedModules.includes(CO) && (
+          <CertificateOfOccupancyReport
+            selectedRegions={appliedFilter.selectedRegions}
+            dateRange={appliedFilter.dateRange}
+            selectedProvinces={appliedFilter.selectedProvinces}
+            selectedCities={appliedFilter.selectedCities}
+            selectedDates={appliedFilter.selectedDateType ? [appliedFilter.selectedDateType] : []}
+            selectedIslands={appliedFilter.selectedIslands}
+            apiData={coTableData || persistedCoTableData}
+            loading={!!loading || lguRegionLoading}
+            lguToRegion={lguToRegion}
+            hasSearched={hasSearched}
+            onTableDataChange={setHasTableData}
+          />
+        )}
+
 
         {selectedModules.length === 0 && (
           <div className="text-center bg-card p-6 rounded-md border text-secondary-foreground border-border shadow-sm">
