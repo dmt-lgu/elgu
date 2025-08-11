@@ -63,7 +63,7 @@ const StatisticCard: React.FC<StatisticCardProps> = ({ title, value, showInfo })
         )}
       </div>
       <p className="text-2xl font-bold text-secondary-foreground">
-        <IncreasingTextAnimation text={String(value)} />
+        <IncreasingTextAnimation isNumber={true} text={String(value)} />
       </p>
     </div>
   );

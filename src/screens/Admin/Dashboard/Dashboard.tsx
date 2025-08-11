@@ -988,31 +988,24 @@ function formatList(arr:any) {
       {/* Charts */}
 
      
-      {data.modules?.includes("Business Permit") ?
-      <StatusChartComponent 
-        data={bpChartData?.current || []}
-        raw={bpChartData?.breakdown || []}
-        title="Operational vs. Developmental vs. Withdrawal (Business Permit)"
-        period={`${data.startDate} - ${data.endDate}`}
-      />: null}
-
-{data?.modules?.includes("Working Permit") && wpChartData?.current && wpChartData?.breakdown ? (
-  <StatusChartComponent 
-    data={wpChartData.current}
-    raw={wpChartData.breakdown}
-    title="Operational vs. Developmental vs. Withdrawal (Working Permit)"
-    period={`${data.startDate} - ${data.endDate}`}
-  />
-) : null}
-
-{data?.modules?.includes("Barangay Clearance") && brgyChartData?.current && brgyChartData?.breakdown ? (
-  <StatusChartComponent 
-    data={brgyChartData.current}
-    raw={brgyChartData.breakdown}
-    title="Operational vs. Developmental vs. Withdrawal (Barangay Clearance)"
-    period={`${data.startDate} - ${data.endDate}`}
-  />
-) : null}
+      {/* Combined Status Chart for all modules */}
+      {(data.modules?.includes("Business Permit") || 
+        data.modules?.includes("Working Permit") || 
+        data.modules?.includes("Barangay Clearance")) && (
+        <StatusChartComponent 
+          data={[]} // Not used anymore
+          raw={null} // Not used anymore
+          bpData={bpChartData?.current || []}
+          wpData={wpChartData?.current || []}
+          brgyData={brgyChartData?.current || []}
+          bpRaw={bpChartData?.breakdown || []}
+          wpRaw={wpChartData?.breakdown || []}
+          brgyRaw={brgyChartData?.breakdown || []}
+          modules={data.modules || []}
+          title="Operational vs. Developmental vs. Withdrawal (All Modules)"
+          period={`${data.startDate} - ${data.endDate}`}
+        />
+      )}
 
 
 

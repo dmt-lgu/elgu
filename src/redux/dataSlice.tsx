@@ -7,13 +7,13 @@ interface DataState {
 const initialState: DataState = {
   value: {
   "modules":["Business Permit","Working Permit","Barangay Clearance"],
-  "locationName": [],
+  "locationName": ["I","II","III","IV-A","V","CAR","IV-B","VI","VII","VIII","IX","X","XI","XII","XIII","BARMM I","BARMM II"],
   "municipalities": [],
   "province": [],
-  "real":[],     // Can be a string or an array of strings
-  "startDate": "",
-  "endDate": "",
-  "selectedDateType": "",
+  "real":["region1","region2","region3","region4a","region5","CAR","region4b","region6","region7","region8","region9","region10","region11","region12","region13","BARMM1","BARMM2"],     // Can be a string or an array of strings
+  "startDate": "2025-01-01",
+  "endDate": "2025-08-31",
+  "selectedDateType": "Month",
 }, // Initial empty list of regions
 };
 

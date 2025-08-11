@@ -15,7 +15,6 @@ import {
 import ChartDataLabels from 'chartjs-plugin-datalabels';
 import { useSelector } from 'react-redux';
 import { selectCharts } from '@/redux/chartSlice';
-import { parseISO, isAfter, isBefore, isEqual } from 'date-fns';
 
 ChartJS.register(
   CategoryScale,
@@ -34,9 +33,17 @@ interface BarChartProps {
   data: any[];
   title: string;
   period?: string;
-  startDate?: string; // Add these
+  startDate?: string;
   endDate?: string;
-  raw?:any
+  raw?: any;
+  // New props for multi-module support
+  bpData?: any[];
+  wpData?: any[];
+  brgyData?: any[];
+  bpRaw?: any[];
+  wpRaw?: any[];
+  brgyRaw?: any[];
+  modules?: string[];
 }
 
 const chartTypes = [
@@ -65,15 +72,19 @@ function aggregateData(data: any[]) {
 const COLORS = ['#2563eb', '#fbbf24', '#dc2626'];
 
 const StatusChartComponent: React.FC<BarChartProps> = ({
-  data,
-  title,
+  
   period,
-  startDate,
-  endDate,
-  raw
+ 
+  // New props
+  bpData = [],
+  wpData = [],
+  brgyData = [],
+  bpRaw = [],
+  wpRaw = [],
+  brgyRaw = [],
+  modules = []
 }) => {
   const charts = useSelector(selectCharts);
-
 
   let reduxChartType: 'bar' | 'line' | 'pie' = 'bar';
   if (charts.includes('Pie Graph')) reduxChartType = 'pie';
@@ -83,27 +94,92 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
   const [hidden, setHidden] = useState<boolean[]>([false, false, false]);
   const [chartType, setChartType] = useState<'bar' | 'line' | 'pie'>(reduxChartType);
   const [showBreakdown, setShowBreakdown] = useState(false);
+  const [selectedModule, setSelectedModule] = useState<string>('All'); // New state for module selection
 
   useEffect(() => {
     setChartType(reduxChartType);
   }, [reduxChartType]);
 
-  // Filter data by date range if startDate and endDate are provided
-  const filteredData = useMemo(() => {
-    if (!startDate || !endDate) return data;
-    return data.filter(item => {
-      if (!item.date) return true;
-      const itemDate = parseISO(item.date);
-      const start = parseISO(startDate);
-      const end = parseISO(endDate);
-      return (
-        (isAfter(itemDate, start) || isEqual(itemDate, start)) &&
-        (isBefore(itemDate, end) || isEqual(itemDate, end))
-      );
-    });
-  }, [data, startDate, endDate]);
+  // Combine all module data
+  const combinedData = useMemo(() => {
+    const combined = new Map<string, { operational: number; developmental: number; withdraw: number }>();
+    
+    // Add Business Permit data
+    if (modules.includes("Business Permit")) {
+      bpData.forEach(item => {
+        const key = item.name;
+        if (!combined.has(key)) {
+          combined.set(key, { operational: 0, developmental: 0, withdraw: 0 });
+        }
+        const entry = combined.get(key)!;
+        entry.operational += Number(item.operational) || 0;
+        entry.developmental += Number(item.developmental) || 0;
+        entry.withdraw += Number(item.withdraw) || 0;
+      });
+    }
 
-  const processedData = aggregateData(filteredData);
+    // Add Working Permit data
+    if (modules.includes("Working Permit")) {
+      wpData.forEach(item => {
+        const key = item.name;
+        if (!combined.has(key)) {
+          combined.set(key, { operational: 0, developmental: 0, withdraw: 0 });
+        }
+        const entry = combined.get(key)!;
+        entry.operational += Number(item.operational) || 0;
+        entry.developmental += Number(item.developmental) || 0;
+        entry.withdraw += Number(item.withdraw) || 0;
+      });
+    }
+
+    // Add Barangay Clearance data
+    if (modules.includes("Barangay Clearance")) {
+      brgyData.forEach(item => {
+        const key = item.name;
+        if (!combined.has(key)) {
+          combined.set(key, { operational: 0, developmental: 0, withdraw: 0 });
+        }
+        const entry = combined.get(key)!;
+        entry.operational += Number(item.operational) || 0;
+        entry.developmental += Number(item.developmental) || 0;
+        entry.withdraw += Number(item.withdraw) || 0;
+      });
+    }
+
+    return Array.from(combined.entries()).map(([name, values]) => ({
+      name,
+      ...values,
+    }));
+  }, [bpData, wpData, brgyData, modules]);
+
+  // Get selected module data for breakdown
+  const getSelectedModuleData = () => {
+    switch (selectedModule) {
+      case 'Business Permit':
+        return { data: bpData, raw: bpRaw };
+      case 'Working Permit':
+        return { data: wpData, raw: wpRaw };
+      case 'Barangay Clearance':
+        return { data: brgyData, raw: brgyRaw };
+      default:
+        return { data: combinedData, raw: null };
+    }
+  };
+
+  // Use combined data for chart, but selected module data for breakdown
+  const chartDataSource = combinedData;
+  const { raw: selectedRaw } = getSelectedModuleData();
+
+  // Generate dynamic title based on enabled modules
+  const getModuleTitle = () => {
+    if (modules.length === 0) return "No Modules";
+    if (modules.length === 1) return modules[0];
+    if (modules.length === 2) return modules.join(" and ");
+    return modules.slice(0, -1).join(", ") + ", and " + modules[modules.length - 1];
+  };
+
+  // Use the combined data directly (date filtering is handled at the source level)
+  const processedData = aggregateData(chartDataSource);
   const categories = processedData.map(item => item.name);
 
   // Pie chart data with hidden support
@@ -265,8 +341,8 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-sm font-bold uppercase">
           {chartType === "pie"
-            ? `Operational vs Developmental vs Withdraw (Percentage)`
-            : title}
+            ? `Operational vs Developmental vs Withdraw (Percentage) - ${getModuleTitle()}`
+            : `Operational vs. Developmental vs. Withdrawal (${getModuleTitle()})`}
         </h2>
         <div className="flex gap-2">
           {chartTypes.map(type => (
@@ -280,7 +356,6 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
               {type.label}
             </button>
           ))}
-          
         </div>
       </div>
       {/* Custom legend styled like ApexCharts */}
@@ -330,9 +405,35 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
           >
             {showBreakdown ? 'Hide Breakdown ▼ ' : 'Show Breakdown ▶ '}
           </button>
-      {showBreakdown && raw && Array.isArray(raw) && (() => {
-  // 1. Sort raw by date (oldest to latest)
-  const sortedRaw = [...raw].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+      {showBreakdown && (
+        <div className="mt-4">
+          {/* Module Selection Dropdown */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-2">Select Module for Breakdown:</label>
+            <select
+              value={selectedModule}
+              onChange={(e) => setSelectedModule(e.target.value)}
+              className="px-3 py-2 border rounded-md text-sm bg-background border-border"
+            >
+              <option value="All">All Modules Combined</option>
+              {modules.includes("Business Permit") && (
+                <option value="Business Permit">Business Permit</option>
+              )}
+              {modules.includes("Working Permit") && (
+                <option value="Working Permit">Working Permit</option>
+              )}
+              {modules.includes("Barangay Clearance") && (
+                <option value="Barangay Clearance">Barangay Clearance</option>
+              )}
+            </select>
+          </div>
+        </div>
+      )}
+
+      {showBreakdown && selectedRaw && Array.isArray(selectedRaw) && (() => {
+  // Split raw by date (oldest to latest)
+  const sortedRaw = [...selectedRaw].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   // 2. Get all unique region names in the order of the first date
   const regionNames = sortedRaw[0]?.data.map((item: any) => item.name) || [];

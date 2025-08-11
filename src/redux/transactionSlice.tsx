@@ -1,11 +1,20 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
 interface TransactionState {
-  value: any;
+  value: {
+    results?: any[];
+    lguCount?: number;
+    dateRange?: {
+      startDate: string;
+      endDate: string;
+    };
+    totalResults?: number;
+    isPartialData?: boolean;
+  };
 }
 
 const initialState: TransactionState = {
-  value: {}, // Initial empty list of regions
+  value: {}, // Initial empty object
 };
 
 export const transactionSlice = createSlice({

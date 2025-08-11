@@ -157,6 +157,8 @@ function Admin() {
       });
   }
 
+  const BATCH_SIZE = 1; // Process 3 regions at a time
+
   function GetTransaction() {
     dispatch(setLoad(true));
     setIsLoading(true);
@@ -169,25 +171,123 @@ function Admin() {
     const controller = new AbortController();
     controllerRef.current = controller;
 
-    axios
-      .post(
-        `${import.meta.env.VITE_URL}/api/bp/transaction-count/`,
-        {
-          locationName: data.real,
-          startDate: data.startDate,
-          endDate: data.endDate,
-        },
-        { signal: controller.signal }
-      )
-      .then((response) => {
-        const totals = calculateTotals(response.data);
+    // Split data.real into smaller batches
+    const locations: string[] = Array.isArray(data.real) ? data.real : [data.real];
+    const totalRegions = locations.length;
+    const batches: string[][] = [];
+    
+    for (let i = 0; i < locations.length; i += BATCH_SIZE) {
+      batches.push(locations.slice(i, i + BATCH_SIZE));
+    }
+
+    let allResults: any[] = [];
+    let totalLguCount = 0;
+    let processedRegions = 0;
+
+    const processBatch = async (batch: string[], batchIndex: number) => {
+      try {
+        const response = await axios.post(
+          `${import.meta.env.VITE_URL}/api/bp/transaction-count/`,
+          {
+            locationName: batch,
+            startDate: data.startDate,
+            endDate: data.endDate,
+          },
+          { signal: controller.signal }
+        );
+
+        // Add new results to existing data
+        allResults = allResults.concat(response.data.results || []);
+        totalLguCount += response.data.lguCount || 0;
+        
+        // Update processed regions count
+        processedRegions += batch.length;
+
+        // Update state after each batch completion
+        const updatedData = {
+          results: allResults,
+          lguCount: totalLguCount,
+          dateRange: {
+            startDate: data.startDate,
+            endDate: data.endDate,
+          }
+        };
+
+        const totals = calculateTotals(updatedData);
         dispatch(setCard(totals));
-        dispatch(setTransaction(response.data));
+        
+        // Keep the full data but limit the size to prevent QuotaExceededError
+        // Only keep the most recent results if data gets too large
+        const maxResultsToStore = 1000; // Adjust this based on your needs
+        const resultsToStore = allResults.length > maxResultsToStore 
+          ? allResults.slice(-maxResultsToStore) 
+          : allResults;
+        
+        const dataToStore = {
+          results: resultsToStore,
+          lguCount: totalLguCount,
+          dateRange: {
+            startDate: data.startDate,
+            endDate: data.endDate,
+          },
+          totalResults: allResults.length,
+          isPartialData: allResults.length > maxResultsToStore
+        };
+        dispatch(setTransaction(dataToStore));
+
+        console.log(`${processedRegions}/${totalRegions} regions has done - Processing: ${batch.join(', ')}`);
+
+      } catch (error: any) {
+        if (axios.isCancel(error) || error.name === "CanceledError") {
+          throw error; // Re-throw cancellation errors
+        } else {
+          console.error(`Error in batch ${batchIndex + 1} (${batch.join(', ')}):`, error);
+          throw error;
+        }
+      }
+    };
+
+    // Process all batches sequentially (one after another)
+    const processAllBatches = async () => {
+      try {
+        // Clear existing data before starting
+        dispatch(setCard({
+          totalnewPending: 0,
+          totalnewPaid: 0,
+          totalnewPaidViaEgov: 0,
+          totalrenewPending: 0,
+          totalrenewPaid: 0,
+          totalrenewPaidViaEgov: 0,
+          totalmalePending: 0,
+          totalmalePaid: 0,
+          totalfemalePending: 0,
+          totalfemalePaid: 0,
+        }));
+        dispatch(setTransaction({
+          results: [],
+          lguCount: 0,
+          dateRange: {
+            startDate: data.startDate,
+            endDate: data.endDate,
+          },
+          totalResults: 0,
+          isPartialData: false
+        }));
+
+        console.log(`Starting batch processing for ${totalRegions} regions: [${locations.join(', ')}]`);
+
+        for (let i = 0; i < batches.length; i++) {
+          if (controller.signal.aborted) {
+            throw new Error("Request was aborted");
+          }
+          await processBatch(batches[i], i);
+        }
+
         dispatch(setLoad(false));
         setIsLoading(false);
-        console.log("Total results:", totals);
-      })
-      .catch((error) => {
+        console.log(`All ${totalRegions} regions completed successfully!`);
+
+      } catch (error: any) {
         if (axios.isCancel(error) || error.name === "CanceledError") {
           console.warn("Transaction request was canceled.");
         } else {
@@ -200,7 +300,10 @@ function Admin() {
         }
         dispatch(setLoad(false));
         setIsLoading(false);
-      });
+      }
+    };
+
+    processAllBatches();
   }
 
   useEffect(() => {
