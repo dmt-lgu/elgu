@@ -19,7 +19,7 @@ import { parseISO, isAfter, isBefore, isEqual } from 'date-fns';
 import StatusChartComponent from './components/StatusChartComponent';
 import { setWp, selectWp } from '@/redux/wpSlice';
 import { setBrgy, selectBrgy } from '@/redux/brgySlice';
-import { selectLoad2, setBPLoading, setWPLoading, setBRGYLoading, setBPCOLoading, setLoad2 } from '@/redux/loadSlice2';
+import { selectLoad2, setLoad2 } from '@/redux/loadSlice2';
 import StatisticCard2 from './components/StatisticCard2';
 
 
@@ -67,11 +67,8 @@ const DashboardPage = () => {
       bpcoControllerRef.current = null;
     }
     
-    // Clear all loading states
-    dispatch(setBPLoading(false));
-    dispatch(setWPLoading(false));
-    dispatch(setBRGYLoading(false));
-    dispatch(setBPCOLoading(false));
+    // Clear loading state
+    dispatch(setLoad2(false));
     
     // Clear queue
     fetchQueueRef.current = [];
@@ -839,12 +836,11 @@ function getWP() {
       wpControllerRef.current.abort();
     }
     
-    // Create new controller and set loading state
+    // Create new controller
     wpControllerRef.current = new AbortController();
-    dispatch(setWPLoading(true));
 
     // Fetch both 2024 and 2025 data
-    Promise.all([
+    return Promise.all([
       axios.get('18kaPQlN0_kA9i7YAD-DftbdVPZX35Qf33sVMkw_TcWc/values/WP UR Input', {
         headers: {
           Authorization: `Token ${import.meta.env.VITE_TOKEN}`,
@@ -924,19 +920,17 @@ function getWP() {
 
       const result = { WP };
 
-      console.log("WP result (combined 2024-2025)", result);
+     
 
       dispatch(setWp({
         ...wp,
         WP: result.WP,
       }));
       
-      dispatch(setWPLoading(false));
     }).catch((error) => {
       if (error.name !== 'AbortError') { // Don't log aborted requests
         console.error("Error fetching WP data:", error);
       }
-      dispatch(setWPLoading(false));
     });
   }
 
@@ -947,12 +941,11 @@ function getBRGY() {
       brgyControllerRef.current.abort();
     }
     
-    // Create new controller and set loading state
+    // Create new controller
     brgyControllerRef.current = new AbortController();
-    dispatch(setBRGYLoading(true));
 
     // Fetch both 2024 and 2025 data
-    Promise.all([
+    return Promise.all([
       axios.get('18kaPQlN0_kA9i7YAD-DftbdVPZX35Qf33sVMkw_TcWc/values/BC UR Input', {
         headers: {
           Authorization: `Token ${import.meta.env.VITE_TOKEN}`,
@@ -1032,19 +1025,17 @@ function getBRGY() {
 
       const result = { BRGY };
 
-      console.log("BRGY result (combined 2024-2025)", result);
+      
 
       dispatch(setBrgy({
         ...brgy,
         BRGY: result.BRGY,
       }));
       
-      dispatch(setBRGYLoading(false));
     }).catch((error) => {
       if (error.name !== 'AbortError') { // Don't log aborted requests
         console.error("Error fetching BRGY data:", error);
       }
-      dispatch(setBRGYLoading(false));
     });
   }
 
@@ -1055,13 +1046,12 @@ function getBPLS() {
       bpControllerRef.current.abort();
     }
     
-    // Create new controller and set loading state
+    // Create new controller
     bpControllerRef.current = new AbortController();
-    dispatch(setBPLoading(true));
 
     
     // Fetch both 2024 and 2025 data
-    Promise.all([
+    return Promise.all([
       axios.get('18kaPQlN0_kA9i7YAD-DftbdVPZX35Qf33sVMkw_TcWc/values/BP1 UR Input', {
         headers: {
           Authorization: `Token ${import.meta.env.VITE_TOKEN}`,
@@ -1141,19 +1131,16 @@ function getBPLS() {
 
       const result = { BP };
 
-      console.log("BP result (combined 2024-2025)", result);
+     
 
       dispatch(setStatus({
-        ...status,
         BP: result.BP,
       }));
       
-      dispatch(setBPLoading(false));
     }).catch((error) => {
       if (error.name !== 'AbortError') { // Don't log aborted requests
         console.error("Error fetching BP data:", error);
       }
-      dispatch(setBPLoading(false));
     });
   }
 
@@ -1164,12 +1151,11 @@ function getBPCO(){
     bpcoControllerRef.current.abort();
   }
   
-  // Create new controller and set loading state
+  // Create new controller
   bpcoControllerRef.current = new AbortController();
-  dispatch(setBPCOLoading(true));
 
   // Fetch both 2024 and 2025 data
-  Promise.all([
+  return Promise.all([
     axios.get('18kaPQlN0_kA9i7YAD-DftbdVPZX35Qf33sVMkw_TcWc/values/BPCO UR Input', {
       headers: {
         Authorization: `Token ${import.meta.env.VITE_TOKEN}`,
@@ -1249,20 +1235,17 @@ function getBPCO(){
 
     const result = { BPCO };
 
-    console.log("BPCO result (combined 2024-2025)", result);
+ 
 
     dispatch(setStatus({
-      ...status,
       BPCO: result.BPCO,
     }));
     
-    dispatch(setBPCOLoading(false));
+   
   }).catch((error) => {
     if (error.name !== 'AbortError') { // Don't log aborted requests
       console.error("Error fetching BPCO data:", error);
     }
-    dispatch(setLoad2(false));
-    dispatch(setBPCOLoading(false));
   });
 }
 
@@ -1300,22 +1283,28 @@ function getBPCO(){
   useEffect(() => {
     // Sequential loading with delay to optimize resource usage
     const loadModulesSequentially = async () => {
+      // Set loading to true at the start
+      dispatch(setLoad2(true));
+      
       // Small delay to prevent overwhelming the system
       const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
       
       try {
-        getBPLS();
-        await delay(500); // 500ms delay between requests
+        await getBPLS();
+        await delay(500); // 500ms delay after BPLS
         
-        getWP();
-        await delay(500);
+        await getWP();
+        await delay(500); // 500ms delay after WP
         
-        getBRGY();
-        await delay(500);
+        await getBRGY();
+        await delay(500); // 500ms delay after BRGY
         
-        getBPCO();
+        await getBPCO();
       } catch (error) {
         console.error("Error in sequential loading:", error);
+      } finally {
+        // Always set loading to false at the end
+        dispatch(setLoad2(false));
       }
     };
 

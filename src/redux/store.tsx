@@ -27,24 +27,21 @@ const persistConfig = {
   storage,
   whitelist: [
     'reportFilter',
-    'businessPermitTable',
+    'businessPermitTable', 
     'workingPermitTable',
-    'brgyClearanceTable', 
+    'brgyClearanceTable',
     'region',
     'charts',
     'project',
     'dates',
     'datas',
     'card',
-    'transaction',
     'load',
-    'status',
-    'wp',
-    'brgy',
+    'load2',
     'buildingPermit',
-    'certificateOfOccupancy', 
-    'load2', // Add load2 to the whitelist
-
+    'certificateOfOccupancy',
+    // Exclude large data slices to prevent quota exceeded errors:
+    // 'transaction', 'status', 'wp', 'brgy' are not persisted
   ],
 };
 
@@ -77,7 +74,15 @@ export const store = configureStore({
   reducer: persistedReducer,
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
-      immutableCheck: false,
+      serializableCheck: {
+        ignoredActions: ['persist/PERSIST', 'persist/REHYDRATE'],
+        ignoredActionsPaths: ['register', 'rehydrate'],
+        ignoredPaths: ['register'],
+      },
+      immutableCheck: {
+        // Disable for better performance with large state
+        warnAfter: 128,
+      },
     }),
 });
 

@@ -14,6 +14,7 @@ interface StatisticCardProps {
 const StatisticCard2: React.FC<StatisticCardProps> = ({ title, value, showInfo }) => {
   const loading = useSelector(selectLoad2);
 
+
   return (
     <div className={`bg-card p-4 rounded-md border border-border relative`}>
       {/* Top animated loading line */}

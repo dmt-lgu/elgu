@@ -46,13 +46,7 @@ interface BarChartProps {
   brgyRaw?: any[];
   bpcoRaw?: any[];
   modules?: string[];
-  loading?: {
-    bp: boolean;
-    wp: boolean;
-    brgy: boolean;
-    bpco: boolean;
-    isAnyLoading: boolean;
-  };
+  loading?: boolean;
 }
 
 const chartTypes = [
@@ -106,11 +100,18 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
   const [hidden, setHidden] = useState<boolean[]>([false, false, false]);
   const [chartType, setChartType] = useState<'bar' | 'line' | 'pie'>(reduxChartType);
   const [showBreakdown, setShowBreakdown] = useState(false);
-  const [selectedModule, setSelectedModule] = useState<string>('All'); // New state for module selection
+  const [selectedModule, setSelectedModule] = useState<string>(modules.length > 0 ? modules[0] : 'All'); // New state for module selection
 
   useEffect(() => {
     setChartType(reduxChartType);
   }, [reduxChartType]);
+
+  useEffect(() => {
+    // Update selectedModule when modules change
+    if (modules.length > 0 && selectedModule === 'All') {
+      setSelectedModule(modules[0]);
+    }
+  }, [modules, selectedModule]);
 
   // Combine all module data
   const combinedData = useMemo(() => {
@@ -365,9 +366,47 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
   const minWidth = Math.max(400, processedData.length * 80);
 
   return (
-    <div className="bg-card p-4 rounded-md border text-secondary-foreground border-border shadow-sm mb-6">
+    <div className="bg-card relative flex flex-col  p-4 rounded-md border text-secondary-foreground border-border shadow-sm mb-6">
+         {loading && (
+            <div className=" absolute left-0 top-0 w-full h-1 z-50 overflow-hidden rounded-t-md flex">
+              <div className=' h-full w-[100%] ease-in-out animate-[moveLine_1.3s_linear_infinite] flex'>
+                <div
+                className="h-full "
+                style={{
+                  width: '30%',
+                  background: '#eccb58'
+                }}
+              />
+              <div
+                className="h-full  delay-300"
+                style={{
+                  width: '40%',
+                  background: '#b8232e'
+                }}
+              />
+              <div
+                className="h-full  delay-600"
+                style={{
+                  width: '50%',
+                  background: '#0134b2'
+                }}
+              />
+                
+              </div>
+              
+           <style>
+                {`
+                  @keyframes moveLine {
+                    0% { transform: translateX(-100%); }
+                    100% { transform: translateX(250%); }
+                  }
+                `}
+              </style>
+            </div>
+          )}
+      
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-sm font-bold uppercase">
+        <h2 className="text-sm font-bold w-[85%] uppercase">
           {chartType === "pie"
             ? `Operational vs Developmental vs Withdraw (Percentage) - ${getModuleTitle()}`
             : `Operational vs. Developmental vs. Withdrawal (${getModuleTitle()})`}
@@ -411,22 +450,7 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
       <div className="w-full overflow-x-auto">
         <div style={{ minWidth: chartType === 'pie' ? 400 : minWidth, height: 400 }} className="relative">
           {/* Loading overlay */}
-          {loading?.isAnyLoading && (
-            <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-10">
-              <div className="flex flex-col items-center gap-3">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                <div className="text-sm text-muted-foreground">
-                  Loading modules data...
-                </div>
-                <div className="text-xs text-muted-foreground space-y-1">
-                  {loading?.bp && <div>• Business Permit loading...</div>}
-                  {loading?.wp && <div>• Working Permit loading...</div>}
-                  {loading?.brgy && <div>• Barangay Clearance loading...</div>}
-                  {loading?.bpco && <div>• Building Permit & Certificate of Occupancy loading...</div>}
-                </div>
-              </div>
-            </div>
-          )}
+       
           
           {chartType === 'bar' && (
             <Bar data={chartData} options={options} plugins={[ChartDataLabels]} />

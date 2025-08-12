@@ -19,6 +19,7 @@ import { selectData } from "@/redux/dataSlice";
 import { setLoad } from "@/redux/loadSlice";
 import { setCard } from "@/redux/cardSlice";
 import { setTransaction } from "@/redux/transactionSlice";
+import { clearStorageIfNeeded, handleStorageError } from "@/lib/storageUtils";
 
 const regionMapping = [
   { id: "region1", text: "I", municipalities: [] },
@@ -218,7 +219,7 @@ function Admin() {
         
         // Keep the full data but limit the size to prevent QuotaExceededError
         // Only keep the most recent results if data gets too large
-        const maxResultsToStore = 1000; // Adjust this based on your needs
+        const maxResultsToStore = 500; // Reduced from 1000 to prevent quota errors
         const resultsToStore = allResults.length > maxResultsToStore 
           ? allResults.slice(-maxResultsToStore) 
           : allResults;
@@ -233,7 +234,25 @@ function Admin() {
           totalResults: allResults.length,
           isPartialData: allResults.length > maxResultsToStore
         };
-        dispatch(setTransaction(dataToStore));
+        
+        try {
+          dispatch(setTransaction(dataToStore));
+        } catch (error: any) {
+          // Use the storage utility to handle quota errors
+          const handled = handleStorageError(error, () => {
+            // Fallback: try with smaller dataset
+            const smallerData = {
+              ...dataToStore,
+              results: resultsToStore.slice(-250) // Keep only 250 most recent
+            };
+            dispatch(setTransaction(smallerData));
+          });
+          
+          if (!handled) {
+            console.error("Error storing data", error);
+            throw error;
+          }
+        }
 
         console.log(`${processedRegions}/${totalRegions} regions has done - Processing: ${batch.join(', ')}`);
 
@@ -324,6 +343,8 @@ function Admin() {
   }, [data.locationName, data.startDate, data.endDate]);
 
   useEffect(() => {
+    // Clear storage if needed to prevent quota errors
+    clearStorageIfNeeded();
     fetchRegions();
   }, []);
 
