@@ -10,6 +10,7 @@ import dataReducer from './dataSlice';
 import cardReducer from './cardSlice';
 import transactionReducer from './transactionSlice';
 import loadReducer from './loadSlice';
+import load2Reducer from './loadSlice2';
 import statusReducer from './statusSlice';
 import reportFilterReducer from './reportFilterSlice';
 import businessPermitTableReducer from './businessPermitSlice';
@@ -19,6 +20,7 @@ import WpReducer from './wpSlice';
 import BrgyReducer from './brgySlice';
 import buildingPermitReducer from './buildingPermitSlice';
 import certificateOfOccupancyReducer from './CertificateOfOccupancySlice';
+
 
 const persistConfig = {
   key: 'root',
@@ -41,6 +43,7 @@ const persistConfig = {
     'brgy',
     'buildingPermit',
     'certificateOfOccupancy', 
+    'load2', // Add load2 to the whitelist
 
   ],
 };
@@ -63,6 +66,7 @@ const rootReducer = combineReducers({
   brgy: BrgyReducer,
   buildingPermit: buildingPermitReducer,
   certificateOfOccupancy: certificateOfOccupancyReducer,
+  load2: load2Reducer,
 
 
 });

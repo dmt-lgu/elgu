@@ -6,7 +6,7 @@ interface DataState {
 
 const initialState: DataState = {
   value: {
-  "modules":["Business Permit","Working Permit","Barangay Clearance"],
+  "modules":["Business Permit","Working Permit","Barangay Clearance","Building Permit & Certificate of Occupancy"],
   "locationName": ["I","II","III","IV-A","V","CAR","IV-B","VI","VII","VIII","IX","X","XI","XII","XIII","BARMM I","BARMM II"],
   "municipalities": [],
   "province": [],

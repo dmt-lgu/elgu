@@ -288,8 +288,14 @@ function Admin() {
         console.log(`All ${totalRegions} regions completed successfully!`);
 
       } catch (error: any) {
+        dispatch(setLoad(false));
+        setIsLoading(false);
+        controllerRef.current = null;
+        
         if (axios.isCancel(error) || error.name === "CanceledError") {
           console.warn("Transaction request was canceled.");
+          // Don't show error popup for user-initiated cancellations
+          return;
         } else {
           console.error("Error fetching transaction data:", error);
           Swal.fire({
@@ -298,8 +304,6 @@ function Admin() {
             text: "Failed to fetch transaction data. Please try again later.",
           });
         }
-        dispatch(setLoad(false));
-        setIsLoading(false);
       }
     };
 
@@ -435,6 +439,15 @@ function Admin() {
             }
             setIsLoading(false);
             dispatch(setLoad(false));
+            // Clear any in-progress data
+            console.log("Request canceled by user");
+            Swal.fire({
+              icon: "info",
+              title: "Canceled",
+              text: "Data loading has been canceled.",
+              timer: 2000,
+              showConfirmButton: false
+            });
           }}
           className="fixed bottom-4 text-xs right-4 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-full shadow-lg z-50"
         >

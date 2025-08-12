@@ -40,10 +40,19 @@ interface BarChartProps {
   bpData?: any[];
   wpData?: any[];
   brgyData?: any[];
+  bpcoData?: any[];
   bpRaw?: any[];
   wpRaw?: any[];
   brgyRaw?: any[];
+  bpcoRaw?: any[];
   modules?: string[];
+  loading?: {
+    bp: boolean;
+    wp: boolean;
+    brgy: boolean;
+    bpco: boolean;
+    isAnyLoading: boolean;
+  };
 }
 
 const chartTypes = [
@@ -79,10 +88,13 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
   bpData = [],
   wpData = [],
   brgyData = [],
+  bpcoData = [],
   bpRaw = [],
   wpRaw = [],
   brgyRaw = [],
-  modules = []
+  bpcoRaw = [],
+  modules = [],
+  loading
 }) => {
   const charts = useSelector(selectCharts);
 
@@ -146,11 +158,25 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
       });
     }
 
+    // Add Building Permit & Certificate of Occupancy data
+    if (modules.includes("Building Permit & Certificate of Occupancy")) {
+      bpcoData.forEach(item => {
+        const key = item.name;
+        if (!combined.has(key)) {
+          combined.set(key, { operational: 0, developmental: 0, withdraw: 0 });
+        }
+        const entry = combined.get(key)!;
+        entry.operational += Number(item.operational) || 0;
+        entry.developmental += Number(item.developmental) || 0;
+        entry.withdraw += Number(item.withdraw) || 0;
+      });
+    }
+
     return Array.from(combined.entries()).map(([name, values]) => ({
       name,
       ...values,
     }));
-  }, [bpData, wpData, brgyData, modules]);
+  }, [bpData, wpData, brgyData, bpcoData, modules]);
 
   // Get selected module data for breakdown
   const getSelectedModuleData = () => {
@@ -161,6 +187,8 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
         return { data: wpData, raw: wpRaw };
       case 'Barangay Clearance':
         return { data: brgyData, raw: brgyRaw };
+      case 'Building Permit & Certificate of Occupancy':
+        return { data: bpcoData, raw: bpcoRaw };
       default:
         return { data: combinedData, raw: null };
     }
@@ -381,7 +409,25 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
         ))}
       </div>
       <div className="w-full overflow-x-auto">
-        <div style={{ minWidth: chartType === 'pie' ? 400 : minWidth, height: 400 }}>
+        <div style={{ minWidth: chartType === 'pie' ? 400 : minWidth, height: 400 }} className="relative">
+          {/* Loading overlay */}
+          {loading?.isAnyLoading && (
+            <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-10">
+              <div className="flex flex-col items-center gap-3">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                <div className="text-sm text-muted-foreground">
+                  Loading modules data...
+                </div>
+                <div className="text-xs text-muted-foreground space-y-1">
+                  {loading?.bp && <div>• Business Permit loading...</div>}
+                  {loading?.wp && <div>• Working Permit loading...</div>}
+                  {loading?.brgy && <div>• Barangay Clearance loading...</div>}
+                  {loading?.bpco && <div>• Building Permit & Certificate of Occupancy loading...</div>}
+                </div>
+              </div>
+            </div>
+          )}
+          
           {chartType === 'bar' && (
             <Bar data={chartData} options={options} plugins={[ChartDataLabels]} />
           )}
@@ -416,7 +462,7 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
               onChange={(e) => setSelectedModule(e.target.value)}
               className="px-3 py-2 border rounded-md text-sm bg-background border-border"
             >
-              <option value="All">All Modules Combined</option>
+              <option value="All">Select Module</option>
               {modules.includes("Business Permit") && (
                 <option value="Business Permit">Business Permit</option>
               )}
@@ -426,8 +472,61 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
               {modules.includes("Barangay Clearance") && (
                 <option value="Barangay Clearance">Barangay Clearance</option>
               )}
+              {modules.includes("Building Permit & Certificate of Occupancy") && (
+                <option value="Building Permit & Certificate of Occupancy">Building Permit & Certificate of Occupancy</option>
+              )}
             </select>
           </div>
+
+          {/* Total Status Summary for Most Recent Date */}
+          {selectedModule !== "All" && selectedRaw && Array.isArray(selectedRaw) && selectedRaw.length > 0 && (() => {
+            // Get the most recent date (sorted data)
+            const sortedRaw = [...selectedRaw].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+            const mostRecentData = sortedRaw[0];
+            
+            // Calculate totals for the most recent date
+            const totals = mostRecentData.data.reduce((acc: any, item: any) => ({
+              operational: acc.operational + (Number(item.operational) || 0),
+              developmental: acc.developmental + (Number(item.developmental) || 0),
+              withdraw: acc.withdraw + (Number(item.withdraw) || 0)
+            }), { operational: 0, developmental: 0, withdraw: 0 });
+
+            const grandTotal = totals.operational + totals.developmental + totals.withdraw;
+
+            return (
+              <div className="mb-4 p-4 bg-primary/5 border border-primary/20 rounded-md">
+                <h3 className="text-sm font-semibold mb-3 text-primary">
+                  Total Status Summary - {selectedModule}
+                </h3>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Most Recent Date: <span className="font-medium">{mostRecentData.date}</span>
+                </p>
+                <div className="grid grid-cols-3 gap-4 text-sm">
+                  <div className="text-center p-2 bg-blue-50 rounded border">
+                    <div className="font-bold text-blue-700">{totals.operational}</div>
+                    <div className="text-xs text-blue-600">Operational</div>
+                    <div className="text-xs text-muted-foreground">
+                      {grandTotal > 0 ? `${((totals.operational / grandTotal) * 100).toFixed(1)}%` : '0%'}
+                    </div>
+                  </div>
+                  <div className="text-center p-2 bg-yellow-50 rounded border">
+                    <div className="font-bold text-yellow-700">{totals.developmental}</div>
+                    <div className="text-xs text-yellow-600">Developmental</div>
+                    <div className="text-xs text-muted-foreground">
+                      {grandTotal > 0 ? `${((totals.developmental / grandTotal) * 100).toFixed(1)}%` : '0%'}
+                    </div>
+                  </div>
+                  <div className="text-center p-2 bg-red-50 rounded border">
+                    <div className="font-bold text-red-700">{totals.withdraw}</div>
+                    <div className="text-xs text-red-600">Withdraw</div>
+                    <div className="text-xs text-muted-foreground">
+                      {grandTotal > 0 ? `${((totals.withdraw / grandTotal) * 100).toFixed(1)}%` : '0%'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
 
