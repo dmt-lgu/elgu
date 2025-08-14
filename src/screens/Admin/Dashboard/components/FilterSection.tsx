@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Select from 'react-select';
-import { Check, ChevronDown, Filter, MapPin, Calendar, Settings2, Layers, Loader2, X } from 'lucide-react';
+import { Check, ChevronDown, Filter, MapPin, Calendar, Settings2, Layers, Loader2,  BarChart3, Monitor } from 'lucide-react';
 import { useSelector, useDispatch } from 'react-redux';
 
 import DateRangeDay from './DateRangeDay';
@@ -405,16 +405,28 @@ const FilterSection: React.FC = () => {
   };
 
   // Function to cancel the API request
-  const handleCancelRequest = () => {
-    window.dispatchEvent(new CustomEvent('cancelFilterAPI'));
-  };
+ 
 
   return (
     <div className="relative bg-white border border-gray-200 rounded-md shadow-sm p-6 mb-6 z-50">
       
-      <div className="relative grid grid-cols-3 lg:grid-cols-2 md:grid-cols-1 gap-6">
+      {/* Title Section */}
+      <div className="mb-6 pb-4 border-b border-gray-200">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="w-10 h-10 bg-[#2162e7]/10 rounded-lg flex items-center justify-center">
+            <Monitor size={20} className="text-[#2162e7]" />
+          </div>
+          <h1 className="text-2xl font-bold text-[#2162e7]">eLGU Services Data Monitoring Tool</h1>
+          <div className="w-8 h-8 bg-[#2162e7]/10 rounded-md flex items-center justify-center">
+            <BarChart3 size={16} className="text-[#2162e7]" />
+          </div>
+        </div>
+        <p className="text-sm text-gray-600 ml-13">Monitor and analyze eLGU service transactions across different regions </p>
+      </div>
+      
+      <div className="relative grid grid-cols-10 lg:grid-cols-3 md:grid-cols-1 gap-2 ">
         {/* Module */}
-        <div className="flex flex-col lg:col-span-2 group" ref={moduleRef}>
+        <div className="flex col-span-3 flex-col group" ref={moduleRef}>
           <div className="flex items-center gap-2 mb-3">
             <div className="w-8 h-8 bg-[#2162e7]/10 rounded-md flex items-center justify-center">
               <Settings2 size={16} className="text-[#2162e7]" />
@@ -482,7 +494,7 @@ const FilterSection: React.FC = () => {
         </div>
 
         {/* Region, Group of Islands, Province, City/Municipality */}
-        <div className="flex flex-col lg:col-span-2 group" ref={regionRef}>
+        <div className="flex col-span-4 flex-col group" ref={regionRef}>
           <div className="flex items-center gap-2 mb-3">
             <div className="w-8 h-8 bg-[#2162e7]/10 rounded-md flex items-center justify-center">
               <MapPin size={16} className="text-[#2162e7]" />
@@ -635,7 +647,7 @@ const FilterSection: React.FC = () => {
         </div>
 
         {/* Date Range */}
-        <div className="flex flex-col lg:col-span-2 group" ref={dateRef}>
+        <div className="flex col-span-3 flex-col group" ref={dateRef}>
           <div className="flex items-center gap-2 mb-3">
             <div className="w-8 h-8 bg-[#2162e7]/10 rounded-md flex items-center justify-center">
               <Calendar size={16} className="text-[#2162e7]" />
@@ -715,41 +727,35 @@ const FilterSection: React.FC = () => {
             )}
           </div>
         </div>
-      </div>
 
-      {/* Filter Button Section */}
-      <div className="mt-6 pt-4 border-t border-gray-200">
-        <div className="flex items-center justify-end gap-3">
-          {isLoading && (
+        {/* Filter Button Section - Inline with filters */}
+        <div className="flex flex-col justify-end">
+          
+          <div className="flex flex-col gap-3">
+            
             <button
-              onClick={handleCancelRequest}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-md hover:bg-red-100 hover:border-red-300 transition-all duration-200"
+              onClick={handleFilterClick}
+              disabled={isLoading}
+              className={`flex items-center justify-center gap-2 px-6 text-sm py-3 font-semibold rounded-md transition-all duration-200 ${
+                isLoading
+                  ? 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed'
+                  : 'bg-[#2162e7] text-[#fcfcfc] border border-[#2162e7] hover:bg-[#1d56d1] hover:border-[#1d56d1] focus:outline-none focus:ring-2 focus:ring-[#2162e7]/20 shadow-sm'
+              }`}
             >
-              <X size={16} />
-              Cancel Request
+              {isLoading ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  Loading...
+                </>
+              ) : (
+                <>
+                  <Filter size={16} />
+                  Run
+                </>
+              )}
             </button>
-          )}
-          <button
-            onClick={handleFilterClick}
-            disabled={isLoading}
-            className={`flex items-center gap-2 px-6 py-3 text-sm font-semibold rounded-md transition-all duration-200 ${
-              isLoading
-                ? 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed'
-                : 'bg-[#2162e7] text-white border border-[#2162e7] hover:bg-[#1d56d1] hover:border-[#1d56d1] focus:outline-none focus:ring-2 focus:ring-[#2162e7]/20 shadow-sm'
-            }`}
-          >
-            {isLoading ? (
-              <>
-                <Loader2 size={16} className="animate-spin" />
-                Loading...
-              </>
-            ) : (
-              <>
-                <Filter size={16} />
-                Apply Filter
-              </>
-            )}
-          </button>
+           
+          </div>
         </div>
       </div>
     </div>

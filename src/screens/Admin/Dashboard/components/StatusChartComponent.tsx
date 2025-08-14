@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Bar, Line, Pie } from 'react-chartjs-2';
+import Select from 'react-select';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -46,7 +47,6 @@ interface BarChartProps {
   brgyRaw?: any[];
   bpcoRaw?: any[];
   modules?: string[];
-  selectedModule?: string;
   loading?: boolean;
 }
 
@@ -89,7 +89,6 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
   brgyRaw = [],
   bpcoRaw = [],
   modules = [],
-  selectedModule = "All",
   loading
 }) => {
   const charts = useSelector(selectCharts);
@@ -102,10 +101,20 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
   const [hidden, setHidden] = useState<boolean[]>([false, false, false]);
   const [chartType, setChartType] = useState<'bar' | 'line' | 'pie'>(reduxChartType);
   const [showBreakdown, setShowBreakdown] = useState(false);
+  const [selectedModules, setSelectedModules] = useState<string[]>([]);
+  const [hasInitialized, setHasInitialized] = useState(false); // Track if we've initialized
 
   useEffect(() => {
     setChartType(reduxChartType);
   }, [reduxChartType]);
+
+  useEffect(() => {
+    // Only auto-select the first module on initial load, not when user clears selection
+    if (modules.length > 0 && !hasInitialized) {
+      setSelectedModules([modules[0]]);
+      setHasInitialized(true);
+    }
+  }, [modules, hasInitialized]);
 
   // Combine all module data
   const combinedData = useMemo(() => {
@@ -173,25 +182,96 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
     }));
   }, [bpData, wpData, brgyData, bpcoData, modules]);
 
-  // Get selected module data for breakdown
-  const getSelectedModuleData = () => {
-    switch (selectedModule) {
-      case 'Business Permit':
-        return { data: bpData, raw: bpRaw };
-      case 'Working Permit':
-        return { data: wpData, raw: wpRaw };
-      case 'Barangay Clearance':
-        return { data: brgyData, raw: brgyRaw };
-      case 'Building Permit & Certificate of Occupancy':
-        return { data: bpcoData, raw: bpcoRaw };
-      default:
-        return { data: combinedData, raw: null };
+  // Get selected modules data for breakdown (combine multiple selections)
+  const getSelectedModulesData = () => {
+    if (selectedModules.length === 0) {
+      return { data: combinedData, raw: null };
     }
+
+    const combinedSelectedData = new Map<string, { operational: number; developmental: number; withdraw: number }>();
+    const combinedRawData: any[] = [];
+
+    selectedModules.forEach(module => {
+      let moduleData: any[] = [];
+      let moduleRaw: any[] = [];
+
+      switch (module) {
+        case 'Business Permit':
+          moduleData = bpData;
+          moduleRaw = bpRaw;
+          break;
+        case 'Working Permit':
+          moduleData = wpData;
+          moduleRaw = wpRaw;
+          break;
+        case 'Barangay Clearance':
+          moduleData = brgyData;
+          moduleRaw = brgyRaw;
+          break;
+        case 'Building Permit & Certificate of Occupancy':
+          moduleData = bpcoData;
+          moduleRaw = bpcoRaw;
+          break;
+      }
+
+      // Combine data
+      moduleData.forEach(item => {
+        const key = item.name;
+        if (!combinedSelectedData.has(key)) {
+          combinedSelectedData.set(key, { operational: 0, developmental: 0, withdraw: 0 });
+        }
+        const entry = combinedSelectedData.get(key)!;
+        entry.operational += Number(item.operational) || 0;
+        entry.developmental += Number(item.developmental) || 0;
+        entry.withdraw += Number(item.withdraw) || 0;
+      });
+
+      // Combine raw data by merging dates
+      moduleRaw.forEach(rawPeriod => {
+        const existingPeriod = combinedRawData.find(p => p.date === rawPeriod.date);
+        if (existingPeriod) {
+          // Merge data for the same date
+          rawPeriod.data.forEach((item: any) => {
+            const existingItem = existingPeriod.data.find((d: any) => d.name === item.name);
+            if (existingItem) {
+              existingItem.operational = (existingItem.operational || 0) + (Number(item.operational) || 0);
+              existingItem.developmental = (existingItem.developmental || 0) + (Number(item.developmental) || 0);
+              existingItem.withdraw = (existingItem.withdraw || 0) + (Number(item.withdraw) || 0);
+            } else {
+              existingPeriod.data.push({
+                name: item.name,
+                operational: Number(item.operational) || 0,
+                developmental: Number(item.developmental) || 0,
+                withdraw: Number(item.withdraw) || 0
+              });
+            }
+          });
+        } else {
+          // Add new period
+          combinedRawData.push({
+            date: rawPeriod.date,
+            data: rawPeriod.data.map((item: any) => ({
+              name: item.name,
+              operational: Number(item.operational) || 0,
+              developmental: Number(item.developmental) || 0,
+              withdraw: Number(item.withdraw) || 0
+            }))
+          });
+        }
+      });
+    });
+
+    const resultData = Array.from(combinedSelectedData.entries()).map(([name, values]) => ({
+      name,
+      ...values,
+    }));
+
+    return { data: resultData, raw: combinedRawData };
   };
 
-  // Use combined data for chart, but selected module data for breakdown
+  // Use combined data for chart, but selected modules data for breakdown
   const chartDataSource = combinedData;
-  const { raw: selectedRaw } = getSelectedModuleData();
+  const { raw: selectedRaw } = getSelectedModulesData();
 
   // Generate dynamic title based on enabled modules
   const getModuleTitle = () => {
@@ -472,8 +552,86 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
 
       {showBreakdown && (
         <div className="mt-4">
+          {/* Module Selection Dropdown */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-2">Select Module(s) for Breakdown:</label>
+            <Select
+              isMulti
+              value={selectedModules.map(module => ({ value: module, label: module }))}
+              onChange={(selectedOptions) => {
+                const values = selectedOptions ? selectedOptions.map((option: any) => option.value) : [];
+                setSelectedModules(values);
+              }}
+              options={modules.filter(module => 
+                ['Business Permit', 'Working Permit', 'Barangay Clearance', 'Building Permit & Certificate of Occupancy'].includes(module)
+              ).map(module => ({ value: module, label: module }))}
+              placeholder="Choose modules to analyze..."
+              className="text-sm"
+              classNamePrefix="react-select"
+              styles={{
+                control: (base, state) => ({
+                  ...base,
+                  borderColor: state.isFocused ? '#2162e7' : '#d1d5db',
+                  boxShadow: state.isFocused ? '0 0 0 3px rgba(33, 98, 231, 0.1)' : 'none',
+                  backgroundColor: '#f9fafb',
+                  '&:hover': {
+                    borderColor: '#2162e7'
+                  }
+                }),
+                multiValue: (base) => ({
+                  ...base,
+                  backgroundColor: '#2162e7',
+                }),
+                multiValueLabel: (base) => ({
+                  ...base,
+                  color: 'white',
+                }),
+                multiValueRemove: (base) => ({
+                  ...base,
+                  color: 'white',
+                  ':hover': {
+                    backgroundColor: '#1d56d1',
+                    color: 'white',
+                  },
+                }),
+              }}
+            />
+          </div>
+
+          {/* Instruction when no modules are selected */}
+          {selectedModules.length === 0 && (
+            <div className="mb-4 p-6 bg-gray-50 border border-gray-200 rounded-md text-center">
+              <div className="flex flex-col items-center space-y-3">
+                <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
+                  <svg className="w-8 h-8 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
+                </div>
+                <div className="text-center">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No Modules Selected</h3>
+                  <p className="text-sm text-gray-600 mb-1">
+                    Please select one or more modules from the dropdown above to view detailed breakdown analysis.
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    You can select multiple modules to compare and analyze combined data across different eLGU services.
+                  </p>
+                </div>
+                <div className="flex items-center space-x-2 text-xs text-gray-500">
+                  <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                  <span>Business Permit</span>
+                  <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                  <span>Working Permit</span>
+                  <span className="w-2 h-2 bg-yellow-500 rounded-full"></span>
+                  <span>Barangay Clearance</span>
+                  <span className="w-2 h-2 bg-purple-500 rounded-full"></span>
+                  <span>Building Permit & COO</span>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Total Status Summary for Most Recent Date */}
-          {selectedModule !== "All" && selectedRaw && Array.isArray(selectedRaw) && selectedRaw.length > 0 && (() => {
+          {selectedModules.length > 0 && selectedRaw && Array.isArray(selectedRaw) && selectedRaw.length > 0 && (() => {
             // Get the most recent date (sorted data)
             const sortedRaw = [...selectedRaw].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
             const mostRecentData = sortedRaw[0];
@@ -486,33 +644,36 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
             }), { operational: 0, developmental: 0, withdraw: 0 });
 
             const grandTotal = totals.operational + totals.developmental + totals.withdraw;
+            const moduleText = selectedModules.length === 1 ? selectedModules[0] : `${selectedModules.length} Modules`;
 
             return (
               <div className="mb-4 p-4 bg-primary/5 border border-primary/20 rounded-md">
                 <h3 className="text-sm font-semibold mb-3 text-primary">
-                  Total Status Summary - {selectedModule}
+                  Total Status Summary - {moduleText} 
                 </h3>
-                <p className="text-xs text-muted-foreground mb-2">
-                  Most Recent Date: <span className="font-medium">{mostRecentData.date}</span>
-                </p>
+                {selectedModules.length > 1 && (
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Combined data from: {selectedModules.join(', ')}
+                  </p>
+                )}
                 <div className="grid grid-cols-3 gap-4 text-sm">
                   <div className="text-center p-2 bg-blue-50 rounded border">
-                    <div className="font-bold text-blue-700">{totals.operational}</div>
+                    <div className="font-bold text-xl text-blue-700">{totals.operational}</div>
                     <div className="text-xs text-blue-600">Operational</div>
                     <div className="text-xs text-muted-foreground">
                       {grandTotal > 0 ? `${((totals.operational / grandTotal) * 100).toFixed(1)}%` : '0%'}
                     </div>
                   </div>
-                  <div className="text-center p-2 bg-yellow-50 rounded border">
-                    <div className="font-bold text-yellow-700">{totals.developmental}</div>
-                    <div className="text-xs text-yellow-600">Developmental</div>
+                  <div className="text-center p-2 bg-/10 rounded border">
+                    <div className="font-bold text-[#f8be24] text-xl">{totals.developmental}</div>
+                    <div className="text-xs text-[#f8be24]">Developmental</div>
                     <div className="text-xs text-muted-foreground">
                       {grandTotal > 0 ? `${((totals.developmental / grandTotal) * 100).toFixed(1)}%` : '0%'}
                     </div>
                   </div>
-                  <div className="text-center p-2 bg-red-50 rounded border">
-                    <div className="font-bold text-red-700">{totals.withdraw}</div>
-                    <div className="text-xs text-red-600">Withdraw</div>
+                  <div className="text-center p-2 bg-red-50/30 rounded border">
+                    <div className="font-bold text-red-700 text-xl">{totals.withdraw}</div>
+                    <div className="text-xs text-red-600"> Withdraw</div>
                     <div className="text-xs text-muted-foreground">
                       {grandTotal > 0 ? `${((totals.withdraw / grandTotal) * 100).toFixed(1)}%` : '0%'}
                     </div>
@@ -524,7 +685,7 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
         </div>
       )}
 
-      {showBreakdown && selectedRaw && Array.isArray(selectedRaw) && (() => {
+      {showBreakdown && selectedRaw && Array.isArray(selectedRaw) && selectedModules.length > 0 && (() => {
   // Split raw by date (oldest to latest)
   const sortedRaw = [...selectedRaw].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
@@ -542,6 +703,16 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
 
   return (
     <div className="mt-6 overflow-x-auto">
+      <div className="mb-3">
+        <h3 className="text-sm font-semibold text-primary">
+          Data Table - {selectedModules.length === 1 ? selectedModules[0] : `${selectedModules.length} Combined Modules`}
+        </h3>
+        {selectedModules.length > 1 && (
+          <p className="text-xs text-muted-foreground">
+            Combined data from: {selectedModules.join(', ')}
+          </p>
+        )}
+      </div>
       <table className="min-w-full border rounded bg-card text-xs">
         <thead>
           <tr>

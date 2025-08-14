@@ -89,7 +89,7 @@ const DashboardPage = () => {
   
 
   // Enhanced filter and group logic
-  const filterAndGroupResults = (results: any[], municipalities: any[], provinces: any[]) => {
+  const filterAndGroupResults = (results: any[], municipalities: any[], provinces: any[], regions: any[] = []) => {
     // 1. If municipalities is not blank, filter by selected municipalities (1 by 1)
     if (municipalities && municipalities.length > 0) {
       const selected = municipalities.map((m: any) => m.value);
@@ -128,7 +128,37 @@ const DashboardPage = () => {
       });
       return Object.values(grouped);
     }
-    // 3. If blank, group by region and sum up the values
+    // 3. If regions are selected, filter by selected regions
+    if (regions && regions.length > 0) {
+      const selectedRegions = Array.isArray(regions) ? regions : [regions];
+      const filteredResults = results.filter((lgu: any) => selectedRegions.includes(lgu.region));
+      
+      // Group by region and sum up the values
+      const grouped: { [region: string]: any } = {};
+      filteredResults.forEach((lgu: any) => {
+        if (!grouped[lgu.region]) {
+          grouped[lgu.region] = {
+            lgu: lgu.region,
+            region: lgu.region,
+            monthlyResults: [],
+          };
+        }
+        lgu.monthlyResults.forEach((m: any, idx: number) => {
+          if (!grouped[lgu.region].monthlyResults[idx]) {
+            grouped[lgu.region].monthlyResults[idx] = { ...m };
+          } else {
+            Object.keys(m).forEach(key => {
+              if (typeof m[key] === 'number') {
+                grouped[lgu.region].monthlyResults[idx][key] =
+                  (grouped[lgu.region].monthlyResults[idx][key] ?? 0) + m[key];
+              }
+            });
+          }
+        });
+      });
+      return Object.values(grouped);
+    }
+    // 4. If blank, group by region and sum up the values
     const grouped: { [region: string]: any } = {};
     results.forEach((lgu: any) => {
       if (!grouped[lgu.region]) {
@@ -700,7 +730,8 @@ const bpcoChartData: any = useMemo(() => {
     const filteredResults = filterAndGroupResults(
       transactionData.results,
       data.municipalities,
-      data.province
+      data.province,
+      data.real
     );
 
     return filteredResults.map((lgu: any) => {
@@ -751,7 +782,8 @@ const chartData3 = useMemo(() => {
   const filteredResults = filterAndGroupResults(
     transactionData.results,
     data.municipalities,
-    data.province
+    data.province,
+    data.real
   );
 
   return filteredResults.map((lgu: any) => {
@@ -832,7 +864,8 @@ const chartData3 = useMemo(() => {
     const filteredResults = filterAndGroupResults(
       transactionData.results,
       data.municipalities,
-      data.province
+      data.province,
+      data.real
     );
 
     // Sum up all relevant fields for the filtered LGUs/provinces/regions
@@ -1457,6 +1490,17 @@ function formatList(arr:any) {
   
   return arr.slice(0, -1).join(", ") + ", and " + arr[arr.length - 1];
 }
+
+// Function to scroll to status chart section
+const scrollToStatusChart = () => {
+  const element = document.getElementById('status-chart-section');
+  if (element) {
+    element.scrollIntoView({ 
+      behavior: 'smooth',
+      block: 'start'
+    });
+  }
+};
   return (
     <div className="p-6 sm:p-2 md:p-4 max-w-[1200px] mx-auto  bg-background ">
       <FilterSection />
@@ -1467,22 +1511,25 @@ function formatList(arr:any) {
       {/* Loading indicator for dashboard */}
     {/* LGU Status Statistics */}
       <div className="mb-6">
-        <h3 className="text-lg font-semibold mb-4 text-foreground">LGU Status Statistics</h3>
+      
         <div className="grid grid-cols-3 lg:grid-cols-2 sm:grid-cols-1 gap-4">
           <StatisticCard2 
             title="No. of LGU Operational"
             value={totalOperational}
             showInfo={`Total of Operational Status on ${formatList(data?.modules)} as of ${data.startDate} - ${data.endDate}`}
+            onClick={scrollToStatusChart}
           />
           <StatisticCard2 
             title="No. of LGU Developmental"
             value={totalDevelopmental}
             showInfo={`Total of Developmental Status on ${formatList(data?.modules)}  as of ${data.startDate} - ${data.endDate}`}
+            onClick={scrollToStatusChart}
           />
           <StatisticCard2
             title="No. of LGU Withdraw"
             value={totalWithdraw}
             showInfo={`Total of Withdraw Status on ${formatList(data?.modules)}  as of ${data.startDate} - ${data.endDate}`}
+            onClick={scrollToStatusChart}
           />
         </div>
       </div>
@@ -1571,6 +1618,7 @@ function formatList(arr:any) {
 
      
       {/* Combined Status Chart for all modules */}
+      <div id="status-chart-section">
       {(data.modules?.includes("Business Permit") || 
         data.modules?.includes("Working Permit") || 
         data.modules?.includes("Barangay Clearance") ||
@@ -1592,6 +1640,7 @@ function formatList(arr:any) {
           loading={loading}
         />
       )}
+      </div>
 
 
 

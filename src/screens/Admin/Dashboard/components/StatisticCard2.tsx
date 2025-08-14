@@ -9,18 +9,19 @@ interface StatisticCardProps {
   value: string | number;
   showInfo?: string; // Tooltip text
   className?: string;
+  onClick?: () => void; // Click handler
 }
 
-const StatisticCard2: React.FC<StatisticCardProps> = ({ title, value, showInfo }) => {
+const StatisticCard2: React.FC<StatisticCardProps> = ({ title, value, showInfo, onClick }) => {
   const loading = useSelector(selectLoad2);
 
   const getCardTheme = () => {
     const themes = {
       'No. of LGU Operational': {
         icon: Building2,
-        iconColor: 'bg-green-600',
-        accentColor: 'text-green-600',
-        borderAccent: 'border-l-green-500'
+        iconColor: 'bg-[#2464e8]',
+        accentColor: 'text-[#2464e8]',
+        borderAccent: 'border-l-[#2464e8]'
       },
       'No. of LGU Developmental': {
         icon: TrendingUp,
@@ -43,20 +44,43 @@ const StatisticCard2: React.FC<StatisticCardProps> = ({ title, value, showInfo }
   const IconComponent = theme.icon;
 
   return (
-    <div className={`bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 relative border-l-4 ${theme.borderAccent}`}>
+    <div 
+      className={loading?`bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 relative `:`bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer duration-200 relative border-l-4 ${theme.borderAccent}`}
+      onClick={onClick}
+      >
       {/* Loading bar */}
       {loading && (
-        <div className="absolute left-0 top-0 w-full h-1 overflow-hidden rounded-t-lg z-10">
-          <div className="h-full w-full animate-[moveLine_1.3s_linear_infinite] flex">
-            <div className="h-full w-[30%] bg-blue-600" />
-            <div className="h-full w-[40%] bg-red-600" />
-            <div className="h-full w-[50%] bg-orange-600" />
+        <div className="absolute left-0 top-0 w-1 h-full z-0 overflow-hidden rounded-l-md flex flex-col">
+          <div className='w-full h-[100%] ease-in-out animate-[moveLineVertical_1.3s_linear_infinite] flex flex-col'>
+            <div
+            className="w-full"
+            style={{
+              height: '30%',
+              background: '#eccb58'
+            }}
+          />
+          <div
+            className="w-full delay-300"
+            style={{
+              height: '40%',
+              background: '#b8232e'
+            }}
+          />
+          <div
+            className="w-full delay-600"
+            style={{
+              height: '50%',
+              background: '#0134b2'
+            }}
+          />
+            
           </div>
-          <style>
+          
+       <style>
             {`
-              @keyframes moveLine {
-                0% { transform: translateX(-100%); }
-                100% { transform: translateX(250%); }
+              @keyframes moveLineVertical {
+                0% { transform: translateY(-100%); }
+                100% { transform: translateY(250%); }
               }
             `}
           </style>

@@ -77,29 +77,29 @@ const StatisticCard: React.FC<StatisticCardProps> = ({
   const IconComponent = theme.icon;
 
   return (
-    <div className={`bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 relative border-l-4 ${theme.borderAccent}`}>
+    <div className={loading?`bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 relative `:`bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 relative border-l-4 ${theme.borderAccent}`}>
       {/* Loading bar */}
       {loading && (
-        <div className=" absolute left-0 top-0 w-full h-1 z-0 overflow-hidden rounded-t-md flex">
-          <div className=' h-full w-[100%] ease-in-out animate-[moveLine_1.3s_linear_infinite] flex'>
+        <div className="absolute left-0 top-0 w-1 h-full z-0 overflow-hidden rounded-l-md flex flex-col">
+          <div className='w-full h-[100%] ease-in-out animate-[moveLineVertical_1.3s_linear_infinite] flex flex-col'>
             <div
-            className="h-full "
+            className="w-full"
             style={{
-              width: '30%',
+              height: '30%',
               background: '#eccb58'
             }}
           />
           <div
-            className="h-full  delay-300"
+            className="w-full delay-300"
             style={{
-              width: '40%',
+              height: '40%',
               background: '#b8232e'
             }}
           />
           <div
-            className="h-full  delay-600"
+            className="w-full delay-600"
             style={{
-              width: '50%',
+              height: '50%',
               background: '#0134b2'
             }}
           />
@@ -108,9 +108,9 @@ const StatisticCard: React.FC<StatisticCardProps> = ({
           
        <style>
             {`
-              @keyframes moveLine {
-                0% { transform: translateX(-100%); }
-                100% { transform: translateX(250%); }
+              @keyframes moveLineVertical {
+                0% { transform: translateY(-100%); }
+                100% { transform: translateY(250%); }
               }
             `}
           </style>

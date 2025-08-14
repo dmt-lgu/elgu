@@ -576,11 +576,12 @@ function Admin() {
       window.removeEventListener('triggerFilterAPI', handleFilterTrigger);
       window.removeEventListener('cancelFilterAPI', handleCancelRequest);
     };
-  }, [data.locationName, data.startDate, data.endDate, data.modules]);
+  }, [data.startDate, data.endDate, data.modules]); // Removed data.locationName from dependencies
 
   useEffect(() => {
     // Clear storage if needed to prevent quota errors
     clearStorageIfNeeded();
+    
     fetchRegions();
   }, []);
 
