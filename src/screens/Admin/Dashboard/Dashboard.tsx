@@ -1,5 +1,6 @@
 import { useMemo, useEffect, useRef, useCallback} from 'react';
 import FilterSection from './components/FilterSection';
+import ModuleFilter from './components/ModuleFilter';
 import StatisticCard from './components/StatisticCard';
 
 
@@ -704,11 +705,26 @@ const bpcoChartData: any = useMemo(() => {
 
     return filteredResults.map((lgu: any) => {
       let paidMale = 0, paidFemale = 0, pendingMale = 0, pendingFemale = 0;
+      let bpMalePaid = 0, bpFemalePaid = 0, bpMalePending = 0, bpFemalePending = 0;
+      let wpMalePaid = 0, wpFemalePaid = 0, wpMalePending = 0, wpFemalePending = 0;
+      
       lgu.monthlyResults.forEach((m: any) => {
-        paidMale += m.malePaid ?? 0;
-        paidFemale += m.femalePaid ?? 0;
-        pendingMale += m.malePending ?? 0;
-        pendingFemale += m.femalePending ?? 0;
+        // Combined totals
+        paidMale += (m.bpMalePaid ?? 0) + (m.wpMalePaid ?? 0);
+        paidFemale += (m.bpFemalePaid ?? 0) + (m.wpFemalePaid ?? 0);
+        pendingMale += (m.bpMalePending ?? 0) + (m.wpMalePending ?? 0);
+        pendingFemale += (m.bpFemalePending ?? 0) + (m.wpFemalePending ?? 0);
+        
+        // Module-specific totals
+        bpMalePaid += m.bpMalePaid ?? 0;
+        bpFemalePaid += m.bpFemalePaid ?? 0;
+        bpMalePending += m.bpMalePending ?? 0;
+        bpFemalePending += m.bpFemalePending ?? 0;
+        
+        wpMalePaid += m.wpMalePaid ?? 0;
+        wpFemalePaid += m.wpFemalePaid ?? 0;
+        wpMalePending += m.wpMalePending ?? 0;
+        wpFemalePending += m.wpFemalePending ?? 0;
       });
       return {
         name: lgu.lgu,
@@ -716,6 +732,15 @@ const bpcoChartData: any = useMemo(() => {
         paidFemale,
         pendingMale,
         pendingFemale,
+        // Module-specific data
+        bpMalePaid,
+        bpFemalePaid,
+        bpMalePending,
+        bpFemalePending,
+        wpMalePaid,
+        wpFemalePaid,
+        wpMalePending,
+        wpFemalePending,
       };
     });
   }, [data, transactionData]);
@@ -732,15 +757,40 @@ const chartData3 = useMemo(() => {
   return filteredResults.map((lgu: any) => {
     let newPaid = 0, newPending = 0, newPaidViaEgov = 0, newPaidLinkBiz = 0;
     let renewPaid = 0, renewPending = 0, renewPaidViaEgov = 0, renewPaidLinkBiz = 0;
+    let bpNewPaid = 0, bpNewPending = 0, bpNewPaidViaEgov = 0, bpNewPaidLinkBiz = 0;
+    let bpRenewPaid = 0, bpRenewPending = 0, bpRenewPaidViaEgov = 0, bpRenewPaidLinkBiz = 0;
+    let wpNewPaid = 0, wpNewPending = 0, wpNewPaidViaEgov = 0, wpNewPaidLinkBiz = 0;
+    let wpRenewPaid = 0, wpRenewPending = 0, wpRenewPaidViaEgov = 0, wpRenewPaidLinkBiz = 0;
+    
     lgu.monthlyResults.forEach((m: any) => {
-      newPaid += m.newPaid ?? 0;
-      newPending += m.newPending ?? 0;
-      newPaidViaEgov += m.newPaidViaEgov ?? 0;
-      newPaidLinkBiz += m.newPaidViaLinkBiz ?? 0;
-      renewPaid += m.renewPaid ?? 0;
-      renewPending += m.renewPending ?? 0;
-      renewPaidViaEgov += m.renewPaidViaEgov ?? 0;
-      renewPaidLinkBiz += m.renewPaidViaLinkBiz ?? 0;
+      // Combined totals
+      newPaid += (m.bpNewPaid ?? 0) + (m.wpNewPaid ?? 0);
+      newPending += (m.bpNewPending ?? 0) + (m.wpNewPending ?? 0);
+      newPaidViaEgov += (m.bpNewPaidViaEgov ?? 0) + (m.wpNewPaidViaEgov ?? 0);
+      newPaidLinkBiz += (m.bpNewPaidLinkBiz ?? 0) + (m.wpNewPaidLinkBiz ?? 0);
+      renewPaid += (m.bpRenewPaid ?? 0) + (m.wpRenewPaid ?? 0);
+      renewPending += (m.bpRenewPending ?? 0) + (m.wpRenewPending ?? 0);
+      renewPaidViaEgov += (m.bpRenewPaidViaEgov ?? 0) + (m.wpRenewPaidViaEgov ?? 0);
+      renewPaidLinkBiz += (m.bpRenewPaidLinkBiz ?? 0) + (m.wpRenewPaidLinkBiz ?? 0);
+
+      // Module-specific totals
+      bpNewPaid += m.bpNewPaid ?? 0;
+      bpNewPending += m.bpNewPending ?? 0;
+      bpNewPaidViaEgov += m.bpNewPaidViaEgov ?? 0;
+      bpNewPaidLinkBiz += m.bpNewPaidLinkBiz ?? 0;
+      bpRenewPaid += m.bpRenewPaid ?? 0;
+      bpRenewPending += m.bpRenewPending ?? 0;
+      bpRenewPaidViaEgov += m.bpRenewPaidViaEgov ?? 0;
+      bpRenewPaidLinkBiz += m.bpRenewPaidLinkBiz ?? 0;
+
+      wpNewPaid += m.wpNewPaid ?? 0;
+      wpNewPending += m.wpNewPending ?? 0;
+      wpNewPaidViaEgov += m.wpNewPaidViaEgov ?? 0;
+      wpNewPaidLinkBiz += m.wpNewPaidLinkBiz ?? 0;
+      wpRenewPaid += m.wpRenewPaid ?? 0;
+      wpRenewPending += m.wpRenewPending ?? 0;
+      wpRenewPaidViaEgov += m.wpRenewPaidViaEgov ?? 0;
+      wpRenewPaidLinkBiz += m.wpRenewPaidLinkBiz ?? 0;
     });
 
     return {
@@ -753,6 +803,23 @@ const chartData3 = useMemo(() => {
       renewPending,
       renewPaidViaEgov,
       renewPaidLinkBiz,
+      // Module-specific data
+      bpNewPaid,
+      bpNewPending,
+      bpNewPaidViaEgov,
+      bpNewPaidLinkBiz,
+      bpRenewPaid,
+      bpRenewPending,
+      bpRenewPaidViaEgov,
+      bpRenewPaidLinkBiz,
+      wpNewPaid,
+      wpNewPending,
+      wpNewPaidViaEgov,
+      wpNewPaidLinkBiz,
+      wpRenewPaid,
+      wpRenewPending,
+      wpRenewPaidViaEgov,
+      wpRenewPaidLinkBiz,
     };
   });
 }, [data, transactionData]);
@@ -782,22 +849,93 @@ const chartData3 = useMemo(() => {
       totalfemalePending: 0,
     };
 
+    // Need to recalculate totals that include module-specific fields
+    const moduleSpecificTotals = {
+      bpTotalnewPending: 0,
+      bpTotalnewPaid: 0,
+      bpTotalnewPaidViaEgov: 0,
+      bpTotalrenewPending: 0,
+      bpTotalrenewPaid: 0,
+      bpTotalrenewPaidViaEgov: 0,
+      bpTotalmalePaid: 0,
+      bpTotalmalePending: 0,
+      bpTotalfemalePaid: 0,
+      bpTotalfemalePending: 0,
+      wpTotalnewPending: 0,
+      wpTotalnewPaid: 0,
+      wpTotalnewPaidViaEgov: 0,
+      wpTotalrenewPending: 0,
+      wpTotalrenewPaid: 0,
+      wpTotalrenewPaidViaEgov: 0,
+      wpTotalmalePaid: 0,
+      wpTotalmalePending: 0,
+      wpTotalfemalePaid: 0,
+      wpTotalfemalePending: 0,
+    };
+
     filteredResults.forEach((lgu: any) => {
       lgu.monthlyResults.forEach((m: any) => {
-        totals.totalnewPending += m.newPending ?? 0;
-        totals.totalnewPaid += m.newPaid ?? 0;
-        totals.totalnewPaidViaEgov += m.newPaidViaEgov ?? 0;
-        totals.totalrenewPending += m.renewPending ?? 0;
-        totals.totalrenewPaid += m.renewPaid ?? 0;
-        totals.totalrenewPaidViaEgov += m.renewPaidViaEgov ?? 0;
-        totals.totalmalePaid += m.malePaid ?? 0;
-        totals.totalmalePending += m.malePending ?? 0;
-        totals.totalfemalePaid += m.femalePaid ?? 0;
-        totals.totalfemalePending += m.femalePending ?? 0;
+        // Use merged structure field names
+        const bpNewPending = m.bpNewPending ?? 0;
+        const bpNewPaid = m.bpNewPaid ?? 0;
+        const bpNewPaidViaEgov = m.bpNewPaidViaEgov ?? 0;
+        const bpRenewPending = m.bpRenewPending ?? 0;
+        const bpRenewPaid = m.bpRenewPaid ?? 0;
+        const bpRenewPaidViaEgov = m.bpRenewPaidViaEgov ?? 0;
+        const bpMalePending = m.bpMalePending ?? 0;
+        const bpMalePaid = m.bpMalePaid ?? 0;
+        const bpFemalePending = m.bpFemalePending ?? 0;
+        const bpFemalePaid = m.bpFemalePaid ?? 0;
+
+        const wpNewPending = m.wpNewPending ?? 0;
+        const wpNewPaid = m.wpNewPaid ?? 0;
+        const wpNewPaidViaEgov = m.wpNewPaidViaEgov ?? 0;
+        const wpRenewPending = m.wpRenewPending ?? 0;
+        const wpRenewPaid = m.wpRenewPaid ?? 0;
+        const wpRenewPaidViaEgov = m.wpRenewPaidViaEgov ?? 0;
+        const wpMalePending = m.wpMalePending ?? 0;
+        const wpMalePaid = m.wpMalePaid ?? 0;
+        const wpFemalePending = m.wpFemalePending ?? 0;
+        const wpFemalePaid = m.wpFemalePaid ?? 0;
+
+        // Combined totals
+        totals.totalnewPending += bpNewPending + wpNewPending;
+        totals.totalnewPaid += bpNewPaid + wpNewPaid;
+        totals.totalnewPaidViaEgov += bpNewPaidViaEgov + wpNewPaidViaEgov;
+        totals.totalrenewPending += bpRenewPending + wpRenewPending;
+        totals.totalrenewPaid += bpRenewPaid + wpRenewPaid;
+        totals.totalrenewPaidViaEgov += bpRenewPaidViaEgov + wpRenewPaidViaEgov;
+        totals.totalmalePaid += bpMalePaid + wpMalePaid;
+        totals.totalmalePending += bpMalePending + wpMalePending;
+        totals.totalfemalePaid += bpFemalePaid + wpFemalePaid;
+        totals.totalfemalePending += bpFemalePending + wpFemalePending;
+
+        // Module-specific totals
+        moduleSpecificTotals.bpTotalnewPending += bpNewPending;
+        moduleSpecificTotals.bpTotalnewPaid += bpNewPaid;
+        moduleSpecificTotals.bpTotalnewPaidViaEgov += bpNewPaidViaEgov;
+        moduleSpecificTotals.bpTotalrenewPending += bpRenewPending;
+        moduleSpecificTotals.bpTotalrenewPaid += bpRenewPaid;
+        moduleSpecificTotals.bpTotalrenewPaidViaEgov += bpRenewPaidViaEgov;
+        moduleSpecificTotals.bpTotalmalePaid += bpMalePaid;
+        moduleSpecificTotals.bpTotalmalePending += bpMalePending;
+        moduleSpecificTotals.bpTotalfemalePaid += bpFemalePaid;
+        moduleSpecificTotals.bpTotalfemalePending += bpFemalePending;
+
+        moduleSpecificTotals.wpTotalnewPending += wpNewPending;
+        moduleSpecificTotals.wpTotalnewPaid += wpNewPaid;
+        moduleSpecificTotals.wpTotalnewPaidViaEgov += wpNewPaidViaEgov;
+        moduleSpecificTotals.wpTotalrenewPending += wpRenewPending;
+        moduleSpecificTotals.wpTotalrenewPaid += wpRenewPaid;
+        moduleSpecificTotals.wpTotalrenewPaidViaEgov += wpRenewPaidViaEgov;
+        moduleSpecificTotals.wpTotalmalePaid += wpMalePaid;
+        moduleSpecificTotals.wpTotalmalePending += wpMalePending;
+        moduleSpecificTotals.wpTotalfemalePaid += wpFemalePaid;
+        moduleSpecificTotals.wpTotalfemalePending += wpFemalePending;
       });
     });
 
-    return { ...card, ...totals };
+    return { ...card, ...totals, ...moduleSpecificTotals };
   }, [card, transactionData, data.municipalities, data.province]);
 
 
@@ -1280,7 +1418,7 @@ function getBPCO(){
     // }
     
 
-  useEffect(() => {
+useEffect(() => {
     // Sequential loading with delay to optimize resource usage
     const loadModulesSequentially = async () => {
       // Set loading to true at the start
@@ -1323,69 +1461,111 @@ function formatList(arr:any) {
     <div className="p-6 sm:p-2 md:p-4 max-w-[1200px] mx-auto  bg-background ">
       <FilterSection />
       
-      {/* Loading indicator for dashboard */}
+      {/* Module Filter Section */}
   
       
-      {/* Main statistics */}
-      <div className="grid grid-cols-3 lg:grid-cols-2 sm:grid-cols-1 gap-4  mb-6">
-        <StatisticCard 
-          title="No. of Transaction"
+      {/* Loading indicator for dashboard */}
+    {/* LGU Status Statistics */}
+      <div className="mb-6">
+        <h3 className="text-lg font-semibold mb-4 text-foreground">LGU Status Statistics</h3>
+        <div className="grid grid-cols-3 lg:grid-cols-2 sm:grid-cols-1 gap-4">
+          <StatisticCard2 
+            title="No. of LGU Operational"
+            value={totalOperational}
+            showInfo={`Total of Operational Status on ${formatList(data?.modules)} as of ${data.startDate} - ${data.endDate}`}
+          />
+          <StatisticCard2 
+            title="No. of LGU Developmental"
+            value={totalDevelopmental}
+            showInfo={`Total of Developmental Status on ${formatList(data?.modules)}  as of ${data.startDate} - ${data.endDate}`}
+          />
+          <StatisticCard2
+            title="No. of LGU Withdraw"
+            value={totalWithdraw}
+            showInfo={`Total of Withdraw Status on ${formatList(data?.modules)}  as of ${data.startDate} - ${data.endDate}`}
+          />
+        </div>
+      </div>
+      
+      {/* Transaction Statistics Section */}
+      <div className="mb-6">
+       
+          
+          <ModuleFilter 
+            filterType="card" 
+          />
+    
+        
+        <div className="grid grid-cols-3 md:grid-cols-2 sm:grid-cols-1 gap-4">
+          <StatisticCard 
+            title="No. of Transaction"
           value={
             (filteredCard?.totalnewPending ?? 0) +
             (filteredCard?.totalnewPaid ?? 0) +
-            
             (filteredCard?.totalrenewPending ?? 0) +
             (filteredCard?.totalrenewPaid ?? 0) 
           }
-          showInfo={`total no. of transaction on Business Permit as of ${data.startDate} - ${data.endDate}`}
-        />
-
-        <div className=' gap-4 grid col-span-2 grid-cols-3 lg:grid-cols-2  sm:grid-cols-2 '>
-          
-            <StatisticCard2 
-          title="No. of LGU Operational"
-          value={totalOperational}
-          showInfo={`Total of Operational Status on ${formatList(data?.modules)} as of ${data.startDate} - ${data.endDate}`}
-        />
-        <StatisticCard2 
-          title="No. of LGU Developmental"
-          value={totalDevelopmental}
-          showInfo={`Total of Developmental Status on ${formatList(data?.modules)}  as of ${data.startDate} - ${data.endDate}`}
-        />
-        <StatisticCard2
-          title="No. of LGU Withdraw"
-          value={totalWithdraw}
-          showInfo={`Total of Withdraw Status on ${formatList(data?.modules)}  as of ${data.startDate} - ${data.endDate}`}
-        />
-
-        </div>
-      
-      </div>
-      
-      {/* Gender statistics */}
-      <div className="grid grid-cols-4 md:grid-cols-2 lg:grid-cols-3 sm:grid-cols-2 gap-4 mb-6">
-
-        <StatisticCard 
-          title="No. of Male"
-          value={(filteredCard?.totalmalePaid ?? 0) + (filteredCard?.totalmalePending ?? 0)}
-        />
-        <StatisticCard 
-          title="No. of Female"
-          value={(filteredCard?.totalfemalePaid ?? 0) + (filteredCard?.totalfemalePending ?? 0)}
-        />
-        <StatisticCard 
-          title="No. of eGovPay"
-          value={(filteredCard?.totalrenewPaidViaEgov ?? 0) + (filteredCard?.totalnewPaidViaEgov ?? 0)}
-        />
-        <StatisticCard 
-          title="Non-Binary"
-          value={
-            ((filteredCard?.totalnewPending ?? 0) + (filteredCard?.totalnewPaid ?? 0) + (filteredCard?.totalrenewPending ?? 0) + (filteredCard?.totalrenewPaid ?? 0))
-            - (((filteredCard?.totalmalePaid ?? 0) + (filteredCard?.totalmalePending ?? 0)) + ((filteredCard?.totalfemalePaid ?? 0) + (filteredCard?.totalfemalePending ?? 0))) < 0 ? 0 :((filteredCard?.totalnewPending ?? 0) + (filteredCard?.totalnewPaid ?? 0) + (filteredCard?.totalrenewPending ?? 0) + (filteredCard?.totalrenewPaid ?? 0))
-            - (((filteredCard?.totalmalePaid ?? 0) + (filteredCard?.totalmalePending ?? 0)) + ((filteredCard?.totalfemalePaid ?? 0) + (filteredCard?.totalfemalePending ?? 0)))
+          bpValue={
+            (filteredCard?.bpTotalnewPending ?? 0) +
+            (filteredCard?.bpTotalnewPaid ?? 0) +
+            (filteredCard?.bpTotalrenewPending ?? 0) +
+            (filteredCard?.bpTotalrenewPaid ?? 0)
           }
-        />
+          wpValue={
+            (filteredCard?.wpTotalnewPending ?? 0) +
+            (filteredCard?.wpTotalnewPaid ?? 0) +
+            (filteredCard?.wpTotalrenewPending ?? 0) +
+            (filteredCard?.wpTotalrenewPaid ?? 0)
+          }
+          showInfo={`total no. of transaction on ${formatList(data?.modules)} as of ${data.startDate} - ${data.endDate}`}
+          />
+          <StatisticCard 
+            title="No. of Male"
+            value={(filteredCard?.totalmalePaid ?? 0) + (filteredCard?.totalmalePending ?? 0)}
+            bpValue={(filteredCard?.bpTotalmalePaid ?? 0) + (filteredCard?.bpTotalmalePending ?? 0)}
+            wpValue={(filteredCard?.wpTotalmalePaid ?? 0) + (filteredCard?.wpTotalmalePending ?? 0)}
+            showInfo={`total no. of male applicants on ${formatList(data?.modules)} as of ${data.startDate} - ${data.endDate}`}
+          />
+          <StatisticCard 
+            title="No. of Female"
+            value={(filteredCard?.totalfemalePaid ?? 0) + (filteredCard?.totalfemalePending ?? 0)}
+            bpValue={(filteredCard?.bpTotalfemalePaid ?? 0) + (filteredCard?.bpTotalfemalePending ?? 0)}
+            wpValue={(filteredCard?.wpTotalfemalePaid ?? 0) + (filteredCard?.wpTotalfemalePending ?? 0)}
+            showInfo={`total no. of female applicants on ${formatList(data?.modules)} as of ${data.startDate} - ${data.endDate}`}
+          />
+          <StatisticCard 
+            title="No. of eGovPay"
+            value={(filteredCard?.totalrenewPaidViaEgov ?? 0) + (filteredCard?.totalnewPaidViaEgov ?? 0)}
+            bpValue={(filteredCard?.bpTotalrenewPaidViaEgov ?? 0) + (filteredCard?.bpTotalnewPaidViaEgov ?? 0)}
+            wpValue={(filteredCard?.wpTotalrenewPaidViaEgov ?? 0) + (filteredCard?.wpTotalnewPaidViaEgov ?? 0)}
+            showInfo={`total no. of eGovPay transactions on ${formatList(data?.modules)} as of ${data.startDate} - ${data.endDate}`}
+          />
+          <StatisticCard 
+            title="Non-Binary"
+            value={
+              ((filteredCard?.totalnewPending ?? 0) + (filteredCard?.totalnewPaid ?? 0) + (filteredCard?.totalrenewPending ?? 0) + (filteredCard?.totalrenewPaid ?? 0))
+              - (((filteredCard?.totalmalePaid ?? 0) + (filteredCard?.totalmalePending ?? 0)) + ((filteredCard?.totalfemalePaid ?? 0) + (filteredCard?.totalfemalePending ?? 0))) < 0 ? 0 :((filteredCard?.totalnewPending ?? 0) + (filteredCard?.totalnewPaid ?? 0) + (filteredCard?.totalrenewPending ?? 0) + (filteredCard?.totalrenewPaid ?? 0))
+              - (((filteredCard?.totalmalePaid ?? 0) + (filteredCard?.totalmalePending ?? 0)) + ((filteredCard?.totalfemalePaid ?? 0) + (filteredCard?.totalfemalePending ?? 0)))
+            }
+            bpValue={
+              ((filteredCard?.bpTotalnewPending ?? 0) + (filteredCard?.bpTotalnewPaid ?? 0) + (filteredCard?.bpTotalrenewPending ?? 0) + (filteredCard?.bpTotalrenewPaid ?? 0))
+              - (((filteredCard?.bpTotalmalePaid ?? 0) + (filteredCard?.bpTotalmalePending ?? 0)) + ((filteredCard?.bpTotalfemalePaid ?? 0) + (filteredCard?.bpTotalfemalePending ?? 0))) < 0 ? 0 : ((filteredCard?.bpTotalnewPending ?? 0) + (filteredCard?.bpTotalnewPaid ?? 0) + (filteredCard?.bpTotalrenewPending ?? 0) + (filteredCard?.bpTotalrenewPaid ?? 0))
+              - (((filteredCard?.bpTotalmalePaid ?? 0) + (filteredCard?.bpTotalmalePending ?? 0)) + ((filteredCard?.bpTotalfemalePaid ?? 0) + (filteredCard?.bpTotalfemalePending ?? 0)))
+            }
+            wpValue={
+              ((filteredCard?.wpTotalnewPending ?? 0) + (filteredCard?.wpTotalnewPaid ?? 0) + (filteredCard?.wpTotalrenewPending ?? 0) + (filteredCard?.wpTotalrenewPaid ?? 0))
+              - (((filteredCard?.wpTotalmalePaid ?? 0) + (filteredCard?.wpTotalmalePending ?? 0)) + ((filteredCard?.wpTotalfemalePaid ?? 0) + (filteredCard?.wpTotalfemalePending ?? 0))) < 0 ? 0 : ((filteredCard?.wpTotalnewPending ?? 0) + (filteredCard?.wpTotalnewPaid ?? 0) + (filteredCard?.wpTotalrenewPending ?? 0) + (filteredCard?.wpTotalrenewPaid ?? 0))
+              - (((filteredCard?.wpTotalmalePaid ?? 0) + (filteredCard?.wpTotalmalePending ?? 0)) + ((filteredCard?.wpTotalfemalePaid ?? 0) + (filteredCard?.wpTotalfemalePending ?? 0)))
+            }
+            showInfo={`calculated non-binary applicants on ${formatList(data?.modules)} as of ${data.startDate} - ${data.endDate}`}
+          />
+        </div>
       </div>
+
+    
+
+      {/* Non-Binary Statistics - Separate section for special calculation */}
+     
       
       {/* Charts */}
 
@@ -1415,19 +1595,29 @@ function formatList(arr:any) {
 
 
 
-      
-
-      
-      <TransactionChart
-        data={chartData3}
-        title="NUMBER OF TRANSACTION PER REGION FOR RENEW APPLICATION"
-        period={`${data.startDate} - ${data.endDate}`}
-      />
-      <TransactionChart2
-        data={chartData}
-        title="NUMBER OF TRANSACTION PER REGION AND GENDER"
-        period={`${data.startDate} - ${data.endDate}`}
-      />
+      {/* Charts Section */}
+      <div className="mb-6">
+  
+          <ModuleFilter 
+            title="Chart Analytics" 
+            filterType="chart" 
+            className=""
+          />
+     
+        
+        <div className="space-y-6">
+          <TransactionChart
+            data={chartData3}
+            title="NUMBER OF TRANSACTION PER REGION FOR RENEW APPLICATION"
+            period={`${data.startDate} - ${data.endDate}`}
+          />
+          <TransactionChart2
+            data={chartData}
+            title="NUMBER OF TRANSACTION PER REGION AND GENDER"
+            period={`${data.startDate} - ${data.endDate}`}
+          />
+        </div>
+      </div>
     
     </div>
   );

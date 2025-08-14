@@ -9,6 +9,7 @@ import dateReducer from './dateSlice';
 import dataReducer from './dataSlice';
 import cardReducer from './cardSlice';
 import transactionReducer from './transactionSlice';
+import transactionCardReducer from './transactionCardSlice';
 import loadReducer from './loadSlice';
 import load2Reducer from './loadSlice2';
 import statusReducer from './statusSlice';
@@ -20,6 +21,7 @@ import WpReducer from './wpSlice';
 import BrgyReducer from './brgySlice';
 import buildingPermitReducer from './buildingPermitSlice';
 import certificateOfOccupancyReducer from './CertificateOfOccupancySlice';
+import separatedTransactionReducer from './separatedTransactionSlice';
 
 
 const persistConfig = {
@@ -52,7 +54,9 @@ const rootReducer = combineReducers({
   dates: dateReducer,
   datas: dataReducer,
   card: cardReducer,
+  transactionCard: transactionCardReducer,
   transaction: transactionReducer,
+  separatedTransaction: separatedTransactionReducer,
   load: loadReducer,
   status: statusReducer,
   wp:WpReducer,

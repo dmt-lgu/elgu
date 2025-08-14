@@ -46,6 +46,7 @@ interface BarChartProps {
   brgyRaw?: any[];
   bpcoRaw?: any[];
   modules?: string[];
+  selectedModule?: string;
   loading?: boolean;
 }
 
@@ -88,6 +89,7 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
   brgyRaw = [],
   bpcoRaw = [],
   modules = [],
+  selectedModule = "All",
   loading
 }) => {
   const charts = useSelector(selectCharts);
@@ -100,18 +102,10 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
   const [hidden, setHidden] = useState<boolean[]>([false, false, false]);
   const [chartType, setChartType] = useState<'bar' | 'line' | 'pie'>(reduxChartType);
   const [showBreakdown, setShowBreakdown] = useState(false);
-  const [selectedModule, setSelectedModule] = useState<string>(modules.length > 0 ? modules[0] : 'All'); // New state for module selection
 
   useEffect(() => {
     setChartType(reduxChartType);
   }, [reduxChartType]);
-
-  useEffect(() => {
-    // Update selectedModule when modules change
-    if (modules.length > 0 && selectedModule === 'All') {
-      setSelectedModule(modules[0]);
-    }
-  }, [modules, selectedModule]);
 
   // Combine all module data
   const combinedData = useMemo(() => {
@@ -478,30 +472,6 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
 
       {showBreakdown && (
         <div className="mt-4">
-          {/* Module Selection Dropdown */}
-          <div className="mb-4">
-            <label className="block text-sm font-medium mb-2">Select Module for Breakdown:</label>
-            <select
-              value={selectedModule}
-              onChange={(e) => setSelectedModule(e.target.value)}
-              className="px-3 py-2 border rounded-md text-sm bg-background border-border"
-            >
-              <option value="All">Select Module</option>
-              {modules.includes("Business Permit") && (
-                <option value="Business Permit">Business Permit</option>
-              )}
-              {modules.includes("Working Permit") && (
-                <option value="Working Permit">Working Permit</option>
-              )}
-              {modules.includes("Barangay Clearance") && (
-                <option value="Barangay Clearance">Barangay Clearance</option>
-              )}
-              {modules.includes("Building Permit & Certificate of Occupancy") && (
-                <option value="Building Permit & Certificate of Occupancy">Building Permit & Certificate of Occupancy</option>
-              )}
-            </select>
-          </div>
-
           {/* Total Status Summary for Most Recent Date */}
           {selectedModule !== "All" && selectedRaw && Array.isArray(selectedRaw) && selectedRaw.length > 0 && (() => {
             // Get the most recent date (sorted data)

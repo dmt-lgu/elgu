@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Select from 'react-select';
-import { Check, ChevronDown } from 'lucide-react';
+import { Check, ChevronDown, Filter, MapPin, Calendar, Settings2, Layers, Loader2, X } from 'lucide-react';
 import { useSelector, useDispatch } from 'react-redux';
 
 import DateRangeDay from './DateRangeDay';
@@ -10,6 +10,7 @@ import { modules, groupOfIslands, regionGroups } from '../utils/mockData';
 import { FilterState } from '../utils/types';
 import { selectRegions } from '@/redux/regionSlice';
 import { selectData, setData } from '@/redux/dataSlice';
+import { selectLoad } from '@/redux/loadSlice';
 
 // Add this type for the formatted state
 interface FormattedFilterState {
@@ -33,6 +34,7 @@ const dateTypes = ['Day', 'Month', 'Year'];
 const FilterSection: React.FC = () => {
   const regions = useSelector(selectRegions);
   const data = useSelector(selectData);
+  const isLoading = useSelector(selectLoad);
   const dispatch = useDispatch();
 
   // Province and municipality options
@@ -377,245 +379,377 @@ const FilterSection: React.FC = () => {
     };
   };
 
-  return (
-    <div className="grid grid-cols-3 lg:grid-cols-2 md:grid-cols-1 gap-4 mb-6">
-      {/* Module */}
-      <div className="flex flex-col lg:col-span-2" ref={moduleRef}>
-        <label className="text-sm font-medium text-secondary-foreground mb-1">Module:</label>
-        <div className="relative">
-          <button
-            onClick={() => setIsModuleOpen(!isModuleOpen)}
-            className="w-full bg-card border border-border rounded-md py-2 px-3 text-left flex justify-between items-center focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <span className="text-sm text-secondary-foreground">
-              {filterState.selectedModules.length > 0
-                ? `${filterState.selectedModules.length} selected`
-                : 'Select modules'}
-            </span>
-            <ChevronDown size={18} className={`text-secondary-foreground  transition-transform ${isModuleOpen ? 'transform rotate-180' : ''}`} />
-          </button>
-          {isModuleOpen && (
-            <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-md shadow-lg z-10">
-              <div className="flex justify-between p-2 border-b border-gray-200">
-                <button
-                  onClick={selectAllModules}
-                  className="text-sm text-blue-600 hover:text-blue-800"
-                >
-                  Select All
-                </button>
-                <button
-                  onClick={deselectAllModules}
-                  className="text-sm text-red-400 hover:text-red-800"
-                >
-                  Deselect All
-                </button>
-              </div>
-              <div className="max-h-[200px] overflow-y-auto">
-                {modules.map((module, index) => (
-                  <label
-                    key={`module-${index}`}
-                    className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer"
-                  >
-                    <div className="relative flex items-center">
-                      <input
-                        type="checkbox"
-                        checked={filterState.selectedModules.includes(module)}
-                        onChange={() => toggleModule(module)}
-                        className="opacity-0 absolute h-4 w-4 cursor-pointer"
-                      />
-                      <div className={`border h-4 w-4 rounded flex items-center justify-center ${
-                        filterState.selectedModules.includes(module)
-                          ? 'bg-blue-600 border-blue-600'
-                          : 'border-gray-300'
-                      }`}>
-                        {filterState.selectedModules.includes(module) && (
-                          <Check size={12} className="text-white" />
-                        )}
-                      </div>
-                      <span className="ml-2 text-sm text-secondary-foreground">{module}</span>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+  // Function to trigger the API request
+  const handleFilterClick = () => {
+    // Check if we have required data
+    if (!data.locationName || data.locationName.length === 0) {
+      alert('Please select at least one region');
+      return;
+    }
+    if (!data.startDate || !data.endDate) {
+      alert('Please select date range');
+      return;
+    }
+    if (!data.modules || data.modules.length === 0) {
+      alert('Please select at least one module');
+      return;
+    }
 
-      {/* Region, Group of Islands, Province, City/Municipality */}
-      <div className="flex flex-col lg:col-span-2" ref={regionRef}>
-        <label className="text-sm font-bold text-secondary-foreground mb-1">Region:</label>
-        <div className="relative">
-          <button
-            onClick={() => setIsRegionOpen(!isRegionOpen)}
-            className="w-full bg-card border border-border rounded-md py-2 px-3 text-left flex justify-between items-center focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <span className="text-sm text-secondary-foreground">
-              {filterState.selectedRegions.length === 0
-                ? 'All Regions'
-                : `${filterState.selectedRegions.length} selected`}
-            </span>
-            <ChevronDown size={18} className={`text-secondary-foreground  transition-transform ${isRegionOpen ? 'transform rotate-180' : ''}`} />
-          </button>
-          {isRegionOpen && (
-            <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-md shadow-lg z-10">
-              <div className="flex justify-between p-2 border-b border-gray-200">
-                <button
-                  onClick={selectAllRegions}
-                  className="text-sm text-blue-600 hover:text-blue-800"
-                >
-                  Select All
-                </button>
-                <button
-                  onClick={deselectAllRegions}
-                  className="text-sm text-red-400 hover:text-red-800"
-                >
-                  Deselect All
-                </button>
-              </div>
-              <div className="max-h-[400px] overflow-y-auto p-3">
-                {/* Group of Islands */}
-                <div className="mb-4">
-                  <label className="block text-sm font-bold text-blue-700 mb-2">Group of Islands</label>
-                  <div className="flex gap-6 mb-2">
-                    {groupOfIslands.map(island => (
-                      <label key={island} className="flex items-center gap-1 text-secondary-foreground  text-sm">
+    // Close all open dropdowns
+    setIsModuleOpen(false);
+    setIsRegionOpen(false);
+    setIsDateOpen(false);
+
+    // Dispatch a custom event that the Admin component can listen to
+    window.dispatchEvent(new CustomEvent('triggerFilterAPI'));
+  };
+
+  // Function to cancel the API request
+  const handleCancelRequest = () => {
+    window.dispatchEvent(new CustomEvent('cancelFilterAPI'));
+  };
+
+  return (
+    <div className="relative bg-white border border-gray-200 rounded-md shadow-sm p-6 mb-6 z-50">
+      
+      <div className="relative grid grid-cols-3 lg:grid-cols-2 md:grid-cols-1 gap-6">
+        {/* Module */}
+        <div className="flex flex-col lg:col-span-2 group" ref={moduleRef}>
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-8 h-8 bg-[#2162e7]/10 rounded-md flex items-center justify-center">
+              <Settings2 size={16} className="text-[#2162e7]" />
+            </div>
+            <label className="text-sm font-semibold text-gray-800">Module Selection</label>
+          </div>
+          <div className="relative">
+            <button
+              onClick={() => setIsModuleOpen(!isModuleOpen)}
+              className="w-full bg-gray-50 border border-gray-200 rounded-md py-3 px-4 text-left flex justify-between items-center hover:border-[#2162e7] hover:bg-[#2162e7]/5 focus:outline-none focus:ring-2 focus:ring-[#2162e7]/20 focus:border-[#2162e7] transition-all duration-200 shadow-sm"
+            >
+              <span className="text-sm font-medium text-gray-700">
+                {filterState.selectedModules.length > 0
+                  ? `${filterState.selectedModules.length} module${filterState.selectedModules.length > 1 ? 's' : ''} selected`
+                  : 'Select modules'}
+              </span>
+              <ChevronDown size={18} className={`text-gray-400 transition-all duration-300 ${isModuleOpen ? 'transform rotate-180 text-[#2162e7]' : ''}`} />
+            </button>
+            {isModuleOpen && (
+              <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-md shadow-lg z-[9999] animate-in slide-in-from-top-2 duration-200">
+                <div className="flex justify-between p-4 bg-gray-50 border-b border-gray-200">
+                  <button
+                    onClick={selectAllModules}
+                    className="text-sm text-[#2162e7] hover:text-[#2162e7]/80 font-semibold hover:bg-[#2162e7]/10 px-3 py-1 rounded-sm transition-colors"
+                  >
+                    Select All
+                  </button>
+                  <button
+                    onClick={deselectAllModules}
+                    className="text-sm text-red-500 hover:text-red-600 font-semibold hover:bg-red-50 px-3 py-1 rounded-sm transition-colors"
+                  >
+                    Clear All
+                  </button>
+                </div>
+                <div className="max-h-[200px] overflow-y-auto">
+                  {modules.map((module, index) => (
+                    <label
+                      key={`module-${index}`}
+                      className="flex items-center px-4 py-3 hover:bg-gray-50 cursor-pointer transition-all duration-150 group"
+                    >
+                      <div className="relative flex items-center">
                         <input
                           type="checkbox"
-                          checked={selectedIslands.includes(island)}
-                          onChange={() => toggleIsland(island)}
-                          className="accent-blue-600"
+                          checked={filterState.selectedModules.includes(module)}
+                          onChange={() => toggleModule(module)}
+                          className="opacity-0 absolute h-5 w-5 cursor-pointer"
                         />
-                        {island}
-                      </label>
-                    ))}
-                  </div>
+                        <div className={`border-2 h-5 w-5 rounded-sm flex items-center justify-center transition-all duration-200 ${
+                          filterState.selectedModules.includes(module)
+                            ? 'bg-[#2162e7] border-[#2162e7] shadow-sm'
+                            : 'border-gray-300 hover:border-[#2162e7] group-hover:bg-gray-50'
+                        }`}>
+                          {filterState.selectedModules.includes(module) && (
+                            <Check size={12} className="text-white" />
+                          )}
+                        </div>
+                        <span className="ml-3 text-sm font-medium text-gray-700 group-hover:text-[#2162e7]">{module}</span>
+                      </div>
+                    </label>
+                  ))}
                 </div>
-                {/* Regions */}
-                <label className="block text-sm font-bold text-blue-700 mb-2">Regions</label>
-                <div className="grid grid-cols-4 gap-2 mb-4">
-                  {regionGroups.map((col, colIdx) => (
-                    <div key={colIdx} className="flex flex-col gap-2">
-                      {col.map((region: any) => (
-                        <label key={region} className="flex items-center gap-1 text-secondary-foreground  text-sm">
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Region, Group of Islands, Province, City/Municipality */}
+        <div className="flex flex-col lg:col-span-2 group" ref={regionRef}>
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-8 h-8 bg-[#2162e7]/10 rounded-md flex items-center justify-center">
+              <MapPin size={16} className="text-[#2162e7]" />
+            </div>
+            <label className="text-sm font-semibold text-gray-800">Region Selection</label>
+          </div>
+          <div className="relative">
+            <button
+              onClick={() => setIsRegionOpen(!isRegionOpen)}
+              className="w-full bg-gray-50 border border-gray-200 rounded-md py-3 px-4 text-left flex justify-between items-center hover:border-[#2162e7] hover:bg-[#2162e7]/5 focus:outline-none focus:ring-2 focus:ring-[#2162e7]/20 focus:border-[#2162e7] transition-all duration-200 shadow-sm"
+            >
+              <span className="text-sm font-medium text-gray-700">
+                {filterState.selectedRegions.length === 0
+                  ? 'All Regions'
+                  : `${filterState.selectedRegions.length} region${filterState.selectedRegions.length > 1 ? 's' : ''} selected`}
+              </span>
+              <ChevronDown size={18} className={`text-gray-400 transition-all duration-300 ${isRegionOpen ? 'transform rotate-180 text-[#2162e7]' : ''}`} />
+            </button>
+            {isRegionOpen && (
+              <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-md shadow-lg z-[9999] animate-in slide-in-from-top-2 duration-200">
+                <div className="flex justify-between p-4 bg-gray-50 border-b border-gray-200">
+                  <button
+                    onClick={selectAllRegions}
+                    className="text-sm text-[#2162e7] hover:text-[#2162e7]/80 font-semibold hover:bg-[#2162e7]/10 px-3 py-1 rounded-sm transition-colors"
+                  >
+                    Select All
+                  </button>
+                  <button
+                    onClick={deselectAllRegions}
+                    className="text-sm text-red-500 hover:text-red-600 font-semibold hover:bg-red-50 px-3 py-1 rounded-sm transition-colors"
+                  >
+                    Clear All
+                  </button>
+                </div>
+                <div className="max-h-[400px] overflow-y-auto p-4">
+                  {/* Group of Islands */}
+                  <div className="mb-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Layers size={14} className="text-[#2162e7]" />
+                      <label className="text-sm font-bold text-gray-800">Island Groups</label>
+                    </div>
+                    <div className="flex gap-6 mb-3">
+                      {groupOfIslands.map(island => (
+                        <label key={island} className="flex items-center gap-2 text-gray-700 text-sm font-medium hover:text-[#2162e7] cursor-pointer transition-colors">
                           <input
                             type="checkbox"
-                            checked={filterState.selectedRegions.includes(region)}
-                            onChange={() => toggleRegion(region)}
-                            className="accent-blue-600"
+                            checked={selectedIslands.includes(island)}
+                            onChange={() => toggleIsland(island)}
+                            className="accent-[#2162e7] w-4 h-4 rounded-sm"
                           />
-                          <span className=' text-xs lg:text-sm'>{region}</span> 
+                          {island}
                         </label>
                       ))}
                     </div>
-                  ))}
-                </div>
-                {/* Province */}
-                <div className="flex flex-col mb-4">
-                  <label className="block text-sm font-bold text-blue-700 mb-2">Province</label>
-                  <Select
-                    options={provinceOptions}
-                    value={selectedProvinces}
-                    onChange={handleProvinceChange}
-                    placeholder="Select province(s)"
-                    isClearable
-                    isMulti
-                    isDisabled={provinceOptions.length === 0}
-                    classNamePrefix="react-select"
-                    className="text-sm"
-                    menuPortalTarget={document.body}
-                    styles={{
-                      menuPortal: base => ({ ...base, zIndex: 9999 }),
-                      menu: base => ({ ...base, zIndex: 9999 }),
-                    }}
-                  />
-                </div>
-                {/* City/Municipality (multi) */}
-                <div className="relative z-50">
-                  <label className="block text-sm font-bold text-blue-700 mb-1">City/Municipality</label>
-                  <div className="relative">
+                  </div>
+                  {/* Regions */}
+                  <div className="mb-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <MapPin size={14} className="text-[#2162e7]" />
+                      <label className="text-sm font-bold text-gray-800">Regions</label>
+                    </div>
+                    <div className="grid grid-cols-4 gap-2 mb-3">
+                      {regionGroups.map((col, colIdx) => (
+                        <div key={colIdx} className="flex flex-col gap-2">
+                          {col.map((region: any) => (
+                            <label key={region} className="flex items-center gap-2 text-gray-700 text-sm hover:text-[#2162e7] cursor-pointer transition-colors">
+                              <input
+                                type="checkbox"
+                                checked={filterState.selectedRegions.includes(region)}
+                                onChange={() => toggleRegion(region)}
+                                className="accent-[#2162e7] w-4 h-4 rounded-sm"
+                              />
+                              <span className="text-xs font-medium">{region}</span> 
+                            </label>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  {/* Province */}
+                  <div className="flex flex-col mb-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Filter size={14} className="text-[#2162e7]" />
+                      <label className="text-sm font-bold text-gray-800">Province</label>
+                    </div>
                     <Select
-                      options={cityOptions}
-                      value={selectedCityOptions}
-                      onChange={handleCityChange}
-                      placeholder="Select city/municipality"
+                      options={provinceOptions}
+                      value={selectedProvinces}
+                      onChange={handleProvinceChange}
+                      placeholder="Select province(s)"
                       isClearable
                       isMulti
-                      isDisabled={cityOptions.length === 0}
+                      isDisabled={provinceOptions.length === 0}
                       classNamePrefix="react-select"
                       className="text-sm"
                       menuPortalTarget={document.body}
                       styles={{
-                        menuPortal: base => ({ ...base, zIndex: 9999 }),
-                        menu: base => ({ ...base, zIndex: 9999 }),
+                        menuPortal: base => ({ ...base, zIndex: 99999 }),
+                        menu: base => ({ ...base, zIndex: 99999 }),
+                        control: (base, state) => ({
+                          ...base,
+                          borderColor: state.isFocused ? '#2162e7' : '#d1d5db',
+                          boxShadow: state.isFocused ? '0 0 0 3px rgba(33, 98, 231, 0.1)' : 'none',
+                          backgroundColor: '#f9fafb',
+                          '&:hover': {
+                            borderColor: '#2162e7'
+                          }
+                        })
                       }}
                     />
                   </div>
+                  {/* City/Municipality (multi) */}
+                  <div className="relative z-50">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Settings2 size={14} className="text-[#2162e7]" />
+                      <label className="text-sm font-bold text-gray-800">City/Municipality</label>
+                    </div>
+                    <div className="relative">
+                      <Select
+                        options={cityOptions}
+                        value={selectedCityOptions}
+                        onChange={handleCityChange}
+                        placeholder="Select city/municipality"
+                        isClearable
+                        isMulti
+                        isDisabled={cityOptions.length === 0}
+                        classNamePrefix="react-select"
+                        className="text-sm"
+                        menuPortalTarget={document.body}
+                        styles={{
+                          menuPortal: base => ({ ...base, zIndex: 99999 }),
+                          menu: base => ({ ...base, zIndex: 99999 }),
+                          control: (base, state) => ({
+                            ...base,
+                            borderColor: state.isFocused ? '#2162e7' : '#d1d5db',
+                            boxShadow: state.isFocused ? '0 0 0 3px rgba(33, 98, 231, 0.1)' : 'none',
+                            backgroundColor: '#f9fafb',
+                            '&:hover': {
+                              borderColor: '#2162e7'
+                            }
+                          })
+                        }}
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
+            )}
+          </div>
+        </div>
+
+        {/* Date Range */}
+        <div className="flex flex-col lg:col-span-2 group" ref={dateRef}>
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-8 h-8 bg-[#2162e7]/10 rounded-md flex items-center justify-center">
+              <Calendar size={16} className="text-[#2162e7]" />
             </div>
-          )}
+            <label className="text-sm font-semibold text-gray-800">Date Range</label>
+          </div>
+          <div className="relative w-full">
+            <button
+              type="button"
+              className="w-full bg-gray-50 border border-gray-200 rounded-md py-3 px-4 text-left flex justify-between items-center hover:border-[#2162e7] hover:bg-[#2162e7]/5 focus:outline-none focus:ring-2 focus:ring-[#2162e7]/20 focus:border-[#2162e7] transition-all duration-200 shadow-sm"
+              onClick={() => setIsDateOpen((open) => !open)}
+            >
+              <span className="text-sm font-medium text-gray-700">
+                {selectedDateType ? selectedDateType : "Select date type"}
+              </span>
+              <ChevronDown size={18} className={`text-gray-400 transition-all duration-300 ${isDateOpen ? "rotate-180 text-[#2162e7]" : ""}`} />
+            </button>
+            {isDateOpen && (
+              <div className="absolute left-0 right-0 mt-2 bg-white border border-gray-200 rounded-md shadow-lg z-[9999] animate-in slide-in-from-top-2 duration-200">
+                <div className="flex items-center justify-between p-4 bg-gray-50 border-b border-gray-200">
+                  <span className="text-sm font-bold text-gray-800">Date Range</span>
+                  <button
+                    className="text-sm text-red-500 hover:text-red-600 font-semibold hover:bg-red-50 px-3 py-1 rounded-sm transition-colors focus:outline-none"
+                    onClick={deselectAllDates}
+                    type="button"
+                  >
+                    Clear
+                  </button>
+                </div>
+                <div className="p-4">
+                  <div className="flex flex-col gap-3 mb-4">
+                    {dateTypes.map((type) => (
+                      <label key={type} className="flex items-center gap-3 text-sm cursor-pointer text-gray-700 hover:text-[#2162e7] transition-colors group">
+                        <input
+                          type="radio"
+                          checked={selectedDateType === type}
+                          onChange={() => handleDateTypeToggle(type)}
+                          className="accent-[#2162e7] w-4 h-4"
+                          name="date-type"
+                        />
+                        <span className="font-medium group-hover:font-semibold">{type}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <div className="border-t border-gray-200 pt-4">
+                    {!selectedDateType && (
+                      <div className="flex items-center justify-center py-6">
+                        <span className="text-sm text-gray-500 text-center">
+                          Please select day, month, or year
+                        </span>
+                      </div>
+                    )}
+                    {selectedDateType === 'Day' && (
+                      <DateRangeDay 
+                        value={{ start: startDate, end: endDate }} 
+                        onChange={handleDateRangeChange}
+                        onApply={() => setIsDateOpen(false)}
+                      />
+                    )}
+                    {selectedDateType === 'Month' && (
+                      <DateRangeMonth 
+                        value={{ start: startDate, end: endDate }} 
+                        onChange={handleDateRangeChange}
+                        onApply={() => setIsDateOpen(false)}
+                      />
+                    )}
+                    {selectedDateType === 'Year' && (
+                      <DateRangeYear 
+                        value={{ start: startDate, end: endDate }} 
+                        onChange={handleDateRangeChange}
+                        onApply={() => setIsDateOpen(false)}
+                      />
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Date Range */}
-      <div className="flex flex-col lg:col-span-2 " ref={dateRef}>
-        <label className="text-sm font-medium text-secondary-foreground mb-1">Date Range:</label>
-        <div className="relative w-full ">
-          <button
-            type="button"
-            className="w-full bg-card border border-border rounded-md py-2 px-3 text-left flex justify-between items-center focus:outline-none focus:ring-2 focus:ring-blue-500"
-            onClick={() => setIsDateOpen((open) => !open)}
-          >
-            <span className="text-sm text-secondary-foreground">
-              {selectedDateType ? selectedDateType : "Select date type"}
-            </span>
-            <ChevronDown size={18} className={`text-secondary-foreground transition-transform ${isDateOpen ? "rotate-180" : ""}`} />
-          </button>
-          {isDateOpen && (
-            <div className="absolute left-0 bg-white right-0 mt-2 border border-border rounded-md shadow-lg z-20 p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[15px] font-semibold">Date Range</span>
-                <button
-                  className="text-red-400 text-[15px] font-semibold hover:text-red-600 focus:outline-none"
-                  onClick={deselectAllDates}
-                  type="button"
-                >
-                  Deselect
-                </button>
-              </div>
-              <div className="flex flex-col gap-2 mb-3">
-                {dateTypes.map((type) => (
-                  <label key={type} className="flex items-center gap-2 text-[15px] cursor-pointer">
-                    <input
-                      type="radio"
-                      checked={selectedDateType === type}
-                      onChange={() => handleDateTypeToggle(type)}
-                      className="accent-blue-600"
-                      name="date-type"
-                    />
-                    {type}
-                  </label>
-                ))}
-              </div>
-              <div className=' '>
-                {!selectedDateType && (
-                  <span className="text-sm text-muted-foreground text-center block">
-                    Please select day, month, or year
-                  </span>
-                )}
-                {selectedDateType === 'Day' && (
-                  <DateRangeDay value={{ start: startDate, end: endDate }} onChange={handleDateRangeChange} />
-                )}
-                {selectedDateType === 'Month' && (
-                  <DateRangeMonth value={{ start: startDate, end: endDate }} onChange={handleDateRangeChange} />
-                )}
-                {selectedDateType === 'Year' && (
-                  <DateRangeYear value={{ start: startDate, end: endDate }} onChange={handleDateRangeChange} />
-                )}
-              </div>
-            </div>
+      {/* Filter Button Section */}
+      <div className="mt-6 pt-4 border-t border-gray-200">
+        <div className="flex items-center justify-end gap-3">
+          {isLoading && (
+            <button
+              onClick={handleCancelRequest}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-md hover:bg-red-100 hover:border-red-300 transition-all duration-200"
+            >
+              <X size={16} />
+              Cancel Request
+            </button>
           )}
+          <button
+            onClick={handleFilterClick}
+            disabled={isLoading}
+            className={`flex items-center gap-2 px-6 py-3 text-sm font-semibold rounded-md transition-all duration-200 ${
+              isLoading
+                ? 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed'
+                : 'bg-[#2162e7] text-white border border-[#2162e7] hover:bg-[#1d56d1] hover:border-[#1d56d1] focus:outline-none focus:ring-2 focus:ring-[#2162e7]/20 shadow-sm'
+            }`}
+          >
+            {isLoading ? (
+              <>
+                <Loader2 size={16} className="animate-spin" />
+                Loading...
+              </>
+            ) : (
+              <>
+                <Filter size={16} />
+                Apply Filter
+              </>
+            )}
+          </button>
         </div>
       </div>
     </div>

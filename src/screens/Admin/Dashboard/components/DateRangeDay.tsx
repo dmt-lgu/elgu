@@ -12,9 +12,10 @@ interface DateRange {
 interface DateRangePickerProps {
   value?: DateRange;
   onChange?: (range: DateRange) => void;
+  onApply?: () => void;
 }
 
-const DateRangeDay: React.FC<DateRangePickerProps> = ({ value, onChange }) => {
+const DateRangeDay: React.FC<DateRangePickerProps> = ({ value, onChange, onApply }) => {
   // Last applied values
   const [_appliedStart, setAppliedStart] = useState<Date | null>(value?.start ?? null);
   const [_appliedEnd, setAppliedEnd] = useState<Date | null>(value?.end ?? null);
@@ -45,6 +46,7 @@ const DateRangeDay: React.FC<DateRangePickerProps> = ({ value, onChange }) => {
     setAppliedStart(draftStart);
     setAppliedEnd(draftEnd);
     onChange?.({ start: draftStart, end: draftEnd });
+    onApply?.(); // Close the dropdown
   };
 
   const handleClear = () => {

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { Bar, Line, Pie } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -13,8 +13,9 @@ import {
   Legend,
 } from 'chart.js';
 import ChartDataLabels from 'chartjs-plugin-datalabels';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { selectLoad } from '@/redux/loadSlice';
+import { selectData, setData } from '@/redux/dataSlice';
 
 // Register Chart.js components
 ChartJS.register(
@@ -59,15 +60,60 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
   const [chartType, setChartType] = useState<'bar' | 'line' | 'pie'>('bar');
   const [hidden, setHidden] = useState<boolean[]>([false, false, false, false]);
   const chartRef = useRef<any>(null);
-  const labels = data.map(item => item.name);
+  
+  const dataState = useSelector(selectData);
+  const dispatch = useDispatch();
+
+  const handleModuleFilterChange = (selectedModule: string) => {
+    dispatch(setData({
+      ...dataState,
+      selectedChartModuleFilter: selectedModule
+    }));
+  };
+
+  // Process data based on module filter
+  const processedData = useMemo(() => {
+    const moduleFilter = dataState.selectedChartModuleFilter || 'All';
+    
+    return data.map(item => {
+      if (moduleFilter === 'Business Permit') {
+        return {
+          name: item.name,
+          paidMale: item.bpMalePaid || 0,
+          paidFemale: item.bpFemalePaid || 0,
+          pendingMale: item.bpMalePending || 0,
+          pendingFemale: item.bpFemalePending || 0,
+        };
+      } else if (moduleFilter === 'Working Permit') {
+        return {
+          name: item.name,
+          paidMale: item.wpMalePaid || 0,
+          paidFemale: item.wpFemalePaid || 0,
+          pendingMale: item.wpMalePending || 0,
+          pendingFemale: item.wpFemalePending || 0,
+        };
+      } else {
+        // All modules - combine BP and WP data
+        return {
+          name: item.name,
+          paidMale: (item.bpMalePaid || 0) + (item.wpMalePaid || 0),
+          paidFemale: (item.bpFemalePaid || 0) + (item.wpFemalePaid || 0),
+          pendingMale: (item.bpMalePending || 0) + (item.wpMalePending || 0),
+          pendingFemale: (item.bpFemalePending || 0) + (item.wpFemalePending || 0),
+        };
+      }
+    });
+  }, [data, dataState.selectedChartModuleFilter]);
+
+  const labels = processedData.map(item => item.name);
 
   // For Pie chart, aggregate all values
   const pieLabels = ['Paid Male', 'Paid Female', 'Pending Male', 'Pending Female'];
   const pieValues = [
-    data.reduce((sum, item) => sum + (item.paidMale ?? 0), 0),
-    data.reduce((sum, item) => sum + (item.paidFemale ?? 0), 0),
-    data.reduce((sum, item) => sum + (item.pendingMale ?? 0), 0),
-    data.reduce((sum, item) => sum + (item.pendingFemale ?? 0), 0),
+    processedData.reduce((sum, item) => sum + (item.paidMale ?? 0), 0),
+    processedData.reduce((sum, item) => sum + (item.paidFemale ?? 0), 0),
+    processedData.reduce((sum, item) => sum + (item.pendingMale ?? 0), 0),
+    processedData.reduce((sum, item) => sum + (item.pendingFemale ?? 0), 0),
   ];
   const pieTotal = pieValues.reduce((a, b) => a + b, 0);
 
@@ -86,7 +132,7 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
     datasets: [
       {
         label: 'Paid Male',
-        data: data.map(item => item.paidMale),
+        data: processedData.map(item => item.paidMale),
         backgroundColor: '#0047CC',
         borderColor: '#0047CC',
         fill: false,
@@ -94,7 +140,7 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
       },
       {
         label: 'Paid Female',
-        data: data.map(item => item.paidFemale),
+        data: processedData.map(item => item.paidFemale),
         backgroundColor: '#FFD700',
         borderColor: '#FFD700',
         fill: false,
@@ -102,7 +148,7 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
       },
       {
         label: 'Pending Male',
-        data: data.map(item => item.pendingMale),
+        data: processedData.map(item => item.pendingMale),
         backgroundColor: '#DC2626',
         borderColor: '#DC2626',
         fill: false,
@@ -110,7 +156,7 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
       },
       {
         label: 'Pending Female',
-        data: data.map(item => item.pendingFemale),
+        data: processedData.map(item => item.pendingFemale),
         backgroundColor: '#38BDF8',
         borderColor: '#38BDF8',
         fill: false,
@@ -197,7 +243,7 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
   };
 
   // Set minWidth based on data length (e.g., 120px per bar group)
-  const minWidth = Math.max(600, data.length * 120);
+  const minWidth = Math.max(600, processedData.length * 120);
     const loading = useSelector(selectLoad);
   return (
     <div className="bg-card p-4 rounded-md border text-secondary-foreground border-border relative shadow-sm mb-6">
@@ -242,7 +288,25 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
         </div>
       )}
         <div className="flex gap-2  justify-between">
-          <p className="font-semibold">{title}</p>
+          <div className="flex flex-col gap-2">
+            <p className="font-semibold">{title}</p>
+            <div className="flex gap-2 items-center">
+              <label className="text-xs font-semibold">Module Filter:</label>
+              <select
+                className="border rounded cursor-pointer px-2 py-1 text-xs"
+                value={dataState.selectedChartModuleFilter || 'All'}
+                onChange={(e) => handleModuleFilterChange(e.target.value)}
+              >
+                <option value="All">All Modules</option>
+                {dataState.modules?.includes("Business Permit") && (
+                  <option value="Business Permit">Business Permit</option>
+                )}
+                {dataState.modules?.includes("Working Permit") && (
+                  <option value="Working Permit">Working Permit</option>
+                )}
+              </select>
+            </div>
+          </div>
           <div className=' gap-2 flex items-center'>
            {chartTypes.map(type => (
             <button
