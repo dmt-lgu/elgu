@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Select from 'react-select';
-import { Check, ChevronDown, Filter, MapPin, Calendar, Settings2, Layers, Loader2,  BarChart3, Monitor } from 'lucide-react';
+import { Check, ChevronDown, Filter, MapPin, Calendar, Settings2,  Loader2,  BarChart3, Monitor } from 'lucide-react';
 import { useSelector, useDispatch } from 'react-redux';
 
 import DateRangeDay from './DateRangeDay';
@@ -533,7 +533,7 @@ const FilterSection: React.FC = () => {
                   {/* Group of Islands */}
                   <div className="mb-4">
                     <div className="flex items-center gap-2 mb-2">
-                      <Layers size={14} className="text-[#2162e7]" />
+                      
                       <label className="text-sm font-bold text-gray-800">Island Groups</label>
                     </div>
                     <div className="flex gap-6 mb-3">
@@ -553,7 +553,7 @@ const FilterSection: React.FC = () => {
                   {/* Regions */}
                   <div className="mb-4">
                     <div className="flex items-center gap-2 mb-2">
-                      <MapPin size={14} className="text-[#2162e7]" />
+                     
                       <label className="text-sm font-bold text-gray-800">Regions</label>
                     </div>
                     <div className="grid grid-cols-4 gap-2 mb-3">
@@ -577,7 +577,7 @@ const FilterSection: React.FC = () => {
                   {/* Province */}
                   <div className="flex flex-col mb-4">
                     <div className="flex items-center gap-2 mb-2">
-                      <Filter size={14} className="text-[#2162e7]" />
+                      <Settings2 size={14} className="text-[#2162e7]" />
                       <label className="text-sm font-bold text-gray-800">Province</label>
                     </div>
                     <Select
@@ -647,7 +647,7 @@ const FilterSection: React.FC = () => {
         </div>
 
         {/* Date Range */}
-        <div className="flex col-span-3 flex-col group" ref={dateRef}>
+        <div className="flex col-span-2 flex-col group" ref={dateRef}>
           <div className="flex items-center gap-2 mb-3">
             <div className="w-8 h-8 bg-[#2162e7]/10 rounded-md flex items-center justify-center">
               <Calendar size={16} className="text-[#2162e7]" />

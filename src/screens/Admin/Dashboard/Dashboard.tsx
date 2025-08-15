@@ -91,6 +91,10 @@ const DashboardPage = () => {
   // Enhanced filter and group logic
   const filterAndGroupResults = (results: any[], municipalities: any[], provinces: any[], regions: any[] = []) => {
     // 1. If municipalities is not blank, filter by selected municipalities (1 by 1)
+
+ 
+
+    
     if (municipalities && municipalities.length > 0) {
       const selected = municipalities.map((m: any) => m.value);
       return results.filter((lgu: any) => selected.includes(lgu.lgu));
@@ -969,7 +973,7 @@ const chartData3 = useMemo(() => {
     });
 
     return { ...card, ...totals, ...moduleSpecificTotals };
-  }, [card, transactionData, data.municipalities, data.province]);
+  }, [card, transactionData, data.municipalities, data.province, data.real]);
 
 
 

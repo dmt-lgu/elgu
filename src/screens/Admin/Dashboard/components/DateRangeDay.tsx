@@ -59,7 +59,7 @@ const DateRangeDay: React.FC<DateRangePickerProps> = ({ value, onChange, onApply
 
   return (
     <div className="relative">
-      <div className="flex border border-border rounded-md overflow-hidden">
+      <div className="flex flex-col  items-center border border-border rounded-md overflow-hidden">
         <input
           type="date"
           value={draftStart ? format(draftStart, 'yyyy-MM-dd') : ''}
@@ -67,7 +67,7 @@ const DateRangeDay: React.FC<DateRangePickerProps> = ({ value, onChange, onApply
           className="w-32 flex-1 py-2 px-3 text-secondary-foreground bg-card focus:outline-none"
           placeholder="Start date"
         />
-        <div className="bg-border px-2 flex items-center text-secondary-foreground">to</div>
+        <div className="bg-border w-full justify-center px-2 flex items-center text-secondary-foreground">to</div>
         <input
           type="date"
           value={draftEnd ? format(draftEnd, 'yyyy-MM-dd') : ''}

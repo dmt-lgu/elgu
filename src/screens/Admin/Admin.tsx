@@ -312,7 +312,7 @@ function Admin() {
       });
   }
 
-  const BATCH_SIZE = 1; // Process 3 regions at a time
+  const BATCH_SIZE = 1; // Process 1 region at a time (reverted back to original working setting)
 
   function GetTransaction() {
     dispatch(setLoad(true));
@@ -412,9 +412,10 @@ function Admin() {
         dispatch(setCard(totals));
         
         // Keep the full data but limit the size to prevent QuotaExceededError
-        const maxResultsToStore = 500;
+        // Increased limit and using slice(0, maxResultsToStore) to keep the FIRST items, not the last ones
+        const maxResultsToStore = 1000; // Increased from 500 to 1000
         const resultsToStore = mergedResults.length > maxResultsToStore 
-          ? mergedResults.slice(-maxResultsToStore) 
+          ? mergedResults.slice(0, maxResultsToStore) // Keep FIRST items, not last
           : mergedResults;
         
         const dataToStore = {
@@ -426,8 +427,8 @@ function Admin() {
           },
           totalResults: mergedResults.length,
           isPartialData: mergedResults.length > maxResultsToStore,
-          bpResults: allBPResults.length > maxResultsToStore ? allBPResults.slice(-maxResultsToStore) : allBPResults,
-          wpResults: allWPResults.length > maxResultsToStore ? allWPResults.slice(-maxResultsToStore) : allWPResults
+          bpResults: allBPResults.length > maxResultsToStore ? allBPResults.slice(0, maxResultsToStore) : allBPResults, // Keep FIRST items
+          wpResults: allWPResults.length > maxResultsToStore ? allWPResults.slice(0, maxResultsToStore) : allWPResults  // Keep FIRST items
         };
         
         try {
@@ -435,12 +436,12 @@ function Admin() {
         } catch (error: any) {
           // Use the storage utility to handle quota errors
           const handled = handleStorageError(error, () => {
-            // Fallback: try with smaller dataset
+            // Fallback: try with smaller dataset - keep FIRST items, not last
             const smallerData = {
               ...dataToStore,
-              results: resultsToStore.slice(-250),
-              bpResults: allBPResults.slice(-250),
-              wpResults: allWPResults.slice(-250)
+              results: resultsToStore.slice(0, 250), // Keep FIRST 250 items
+              bpResults: allBPResults.slice(0, 250), // Keep FIRST 250 items
+              wpResults: allWPResults.slice(0, 250)  // Keep FIRST 250 items
             };
             dispatch(setTransaction(smallerData));
           });

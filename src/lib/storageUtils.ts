@@ -3,9 +3,9 @@
 export const clearStorageIfNeeded = () => {
   try {
     const storageUsed = JSON.stringify(localStorage).length;
-    const maxStorage = 5 * 1024 * 1024; // 5MB limit (typical browser limit is 5-10MB)
-    
-    if (storageUsed > maxStorage * 0.8) { // If over 80% of limit
+    const maxStorage = 20 * 1024 * 1024; // Increased to 20MB limit for more data capacity
+
+    if (storageUsed > maxStorage * 0.9) { // Increased threshold to 90% of limit
       console.warn('Storage usage high, clearing old data...');
       // Clear specific keys that might be large
       const keysToRemove = [
@@ -62,7 +62,7 @@ export const getStorageUsage = () => {
     return {
       used: storageUsed,
       usedMB: Math.round(storageUsedMB * 100) / 100,
-      percentage: Math.round((storageUsed / (5 * 1024 * 1024)) * 100)
+      percentage: Math.round((storageUsed / (8 * 1024 * 1024)) * 100) // Updated to 8MB
     };
   } catch (error) {
     console.error('Error calculating storage usage:', error);

@@ -117,7 +117,7 @@ function DateRangeYear({
   return (
     <div className={cn("grid gap-2", className)}>
       <div className="flex flex-col gap-4">
-        <div className=" flex w-full items-center gap-4 justify-between">
+        <div className=" flex flex-col w-full items-center gap-4 justify-between">
           <div className="w-full">
             <div className="font-semibold mb-1">Start Year</div>
             <Select
