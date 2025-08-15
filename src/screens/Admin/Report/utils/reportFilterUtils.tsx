@@ -1,6 +1,9 @@
 import { filterTableResults as bpFilterTableResults } from '../table/BusinessPermitReport';
 import { filterTableResults as wpFilterTableResults } from '../table/WorkingPermitReport';
 import { filterTableResults as bcFilterTableResults } from '../table/BrgyClearanceReport';
+import { filterTableResults as bpermitFilterTableResults } from '../table/BuildingPermitReport';
+import { filterTableResults as coFilterTableResults } from '../table/CertificateOfOccupancyReport';
+
 
 export function getModuleFilteredResults({
   moduleKey,
@@ -49,6 +52,30 @@ export function getModuleFilteredResults({
   }
   if (moduleKey === 'Barangay Clearance') {
     return bcFilterTableResults({
+      apiData,
+      selectedRegions,
+      selectedProvinces,
+      selectedCities,
+      selectedDates,
+      selectedIslands,
+      lguToRegion,
+      dateRange,
+    });
+  }
+  if (moduleKey === 'Building Permit') {
+    return bpermitFilterTableResults({
+      apiData,
+      selectedRegions,
+      selectedProvinces,
+      selectedCities,
+      selectedDates,
+      selectedIslands,
+      lguToRegion,
+      dateRange,
+    });
+  }
+  if (moduleKey === 'Certificate of Occupancy') {
+    return coFilterTableResults({
       apiData,
       selectedRegions,
       selectedProvinces,

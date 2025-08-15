@@ -51,10 +51,8 @@ const CO = "Certificate of Occupancy";
 
 // Helper: deep filter equality
 function areFiltersEqual(a: any, b: any) {
-  // If either is null/undefined, only equal if both are null/undefined
   if (!a && !b) return true;
   if (!a || !b) return false;
-  // Make sure to include selectedModules and all other relevant fields
   return JSON.stringify({
     ...a,
     selectedModules: (a.selectedModules || []).slice().sort(),
@@ -63,9 +61,6 @@ function areFiltersEqual(a: any, b: any) {
     selectedModules: (b.selectedModules || []).slice().sort(),
   });
 }
-
-
-
 
 function ensureDate(val: Date | string | null | undefined): Date | null {
   if (!val) return null;
@@ -100,8 +95,7 @@ function useReportData({
   setReduxAppliedFilter,
   hasSearched,
   abortSignal,
-  skipLoading, 
-
+  skipLoading,
 }: {
   moduleKey: string;
   apiUrl: string;
@@ -113,19 +107,17 @@ function useReportData({
   setReduxAppliedFilter: (filter: any) => void;
   hasSearched: boolean;
   abortSignal: AbortSignal | undefined;
-  skipLoading?: boolean; 
+  skipLoading?: boolean;
 }) {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
-  // Compose the current filter for this module
   const currentFilter = useMemo(() => ({
     selectedRegions: appliedFilter.selectedRegions,
     selectedProvinces: appliedFilter.selectedProvinces,
     selectedCities: appliedFilter.selectedCities,
     selectedIslands: appliedFilter.selectedIslands,
     dateRange: appliedFilter.dateRange,
-    // Optionally add more fields if needed
   }), [
     appliedFilter.selectedRegions,
     appliedFilter.selectedProvinces,
@@ -148,7 +140,6 @@ function useReportData({
       return;
     }
 
-    // Use persisted data if filter matches
     if (
       reduxTableData &&
       reduxAppliedFilter &&
@@ -159,7 +150,6 @@ function useReportData({
       return;
     }
 
-    // Else, fetch new data
     setLoading(true);
 
     const payload: any = {
@@ -180,7 +170,6 @@ function useReportData({
     axios.post(apiUrl, payload, { signal: abortSignal })
       .then((response) => {
         setData(response.data);
-        // Only persist for BP, WP, and BC (main Redux slices)
         if (moduleKey === BP) {
           setReduxTableData(response.data);
           setReduxAppliedFilter(currentFilter);
@@ -222,7 +211,6 @@ function useReportData({
           if (moduleKey === CO) {
             setReduxTableData(null);
           }
-
         }
       })
       .finally(() => {
@@ -268,7 +256,6 @@ const Reports: React.FC = () => {
   const persistedCoTableData = useSelector((state: any) => state.certificateOfOccupancy.tableData);
   const persistedCoAppliedFilter = useSelector((state: any) => state.certificateOfOccupancy.appliedFilter);
 
-  
   // Local state
   const [appliedFilter, setAppliedFilterState] = useState<AppliedFilter>({
     selectedRegions: [],
@@ -400,22 +387,21 @@ const Reports: React.FC = () => {
     skipLoading: !selectedModules.includes(CO) || !hasSearched,
   });
 
-  // For loading state, combine only those modules that are selected
+  // Combined loading for top-level (FilterSection), but we'll pass per-module to each table
   const loading =
    !cancelled && (
       (selectedModules.includes(BP) && bpReport.loading) ||
       (selectedModules.includes(WP) && wpReport.loading) ||
       (selectedModules.includes(BC) && bcReport.loading) ||
-      (selectedModules.includes(BLDG) && bldgReport.loading) 
+      (selectedModules.includes(BLDG) && bldgReport.loading)
       || (selectedModules.includes(CO) && coReport.loading)
     );
-  // For table data, use the conditional hook results
+
   const bpTableData = bpReport.data;
   const wpTableData = wpReport.data;
   const bcTableData = bcReport.data;
   const bldgTableData = bldgReport.data;
-  const coTableData = coReport.data; 
-
+  const coTableData = coReport.data;
 
   const getFilteredResults = (moduleKey: string) => {
     let rawData: any = null;
@@ -444,7 +430,7 @@ const Reports: React.FC = () => {
   };
 
   // --- PDF/Excel Export Handler ---
- const handleDownload = async (
+  const handleDownload = async (
     type: "pdf" | "excel",
     permitTypes?: ("business" | "working" | "barangay" | "building" | "certificate")[]
   ) => {
@@ -474,11 +460,8 @@ const Reports: React.FC = () => {
           dateRangeLabel,
           logoUrl: dictImage,
           fileLabel: "business-permit-report",
-          isDayMode: false,
-          isBarangayClearance: false,
           moduleLabel: "Business Permit",
           selectedDateType: appliedFilter.selectedDateType,
-          selectedModules: [BP],
         });
       }
       if (type === "excel") {
@@ -487,10 +470,8 @@ const Reports: React.FC = () => {
           lguToRegion,
           dateRangeLabel,
           fileLabel: "business-permit-report",
-          isDayMode: false,
           moduleLabel: "Business Permit",
           selectedDateType: appliedFilter.selectedDateType,
-          selectedModules: [BP],
         });
       }
     }
@@ -510,11 +491,8 @@ const Reports: React.FC = () => {
           dateRangeLabel,
           logoUrl: dictImage,
           fileLabel: "working-permit-report",
-          isDayMode: false,
-          isBarangayClearance: false,
           moduleLabel: "Working Permit",
           selectedDateType: appliedFilter.selectedDateType,
-          selectedModules: [WP],
         });
       }
       if (type === "excel") {
@@ -523,10 +501,8 @@ const Reports: React.FC = () => {
           lguToRegion,
           dateRangeLabel,
           fileLabel: "working-permit-report",
-          isDayMode: false,
           moduleLabel: "Working Permit",
           selectedDateType: appliedFilter.selectedDateType,
-          selectedModules: [WP],
         });
       }
     }
@@ -546,10 +522,8 @@ const Reports: React.FC = () => {
           dateRangeLabel,
           logoUrl: dictImage,
           fileLabel: "barangay-clearance-report",
-          isDayMode: false,
           moduleLabel: "Barangay Clearance",
           selectedDateType: appliedFilter.selectedDateType,
-          selectedModules: [BC],
         });
       }
       if (type === "excel") {
@@ -558,10 +532,8 @@ const Reports: React.FC = () => {
           lguToRegion,
           dateRangeLabel,
           fileLabel: "barangay-clearance-report",
-          isDayMode: false,
           moduleLabel: "Barangay Clearance",
           selectedDateType: appliedFilter.selectedDateType,
-          selectedModules: [BC],
         });
       }
     }
@@ -581,11 +553,8 @@ const Reports: React.FC = () => {
           dateRangeLabel,
           logoUrl: dictImage,
           fileLabel: "building-permit-report",
-          isDayMode: false,
-          isBarangayClearance: false,
           moduleLabel: "Building Permit",
           selectedDateType: appliedFilter.selectedDateType,
-          selectedModules: [BLDG],
         });
       }
       if (type === "excel") {
@@ -594,10 +563,8 @@ const Reports: React.FC = () => {
           lguToRegion,
           dateRangeLabel,
           fileLabel: "building-permit-report",
-          isDayMode: false,
           moduleLabel: "Building Permit",
           selectedDateType: appliedFilter.selectedDateType,
-          selectedModules: [BLDG],
         });
       }
     }
@@ -617,11 +584,8 @@ const Reports: React.FC = () => {
           dateRangeLabel,
           logoUrl: dictImage,
           fileLabel: "certificate-of-occupancy-report",
-          isDayMode: false,
-          isBarangayClearance: false,
           moduleLabel: "Certificate of Occupancy",
           selectedDateType: appliedFilter.selectedDateType,
-          selectedModules: [CO],
         });
       }
       if (type === "excel") {
@@ -630,10 +594,8 @@ const Reports: React.FC = () => {
           lguToRegion,
           dateRangeLabel,
           fileLabel: "certificate-of-occupancy-report",
-          isDayMode: false,
           moduleLabel: "Certificate of Occupancy",
           selectedDateType: appliedFilter.selectedDateType,
-          selectedModules: [CO],
         });
       }
     }
@@ -642,55 +604,53 @@ const Reports: React.FC = () => {
   // Search handler
   const handleSearch = (filters: any) => {
     setCancelled(false);
-  const normalizedDateRange = {
-    start: filters.dateRange?.start
-      ? typeof filters.dateRange.start === "string"
-        ? filters.dateRange.start
-        : filters.dateRange.start instanceof Date
-          ? filters.dateRange.start.toISOString().slice(0, 10)
-          : null
-      : null,
-    end: filters.dateRange?.end
-      ? typeof filters.dateRange.end === "string"
-        ? filters.dateRange.end
-        : filters.dateRange.end instanceof Date
-          ? filters.dateRange.end.toISOString().slice(0, 10)
-          : null
-      : null,
-  };
+    const normalizedDateRange = {
+      start: filters.dateRange?.start
+        ? typeof filters.dateRange.start === "string"
+          ? filters.dateRange.start
+          : filters.dateRange.start instanceof Date
+            ? filters.dateRange.start.toISOString().slice(0, 10)
+            : null
+        : null,
+      end: filters.dateRange?.end
+        ? typeof filters.dateRange.end === "string"
+          ? filters.dateRange.end
+          : filters.dateRange.end instanceof Date
+            ? filters.dateRange.end.toISOString().slice(0, 10)
+            : null
+        : null,
+    };
 
-  const normalizedFilters = {
-    ...filters,
-    dateRange: normalizedDateRange,
-    selectedModules: (filters.selectedModules || []).slice().sort(),
-  };
+    const normalizedFilters = {
+      ...filters,
+      dateRange: normalizedDateRange,
+      selectedModules: (filters.selectedModules || []).slice().sort(),
+    };
 
-  // If skipApi is true, only update filter state (for local filtering)
-  if (filters.skipApi) {
+    if (filters.skipApi) {
+      setAppliedFilterState(normalizedFilters);
+      setHasSearched(false);
+      dispatch(setAppliedFilter(normalizedFilters)); // BP
+      dispatch(setWorkingPermitAppliedFilter(normalizedFilters)); // WP
+      dispatch(setBrgyClearanceAppliedFilter(normalizedFilters)); // BC
+      dispatch(setbuildingPermiAppliedFilter(normalizedFilters)); // BLDG
+      dispatch(setCertificateOfOccupancyAppliedFilter(normalizedFilters)); // CO
+      return;
+    }
+
+    if (areFiltersEqual(normalizedFilters, lastAppliedFilters)) {
+      return;
+    }
+
     setAppliedFilterState(normalizedFilters);
-    setHasSearched(false);
-    // Update all module filters for local filtering
-    dispatch(setAppliedFilter(normalizedFilters)); // BP
-    dispatch(setWorkingPermitAppliedFilter(normalizedFilters)); // WP
-    dispatch(setBrgyClearanceAppliedFilter(normalizedFilters)); // BC
-    dispatch(setbuildingPermiAppliedFilter(normalizedFilters)); // BLDG
-    dispatch(setCertificateOfOccupancyAppliedFilter(normalizedFilters)); // CO
-    return;
-  }
-
-  if (areFiltersEqual(normalizedFilters, lastAppliedFilters)) {
-    return;
-  }
-
-  setAppliedFilterState(normalizedFilters);
-  setHasSearched(true);
-  setLastAppliedFilters(normalizedFilters);
-  dispatch(setAppliedFilter(normalizedFilters));
-  if (searchAbortController.current) {
-    searchAbortController.current.abort();
-  }
-  searchAbortController.current = new AbortController();
-};
+    setHasSearched(true);
+    setLastAppliedFilters(normalizedFilters);
+    dispatch(setAppliedFilter(normalizedFilters));
+    if (searchAbortController.current) {
+      searchAbortController.current.abort();
+    }
+    searchAbortController.current = new AbortController();
+  };
 
   // Reset handler
   const handleReset = () => {
@@ -734,8 +694,8 @@ const Reports: React.FC = () => {
       searchAbortController.current.abort();
       searchAbortController.current = null;
     }
-    setHasSearched(false); 
-    setCancelled(true); // <-- Set cancelled to true
+    setHasSearched(false);
+    setCancelled(true);
     Swal.fire({
       icon: "info",
       title: "Search Cancelled",
@@ -744,7 +704,6 @@ const Reports: React.FC = () => {
       showConfirmButton: false,
     });
   };
-  
 
   return (
     <div
@@ -763,7 +722,7 @@ const Reports: React.FC = () => {
           onDownload={handleDownload}
           onReset={handleReset}
           hasTableData={hasTableData}
-          loading={!!loading || lguRegionLoading}
+          loading={!!loading || lguRegionLoading}  // keep combined loading for header/controls
           onCancel={handleCancelSearch}
           hasSearched={hasSearched}
         />
@@ -777,7 +736,7 @@ const Reports: React.FC = () => {
             selectedDates={appliedFilter.selectedDateType ? [appliedFilter.selectedDateType] : []}
             selectedIslands={appliedFilter.selectedIslands}
             apiData={bpTableData}
-            loading={!!loading || lguRegionLoading}
+            loading={!!bpReport.loading || lguRegionLoading}  // per-module loading
             lguToRegion={lguToRegion}
             hasSearched={hasSearched}
             onTableDataChange={setHasTableData}
@@ -793,7 +752,7 @@ const Reports: React.FC = () => {
             selectedDates={appliedFilter.selectedDateType ? [appliedFilter.selectedDateType] : []}
             selectedIslands={appliedFilter.selectedIslands}
             apiData={wpTableData || persistedWPTableData}
-            loading={!!loading || lguRegionLoading}
+            loading={!!wpReport.loading || lguRegionLoading}  // per-module loading
             lguToRegion={lguToRegion}
             hasSearched={hasSearched}
             onTableDataChange={setHasTableData}
@@ -809,13 +768,13 @@ const Reports: React.FC = () => {
             selectedDates={appliedFilter.selectedDateType ? [appliedFilter.selectedDateType] : []}
             selectedIslands={appliedFilter.selectedIslands}
             apiData={bcTableData || persistedBrgyTableData}
-            loading={!!loading || lguRegionLoading}
+            loading={!!bcReport.loading || lguRegionLoading}  // per-module loading
             lguToRegion={lguToRegion}
             hasSearched={hasSearched}
             onTableDataChange={setHasTableData}
           />
         )}
-        
+
         {selectedModules.includes(BLDG) && (
           <BuildingPermitReport
             selectedRegions={appliedFilter.selectedRegions}
@@ -825,14 +784,14 @@ const Reports: React.FC = () => {
             selectedDates={appliedFilter.selectedDateType ? [appliedFilter.selectedDateType] : []}
             selectedIslands={appliedFilter.selectedIslands}
             apiData={bldgTableData || persistedBldgTableData}
-            loading={!!loading || lguRegionLoading}
+            loading={!!bldgReport.loading || lguRegionLoading}  // per-module loading
             lguToRegion={lguToRegion}
             hasSearched={hasSearched}
             onTableDataChange={setHasTableData}
           />
         )}
 
-         {selectedModules.includes(CO) && (
+        {selectedModules.includes(CO) && (
           <CertificateOfOccupancyReport
             selectedRegions={appliedFilter.selectedRegions}
             dateRange={appliedFilter.dateRange}
@@ -841,21 +800,49 @@ const Reports: React.FC = () => {
             selectedDates={appliedFilter.selectedDateType ? [appliedFilter.selectedDateType] : []}
             selectedIslands={appliedFilter.selectedIslands}
             apiData={coTableData || persistedCoTableData}
-            loading={!!loading || lguRegionLoading}
+            loading={!!coReport.loading || lguRegionLoading}  // per-module loading
             lguToRegion={lguToRegion}
             hasSearched={hasSearched}
             onTableDataChange={setHasTableData}
           />
         )}
 
+       {selectedModules.length === 0 && (
+  <div className="text-center bg-card p-8 rounded-lg border text-secondary-foreground border-border shadow-sm">
+    <div className="flex flex-col items-center gap-4">
+      {/* Filter Icon */}
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="h-16 w-16 text-muted-foreground"
+      >
+        <path d="M20 7h-9" />
+        <path d="M14 17H4" />
+        <circle cx="17" cy="17" r="3" />
+        <circle cx="7" cy="7" r="3" />
+      </svg>
+      
+      {/* Main Message */}
+      <h3 className="text-2xl font-bold text-foreground">
+        Start by Selecting Filters
+      </h3>
 
-        {selectedModules.length === 0 && (
-          <div className="text-center bg-card p-6 rounded-md border text-secondary-foreground border-border shadow-sm">
-            <span className="font-bold text-lg text-accent-foreground">
-              Please select <span className="text-blue-700">Module</span>, <span className="text-blue-700">Region</span>, and <span className="text-blue-700">Date Range</span> for transaction.
-            </span>
-          </div>
-        )}
+      {/* Additional Guidance */}
+      <p className="text-md text-muted-foreground max-w-md">
+        Please select a <span className="font-semibold text-primary">Module</span>,{' '}
+        <span className="font-semibold text-primary">Region</span>, and{' '}
+        <span className="font-semibold text-primary">Date Range</span> to generate a report.
+      </p>
+    </div>
+  </div>
+)}
 
         <ScrollToTopButton scrollTargetRef={tableContainerRef} />
       </div>
