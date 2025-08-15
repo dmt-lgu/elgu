@@ -277,6 +277,9 @@ const calculateTotals = (data: any): TotalResults => {
 };
 
 function Admin() {
+
+
+
   const location = useLocation();
   const dispatch = useDispatch();
 
@@ -285,6 +288,17 @@ function Admin() {
 
   const controllerRef = useRef<AbortController | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Helper function to reset first run flag (useful for testing)
+  const resetFirstRun = () => {
+    localStorage.setItem('elgu_first_run', '0');
+    console.log('First run flag reset - will auto-trigger on next page load');
+  };
+
+  // Make resetFirstRun available globally for testing
+  (window as any).resetFirstRun = resetFirstRun;
+
+  const [regionStats, setRegionStats] = useState<any[]>([0,17]);
 
   function fetchRegions() {
     dispatch(setLoad(true));
@@ -452,8 +466,8 @@ function Admin() {
           }
         }
 
-        console.log(`${processedRegions}/${totalRegions} regions has done - Processing: ${batch.join(', ')}`);
-
+        
+        setRegionStats([processedRegions,totalRegions])
       } catch (error: any) {
         if (axios.isCancel(error) || error.name === "CanceledError") {
           throw error; // Re-throw cancellation errors
@@ -513,7 +527,7 @@ function Admin() {
           wpResults: []
         }));
 
-        console.log(`Starting batch processing for ${totalRegions} regions: [${locations.join(', ')}]`);
+        
 
         for (let i = 0; i < batches.length; i++) {
           if (controller.signal.aborted) {
@@ -525,6 +539,13 @@ function Admin() {
         dispatch(setLoad(false));
         setIsLoading(false);
         console.log(`All ${totalRegions} regions completed successfully!`);
+        
+        // Mark first run as complete if it was a first run
+        const isFirstRun = localStorage.getItem('elgu_first_run');
+        if (isFirstRun === '0') {
+          localStorage.setItem('elgu_first_run', '1');
+          console.log('First run completed, marked as done');
+        }
 
       } catch (error: any) {
         dispatch(setLoad(false));
@@ -572,18 +593,42 @@ function Admin() {
     window.addEventListener('triggerFilterAPI', handleFilterTrigger);
     window.addEventListener('cancelFilterAPI', handleCancelRequest);
 
+    // Auto-trigger on first run if data is ready
+    const isFirstRun = localStorage.getItem('elgu_first_run');
+    if ((isFirstRun === null || isFirstRun === '0') && data.locationName.length !== 0 && data.startDate && data.endDate) {
+      
+      // Small delay to ensure everything is loaded
+      setTimeout(() => {
+        GetTransaction();
+        // Mark as no longer first run
+        localStorage.setItem('elgu_first_run', '1');
+      }, 1000);
+    }
+
     // Cleanup event listeners
     return () => {
       window.removeEventListener('triggerFilterAPI', handleFilterTrigger);
       window.removeEventListener('cancelFilterAPI', handleCancelRequest);
     };
-  }, [data.startDate, data.endDate, data.modules]); // Removed data.locationName from dependencies
+  }, [data.startDate, data.endDate, data.modules, data.locationName]); // Added data.locationName back to dependencies for auto-trigger
 
   useEffect(() => {
     // Clear storage if needed to prevent quota errors
     clearStorageIfNeeded();
     
     fetchRegions();
+    
+    // Check if this is the first run
+    const isFirstRun = localStorage.getItem('elgu_first_run');
+    
+    if (isFirstRun === null) {
+      // Very first visit - localStorage doesn't exist yet
+      
+      localStorage.setItem('elgu_first_run', '0'); // Set to 0 to indicate first run pending
+    } else if (isFirstRun === '0') {
+      // Previously detected first run that hasn't completed yet
+     
+    }
   }, []);
 
   return (
@@ -710,7 +755,7 @@ function Admin() {
           }}
           className="fixed bottom-4 text-xs right-4 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-full shadow-lg z-50"
         >
-          Cancel Request  <Loader2Icon className="inline w-4 h-4 animate-spin ml-2" />
+          Cancel Request ({regionStats[0]} / {regionStats[1]})  <Loader2Icon className="inline w-4 h-4 animate-spin ml-2" />
         </button>
       )}
     </ThemeProvider>
