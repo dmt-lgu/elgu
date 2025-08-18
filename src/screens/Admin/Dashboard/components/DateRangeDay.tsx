@@ -12,9 +12,10 @@ interface DateRange {
 interface DateRangePickerProps {
   value?: DateRange;
   onChange?: (range: DateRange) => void;
+  onApply?: () => void;
 }
 
-const DateRangeDay: React.FC<DateRangePickerProps> = ({ value, onChange }) => {
+const DateRangeDay: React.FC<DateRangePickerProps> = ({ value, onChange, onApply }) => {
   // Last applied values
   const [_appliedStart, setAppliedStart] = useState<Date | null>(value?.start ?? null);
   const [_appliedEnd, setAppliedEnd] = useState<Date | null>(value?.end ?? null);
@@ -45,6 +46,7 @@ const DateRangeDay: React.FC<DateRangePickerProps> = ({ value, onChange }) => {
     setAppliedStart(draftStart);
     setAppliedEnd(draftEnd);
     onChange?.({ start: draftStart, end: draftEnd });
+    onApply?.(); // Close the dropdown
   };
 
   const handleClear = () => {
@@ -57,7 +59,7 @@ const DateRangeDay: React.FC<DateRangePickerProps> = ({ value, onChange }) => {
 
   return (
     <div className="relative">
-      <div className="flex border border-border rounded-md overflow-hidden">
+      <div className="flex flex-col  items-center border border-border rounded-md overflow-hidden">
         <input
           type="date"
           value={draftStart ? format(draftStart, 'yyyy-MM-dd') : ''}
@@ -65,7 +67,7 @@ const DateRangeDay: React.FC<DateRangePickerProps> = ({ value, onChange }) => {
           className="w-32 flex-1 py-2 px-3 text-secondary-foreground bg-card focus:outline-none"
           placeholder="Start date"
         />
-        <div className="bg-border px-2 flex items-center text-secondary-foreground">to</div>
+        <div className="bg-border w-full justify-center px-2 flex items-center text-secondary-foreground">to</div>
         <input
           type="date"
           value={draftEnd ? format(draftEnd, 'yyyy-MM-dd') : ''}

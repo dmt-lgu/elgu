@@ -13,8 +13,9 @@ import {
   Legend,
 } from 'chart.js';
 import ChartDataLabels from 'chartjs-plugin-datalabels';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { selectLoad } from '@/redux/loadSlice';
+import { selectData, setData } from '@/redux/dataSlice';
 
 // Register Chart.js components
 ChartJS.register(
@@ -29,15 +30,6 @@ ChartJS.register(
   Legend,
   ChartDataLabels
 );
-
-// Mock data
-// const mockTransactionChartData = [
-//   { name: 'CAR', paidMale: 472, paidFemale: 20, pendingMale: 0, pendingFemale: 1 },
-//   { name: 'Region I', paidMale: 1007, paidFemale: 449, pendingMale: 1, pendingFemale: 0 },
-//   { name: 'Region II', paidMale: 1106, paidFemale: 111, pendingMale: 3, pendingFemale: 6 },
-//   { name: 'Region III', paidMale: 971, paidFemale: 125, pendingMale: 3, pendingFemale: 3 },
-//   { name: 'Region IV-A', paidMale: 528, paidFemale: 46, pendingMale: 1, pendingFemale: 3 },
-// ];
 
 interface TransactionChartProps {
   data?: any[];
@@ -59,44 +51,120 @@ const typeOptions = [
 
 const TransactionChart: React.FC<TransactionChartProps> = ({
   data = [],
-  
   period
 }) => {
   const [chartType, setChartType] = useState<'bar' | 'line' | 'pie'>('bar');
   const [hidden, setHidden] = useState<boolean[]>([false, false, false, false]);
   const [txnType, setTxnType] = useState<'overall' | 'new' | 'renew'>('overall');
+  
+  const dataState = useSelector(selectData);
+  const dispatch = useDispatch();
 
-  // Massage data based on txnType
+  const handleModuleFilterChange = (selectedModule: string) => {
+    dispatch(setData({
+      ...dataState,
+      selectedChartModuleFilter: selectedModule
+    }));
+  };
+
+  // Massage data based on txnType and module filter
   const processedData = useMemo(() => {
+    const moduleFilter = dataState.selectedChartModuleFilter || 'All';
+    
     return data.map(item => {
-      if (txnType === 'new') {
-        return {
-          name: item.name,
-          paid: item.newPaid ?? 0,
-          pending: item.newPending ?? 0,
-          paideGov: item.newPaidViaEgov ?? 0,
-          paidLinkBiz: item.newPaidLinkBiz ?? 0,
-        };
-      } else if (txnType === 'renew') {
-        return {
-          name: item.name,
-          paid: item.renewPaid ?? 0,
-          pending: item.renewPending ?? 0,
-          paideGov: item.renewPaidViaEgov ?? 0,
-          paidLinkBiz: item.renewPaidLinkBiz ?? 0,
-        };
+      let baseData = {
+        name: item.name,
+        paid: 0,
+        pending: 0,
+        paideGov: 0,
+        paidLinkBiz: 0,
+      };
+
+      // Get data based on module filter
+      if (moduleFilter === 'Business Permit') {
+        if (txnType === 'new') {
+          baseData = {
+            name: item.name,
+            paid: item.bpNewPaid ?? 0,
+            pending: item.bpNewPending ?? 0,
+            paideGov: item.bpNewPaidViaEgov ?? 0,
+            paidLinkBiz: item.bpNewPaidLinkBiz ?? 0,
+          };
+        } else if (txnType === 'renew') {
+          baseData = {
+            name: item.name,
+            paid: item.bpRenewPaid ?? 0,
+            pending: item.bpRenewPending ?? 0,
+            paideGov: item.bpRenewPaidViaEgov ?? 0,
+            paidLinkBiz: item.bpRenewPaidLinkBiz ?? 0,
+          };
+        } else {
+          baseData = {
+            name: item.name,
+            paid: (item.bpNewPaid ?? 0) + (item.bpRenewPaid ?? 0),
+            pending: (item.bpNewPending ?? 0) + (item.bpRenewPending ?? 0),
+            paideGov: (item.bpNewPaidViaEgov ?? 0) + (item.bpRenewPaidViaEgov ?? 0),
+            paidLinkBiz: (item.bpNewPaidLinkBiz ?? 0) + (item.bpRenewPaidLinkBiz ?? 0),
+          };
+        }
+      } else if (moduleFilter === 'Working Permit') {
+        if (txnType === 'new') {
+          baseData = {
+            name: item.name,
+            paid: item.wpNewPaid ?? 0,
+            pending: item.wpNewPending ?? 0,
+            paideGov: item.wpNewPaidViaEgov ?? 0,
+            paidLinkBiz: item.wpNewPaidLinkBiz ?? 0,
+          };
+        } else if (txnType === 'renew') {
+          baseData = {
+            name: item.name,
+            paid: item.wpRenewPaid ?? 0,
+            pending: item.wpRenewPending ?? 0,
+            paideGov: item.wpRenewPaidViaEgov ?? 0,
+            paidLinkBiz: item.wpRenewPaidLinkBiz ?? 0,
+          };
+        } else {
+          baseData = {
+            name: item.name,
+            paid: (item.wpNewPaid ?? 0) + (item.wpRenewPaid ?? 0),
+            pending: (item.wpNewPending ?? 0) + (item.wpRenewPending ?? 0),
+            paideGov: (item.wpNewPaidViaEgov ?? 0) + (item.wpRenewPaidViaEgov ?? 0),
+            paidLinkBiz: (item.wpNewPaidLinkBiz ?? 0) + (item.wpRenewPaidLinkBiz ?? 0),
+          };
+        }
       } else {
-        // total
-        return {
-          name: item.name,
-          paid: (item.newPaid ?? 0) + (item.renewPaid ?? 0),
-          pending: (item.newPending ?? 0) + (item.renewPending ?? 0),
-          paideGov: (item.newPaidViaEgov ?? 0) + (item.renewPaidViaEgov ?? 0),
-          paidLinkBiz: (item.newPaidLinkBiz ?? 0) + (item.renewPaidLinkBiz ?? 0),
-        };
+        // All modules - combine BP and WP data
+        if (txnType === 'new') {
+          baseData = {
+            name: item.name,
+            paid: (item.bpNewPaid ?? 0) + (item.wpNewPaid ?? 0),
+            pending: (item.bpNewPending ?? 0) + (item.wpNewPending ?? 0),
+            paideGov: (item.bpNewPaidViaEgov ?? 0) + (item.wpNewPaidViaEgov ?? 0),
+            paidLinkBiz: (item.bpNewPaidLinkBiz ?? 0) + (item.wpNewPaidLinkBiz ?? 0),
+          };
+        } else if (txnType === 'renew') {
+          baseData = {
+            name: item.name,
+            paid: (item.bpRenewPaid ?? 0) + (item.wpRenewPaid ?? 0),
+            pending: (item.bpRenewPending ?? 0) + (item.wpRenewPending ?? 0),
+            paideGov: (item.bpRenewPaidViaEgov ?? 0) + (item.wpRenewPaidViaEgov ?? 0),
+            paidLinkBiz: (item.bpRenewPaidLinkBiz ?? 0) + (item.wpRenewPaidLinkBiz ?? 0),
+          };
+        } else {
+          baseData = {
+            name: item.name,
+            paid: (item.bpNewPaid ?? 0) + (item.bpRenewPaid ?? 0) + (item.wpNewPaid ?? 0) + (item.wpRenewPaid ?? 0),
+            pending: (item.bpNewPending ?? 0) + (item.bpRenewPending ?? 0) + (item.wpNewPending ?? 0) + (item.wpRenewPending ?? 0),
+            paideGov: (item.bpNewPaidViaEgov ?? 0) + (item.bpRenewPaidViaEgov ?? 0) + (item.wpNewPaidViaEgov ?? 0) + (item.wpRenewPaidViaEgov ?? 0),
+            paidLinkBiz: (item.bpNewPaidLinkBiz ?? 0) + (item.bpRenewPaidLinkBiz ?? 0) + (item.wpNewPaidLinkBiz ?? 0) + (item.wpRenewPaidLinkBiz ?? 0),
+          };
+        }
       }
+
+      return baseData;
     });
-  }, [data, txnType]);
+  }, [data, txnType, dataState.selectedChartModuleFilter]);
 
   const labels = processedData.map(item => item.name);
 
@@ -302,11 +370,29 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
         </div>
       )}
       <div className="flex gap-2  justify-between">
-        <p className="font-semibold">
-    {txnType === 'renew' && 'NUMBER OF TRANSACTION PER REGION FOR RENEW APPLICATION'}
-    {txnType === 'new' && 'NUMBER OF TRANSACTION PER REGION FOR NEW APPLICATION'}
-    {txnType === 'overall' && 'NUMBER OF TRANSACTION PER REGION FOR OVERALL APPLICATION'}
-  </p>
+        <div className="flex flex-col gap-2">
+          <p className="font-semibold">
+            {txnType === 'renew' && 'NUMBER OF TRANSACTION PER REGION FOR RENEW APPLICATION'}
+            {txnType === 'new' && 'NUMBER OF TRANSACTION PER REGION FOR NEW APPLICATION'}
+            {txnType === 'overall' && 'NUMBER OF TRANSACTION PER REGION FOR OVERALL APPLICATION'}
+          </p>
+          <div className="flex gap-2 items-center">
+            <label className="text-xs font-semibold">Module Filter:</label>
+            <select
+              className="border rounded cursor-pointer px-2 py-1 text-xs"
+              value={dataState.selectedChartModuleFilter || 'All'}
+              onChange={(e) => handleModuleFilterChange(e.target.value)}
+            >
+              <option value="All">All Modules</option>
+              {dataState.modules?.includes("Business Permit") && (
+                <option value="Business Permit">Business Permit</option>
+              )}
+              {dataState.modules?.includes("Working Permit") && (
+                <option value="Working Permit">Working Permit</option>
+              )}
+            </select>
+          </div>
+        </div>
         <div className=' gap-2 flex items-center'>
           {chartTypes.map(type => (
             <button

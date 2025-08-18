@@ -3,7 +3,6 @@ import { cn } from "@/lib/utils";
 import React from "react";
 import Select from "react-select";
 import { useSelector } from "react-redux";
-import { selectData } from "@/redux/dataSlice"; // Update the import path as needed
 import { selectLoad } from '@/redux/loadSlice';
 
 type YearOnly = { year: number };
@@ -12,27 +11,28 @@ interface DateRangeYearProps {
   className?: string;
   value?: { start: Date | null; end: Date | null };
   onChange?: (range: { start: Date | null; end: Date | null }) => void;
+  onApply?: () => void;
 }
 
 function DateRangeYear({
   className,
   value,
   onChange,
+  onApply,
 }: DateRangeYearProps) {
-  // Get startDate and endDate from Redux
-  const data = useSelector(selectData);
-  const reduxStart = data?.startDate;
-  const reduxEnd = data?.endDate;
-
-  // Parse years from Redux dates, fallback to current year if not set
-  const startYearRedux = reduxStart ? new Date(reduxStart).getFullYear() : new Date().getFullYear() - 10;
-  const endYearRedux = reduxEnd ? new Date(reduxEnd).getFullYear() : new Date().getFullYear() + 1;
-
-  // Generate years for dropdown based on Redux, highest to lowest
+  // Get current year for reasonable defaults
+  const currentYear = new Date().getFullYear();
+  
+  // Generate a reasonable range of years (e.g., 2020 to current year + 2)
+  const startYear = 2020;
+  const endYear = currentYear + 2;
+  
+  // Generate years for dropdown, highest to lowest
   const years = Array.from(
-    { length: endYearRedux - startYearRedux  },
-    (_, i) => startYearRedux + i
+    { length: endYear - startYear + 1 },
+    (_, i) => startYear + i
   ).reverse();
+  
   const yearOptions = years.map(y => ({
     value: y,
     label: y.toString(),
@@ -95,11 +95,13 @@ function DateRangeYear({
         start: new Date(from.year, 0, 1), // 01-01-YYYY
         end: new Date(to.year, 11, 31),   // 12-31-YYYY
       });
+      onApply?.(); // Close dropdown after applying
     } else if (from && onChange) {
       onChange({
         start: new Date(from.year, 0, 1),
         end: null,
       });
+      onApply?.(); // Close dropdown after applying
     }
   };
 
@@ -115,7 +117,7 @@ function DateRangeYear({
   return (
     <div className={cn("grid gap-2", className)}>
       <div className="flex flex-col gap-4">
-        <div className=" flex w-full items-center gap-4 justify-between">
+        <div className=" flex flex-col w-full items-center gap-4 justify-between">
           <div className="w-full">
             <div className="font-semibold mb-1">Start Year</div>
             <Select

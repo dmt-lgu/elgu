@@ -48,34 +48,6 @@ export const regionGroups = [
   ["BARMM I", "BARMM II", "XIII"],
 ];
 
-interface MonthlyResult {
-  month: string;
-  newPending: number;
-  newPaid: number;
-  newPaidViaEgov: number;
-  renewPending: number;
-  renewPaid: number;
-  renewPaidViaEgov: number;
-  malePending: number;
-  malePaid: number;
-  femalePending: number;
-  femalePaid: number;
-}
-
-interface LGUData {
-  lgu: string;
-  monthlyResults: MonthlyResult[];
-}
-
-interface TransactionResponse {
-  dateRange: {
-    startDate: string;
-    endDate: string;
-  };
-  lguCount: number;
-  results: LGUData[];
-}
-
 interface TotalResults {
   totalnewPending: number;
   totalnewPaid: number;
@@ -87,9 +59,123 @@ interface TotalResults {
   totalmalePaid: number;
   totalfemalePending: number;
   totalfemalePaid: number;
+  // Add totals for each module
+  bpTotalnewPending?: number;
+  bpTotalnewPaid?: number;
+  bpTotalnewPaidViaEgov?: number;
+  bpTotalrenewPending?: number;
+  bpTotalrenewPaid?: number;
+  bpTotalrenewPaidViaEgov?: number;
+  bpTotalmalePending?: number;
+  bpTotalmalePaid?: number;
+  bpTotalfemalePending?: number;
+  bpTotalfemalePaid?: number;
+  wpTotalnewPending?: number;
+  wpTotalnewPaid?: number;
+  wpTotalnewPaidViaEgov?: number;
+  wpTotalrenewPending?: number;
+  wpTotalrenewPaid?: number;
+  wpTotalrenewPaidViaEgov?: number;
+  wpTotalmalePending?: number;
+  wpTotalmalePaid?: number;
+  wpTotalfemalePending?: number;
+  wpTotalfemalePaid?: number;
 }
 
-const calculateTotals = (data: TransactionResponse): TotalResults => {
+const mergeModuleResults = (bpResults: any[], wpResults: any[]): any[] => {
+  const mergedMap = new Map();
+
+  // Add BP results
+  bpResults.forEach(bpLgu => {
+    mergedMap.set(bpLgu.lgu, {
+      lgu: bpLgu.lgu,
+      region: bpLgu.region,
+      monthlyResults: bpLgu.monthlyResults.map((month: any) => ({
+        ...month,
+        bpNewPending: month.newPending,
+        bpNewPaid: month.newPaid,
+        bpNewPaidViaEgov: month.newPaidViaEgov || 0,
+        bpRenewPending: month.renewPending,
+        bpRenewPaid: month.renewPaid,
+        bpRenewPaidViaEgov: month.renewPaidViaEgov || 0,
+        bpMalePending: month.malePending,
+        bpMalePaid: month.malePaid,
+        bpFemalePending: month.femalePending,
+        bpFemalePaid: month.femalePaid,
+        wpNewPending: 0,
+        wpNewPaid: 0,
+        wpNewPaidViaEgov: 0,
+        wpRenewPending: 0,
+        wpRenewPaid: 0,
+        wpRenewPaidViaEgov: 0,
+        wpMalePending: 0,
+        wpMalePaid: 0,
+        wpFemalePending: 0,
+        wpFemalePaid: 0,
+      }))
+    });
+  });
+
+  // Add WP results
+  wpResults.forEach(wpLgu => {
+    const existing = mergedMap.get(wpLgu.lgu);
+    if (existing) {
+      // Merge with existing BP data
+      existing.monthlyResults = existing.monthlyResults.map((month: any) => {
+        const wpMonth = wpLgu.monthlyResults.find((wp: any) => wp.month === month.month);
+        if (wpMonth) {
+          return {
+            ...month,
+            wpNewPending: wpMonth.newPending,
+            wpNewPaid: wpMonth.newPaid,
+            wpNewPaidViaEgov: wpMonth.newPaidViaEgov || 0,
+            wpRenewPending: wpMonth.renewPending,
+            wpRenewPaid: wpMonth.renewPaid,
+            wpRenewPaidViaEgov: wpMonth.renewPaidViaEgov || 0,
+            wpMalePending: wpMonth.malePending,
+            wpMalePaid: wpMonth.malePaid,
+            wpFemalePending: wpMonth.femalePending,
+            wpFemalePaid: wpMonth.femalePaid,
+          };
+        }
+        return month;
+      });
+    } else {
+      // Create new entry for WP only
+      mergedMap.set(wpLgu.lgu, {
+        lgu: wpLgu.lgu,
+        region: wpLgu.region,
+        monthlyResults: wpLgu.monthlyResults.map((month: any) => ({
+          ...month,
+          bpNewPending: 0,
+          bpNewPaid: 0,
+          bpNewPaidViaEgov: 0,
+          bpRenewPending: 0,
+          bpRenewPaid: 0,
+          bpRenewPaidViaEgov: 0,
+          bpMalePending: 0,
+          bpMalePaid: 0,
+          bpFemalePending: 0,
+          bpFemalePaid: 0,
+          wpNewPending: month.newPending,
+          wpNewPaid: month.newPaid,
+          wpNewPaidViaEgov: month.newPaidViaEgov || 0,
+          wpRenewPending: month.renewPending,
+          wpRenewPaid: month.renewPaid,
+          wpRenewPaidViaEgov: month.renewPaidViaEgov || 0,
+          wpMalePending: month.malePending,
+          wpMalePaid: month.malePaid,
+          wpFemalePending: month.femalePending,
+          wpFemalePaid: month.femalePaid,
+        }))
+      });
+    }
+  });
+
+  return Array.from(mergedMap.values());
+};
+
+const calculateTotals = (data: any): TotalResults => {
   const totals: TotalResults = {
     totalnewPending: 0,
     totalnewPaid: 0,
@@ -101,20 +187,89 @@ const calculateTotals = (data: TransactionResponse): TotalResults => {
     totalmalePaid: 0,
     totalfemalePending: 0,
     totalfemalePaid: 0,
+    // Module-specific totals
+    bpTotalnewPending: 0,
+    bpTotalnewPaid: 0,
+    bpTotalnewPaidViaEgov: 0,
+    bpTotalrenewPending: 0,
+    bpTotalrenewPaid: 0,
+    bpTotalrenewPaidViaEgov: 0,
+    bpTotalmalePending: 0,
+    bpTotalmalePaid: 0,
+    bpTotalfemalePending: 0,
+    bpTotalfemalePaid: 0,
+    wpTotalnewPending: 0,
+    wpTotalnewPaid: 0,
+    wpTotalnewPaidViaEgov: 0,
+    wpTotalrenewPending: 0,
+    wpTotalrenewPaid: 0,
+    wpTotalrenewPaidViaEgov: 0,
+    wpTotalmalePending: 0,
+    wpTotalmalePaid: 0,
+    wpTotalfemalePending: 0,
+    wpTotalfemalePaid: 0,
   };
 
-  data.results.forEach((lgu) => {
-    lgu.monthlyResults.forEach((result) => {
-      totals.totalnewPending += result.newPending;
-      totals.totalnewPaid += result.newPaid;
-      totals.totalnewPaidViaEgov += result.newPaidViaEgov;
-      totals.totalrenewPending += result.renewPending;
-      totals.totalrenewPaid += result.renewPaid;
-      totals.totalrenewPaidViaEgov += result.renewPaidViaEgov;
-      totals.totalmalePending += result.malePending;
-      totals.totalmalePaid += result.malePaid;
-      totals.totalfemalePending += result.femalePending;
-      totals.totalfemalePaid += result.femalePaid;
+  data.results.forEach((lgu: any) => {
+    lgu.monthlyResults.forEach((result: any) => {
+      // Calculate combined totals
+      const bpNewPending = result.bpNewPending || 0;
+      const bpNewPaid = result.bpNewPaid || 0;
+      const bpNewPaidViaEgov = result.bpNewPaidViaEgov || 0;
+      const bpRenewPending = result.bpRenewPending || 0;
+      const bpRenewPaid = result.bpRenewPaid || 0;
+      const bpRenewPaidViaEgov = result.bpRenewPaidViaEgov || 0;
+      const bpMalePending = result.bpMalePending || 0;
+      const bpMalePaid = result.bpMalePaid || 0;
+      const bpFemalePending = result.bpFemalePending || 0;
+      const bpFemalePaid = result.bpFemalePaid || 0;
+
+      const wpNewPending = result.wpNewPending || 0;
+      const wpNewPaid = result.wpNewPaid || 0;
+      const wpNewPaidViaEgov = result.wpNewPaidViaEgov || 0;
+      const wpRenewPending = result.wpRenewPending || 0;
+      const wpRenewPaid = result.wpRenewPaid || 0;
+      const wpRenewPaidViaEgov = result.wpRenewPaidViaEgov || 0;
+      const wpMalePending = result.wpMalePending || 0;
+      const wpMalePaid = result.wpMalePaid || 0;
+      const wpFemalePending = result.wpFemalePending || 0;
+      const wpFemalePaid = result.wpFemalePaid || 0;
+
+      // Combined totals
+      totals.totalnewPending += bpNewPending + wpNewPending;
+      totals.totalnewPaid += bpNewPaid + wpNewPaid;
+      totals.totalnewPaidViaEgov += bpNewPaidViaEgov + wpNewPaidViaEgov;
+      totals.totalrenewPending += bpRenewPending + wpRenewPending;
+      totals.totalrenewPaid += bpRenewPaid + wpRenewPaid;
+      totals.totalrenewPaidViaEgov += bpRenewPaidViaEgov + wpRenewPaidViaEgov;
+      totals.totalmalePending += bpMalePending + wpMalePending;
+      totals.totalmalePaid += bpMalePaid + wpMalePaid;
+      totals.totalfemalePending += bpFemalePending + wpFemalePending;
+      totals.totalfemalePaid += bpFemalePaid + wpFemalePaid;
+
+      // BP specific totals
+      totals.bpTotalnewPending! += bpNewPending;
+      totals.bpTotalnewPaid! += bpNewPaid;
+      totals.bpTotalnewPaidViaEgov! += bpNewPaidViaEgov;
+      totals.bpTotalrenewPending! += bpRenewPending;
+      totals.bpTotalrenewPaid! += bpRenewPaid;
+      totals.bpTotalrenewPaidViaEgov! += bpRenewPaidViaEgov;
+      totals.bpTotalmalePending! += bpMalePending;
+      totals.bpTotalmalePaid! += bpMalePaid;
+      totals.bpTotalfemalePending! += bpFemalePending;
+      totals.bpTotalfemalePaid! += bpFemalePaid;
+
+      // WP specific totals
+      totals.wpTotalnewPending! += wpNewPending;
+      totals.wpTotalnewPaid! += wpNewPaid;
+      totals.wpTotalnewPaidViaEgov! += wpNewPaidViaEgov;
+      totals.wpTotalrenewPending! += wpRenewPending;
+      totals.wpTotalrenewPaid! += wpRenewPaid;
+      totals.wpTotalrenewPaidViaEgov! += wpRenewPaidViaEgov;
+      totals.wpTotalmalePending! += wpMalePending;
+      totals.wpTotalmalePaid! += wpMalePaid;
+      totals.wpTotalfemalePending! += wpFemalePending;
+      totals.wpTotalfemalePaid! += wpFemalePaid;
     });
   });
 
@@ -122,15 +277,28 @@ const calculateTotals = (data: TransactionResponse): TotalResults => {
 };
 
 function Admin() {
+
+
+
   const location = useLocation();
   const dispatch = useDispatch();
 
   const data = useSelector(selectData);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
   const controllerRef = useRef<AbortController | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Helper function to reset first run flag (useful for testing)
+  const resetFirstRun = () => {
+    localStorage.setItem('elgu_first_run', '0');
+    console.log('First run flag reset - will auto-trigger on next page load');
+  };
+
+  // Make resetFirstRun available globally for testing
+  (window as any).resetFirstRun = resetFirstRun;
+
+  const [regionStats, setRegionStats] = useState<any[]>([]);
 
   function fetchRegions() {
     dispatch(setLoad(true));
@@ -158,7 +326,7 @@ function Admin() {
       });
   }
 
-  const BATCH_SIZE = 1; // Process 3 regions at a time
+  const BATCH_SIZE = 1; // Process 1 region at a time (reverted back to original working setting)
 
   function GetTransaction() {
     dispatch(setLoad(true));
@@ -181,48 +349,88 @@ function Admin() {
       batches.push(locations.slice(i, i + BATCH_SIZE));
     }
 
-    let allResults: any[] = [];
+    // Initialize results for each module
+    let allBPResults: any[] = [];
+    let allWPResults: any[] = [];
     let totalLguCount = 0;
     let processedRegions = 0;
 
     const processBatch = async (batch: string[], batchIndex: number) => {
       try {
-        const response = await axios.post(
-          `${import.meta.env.VITE_URL}/api/bp/transaction-count/`,
-          {
-            locationName: batch,
-            startDate: data.startDate,
-            endDate: data.endDate,
-          },
-          { signal: controller.signal }
-        );
+        const requests = [];
+        
+        // Check which modules are enabled and make appropriate API calls
+        if (data.modules?.includes("Business Permit")) {
+          requests.push(
+            axios.post(
+              `${import.meta.env.VITE_URL}/api/bp/transaction-count/`,
+              {
+                locationName: batch,
+                startDate: data.startDate,
+                endDate: data.endDate,
+              },
+              { signal: controller.signal }
+            ).then(response => ({ type: 'bp', data: response.data }))
+          );
+        }
 
-        // Add new results to existing data
-        allResults = allResults.concat(response.data.results || []);
-        totalLguCount += response.data.lguCount || 0;
+        if (data.modules?.includes("Working Permit")) {
+          requests.push(
+            axios.post(
+              `${import.meta.env.VITE_URL}/api/wp/transaction-count/`,
+              {
+                locationName: batch,
+                startDate: data.startDate,
+                endDate: data.endDate,
+              },
+              { signal: controller.signal }
+            ).then(response => ({ type: 'wp', data: response.data }))
+          );
+        }
+
+        // Execute all requests in parallel
+        const responses = await Promise.all(requests);
+
+        // Process responses
+        responses.forEach(response => {
+          if (response.type === 'bp') {
+            allBPResults = allBPResults.concat(response.data.results || []);
+          } else if (response.type === 'wp') {
+            allWPResults = allWPResults.concat(response.data.results || []);
+          }
+          
+          if (response.data.lguCount && response.data.lguCount > totalLguCount) {
+            totalLguCount = response.data.lguCount;
+          }
+        });
         
         // Update processed regions count
         processedRegions += batch.length;
 
+        // Merge results from both modules by LGU
+        const mergedResults = mergeModuleResults(allBPResults, allWPResults);
+
         // Update state after each batch completion
         const updatedData = {
-          results: allResults,
+          results: mergedResults,
           lguCount: totalLguCount,
           dateRange: {
             startDate: data.startDate,
             endDate: data.endDate,
-          }
+          },
+          bpResults: allBPResults,
+          wpResults: allWPResults
         };
 
         const totals = calculateTotals(updatedData);
         dispatch(setCard(totals));
         
         // Keep the full data but limit the size to prevent QuotaExceededError
-        // Only keep the most recent results if data gets too large
-        const maxResultsToStore = 500; // Reduced from 1000 to prevent quota errors
-        const resultsToStore = allResults.length > maxResultsToStore 
-          ? allResults.slice(-maxResultsToStore) 
-          : allResults;
+        // Increased limit and using slice(0, maxResultsToStore) to keep the FIRST items, not the last ones
+        const maxResultsToStore = 1000; // Increased from 500 to 1000
+        const resultsToStore = mergedResults.length > maxResultsToStore 
+          ? mergedResults.slice(0, maxResultsToStore) // Keep FIRST items, not last
+          : mergedResults;
         
         const dataToStore = {
           results: resultsToStore,
@@ -231,8 +439,10 @@ function Admin() {
             startDate: data.startDate,
             endDate: data.endDate,
           },
-          totalResults: allResults.length,
-          isPartialData: allResults.length > maxResultsToStore
+          totalResults: mergedResults.length,
+          isPartialData: mergedResults.length > maxResultsToStore,
+          bpResults: allBPResults.length > maxResultsToStore ? allBPResults.slice(0, maxResultsToStore) : allBPResults, // Keep FIRST items
+          wpResults: allWPResults.length > maxResultsToStore ? allWPResults.slice(0, maxResultsToStore) : allWPResults  // Keep FIRST items
         };
         
         try {
@@ -240,10 +450,12 @@ function Admin() {
         } catch (error: any) {
           // Use the storage utility to handle quota errors
           const handled = handleStorageError(error, () => {
-            // Fallback: try with smaller dataset
+            // Fallback: try with smaller dataset - keep FIRST items, not last
             const smallerData = {
               ...dataToStore,
-              results: resultsToStore.slice(-250) // Keep only 250 most recent
+              results: resultsToStore.slice(0, 250), // Keep FIRST 250 items
+              bpResults: allBPResults.slice(0, 250), // Keep FIRST 250 items
+              wpResults: allWPResults.slice(0, 250)  // Keep FIRST 250 items
             };
             dispatch(setTransaction(smallerData));
           });
@@ -254,8 +466,8 @@ function Admin() {
           }
         }
 
-        console.log(`${processedRegions}/${totalRegions} regions has done - Processing: ${batch.join(', ')}`);
-
+        
+        setRegionStats([processedRegions,totalRegions])
       } catch (error: any) {
         if (axios.isCancel(error) || error.name === "CanceledError") {
           throw error; // Re-throw cancellation errors
@@ -281,6 +493,26 @@ function Admin() {
           totalmalePaid: 0,
           totalfemalePending: 0,
           totalfemalePaid: 0,
+          bpTotalnewPending: 0,
+          bpTotalnewPaid: 0,
+          bpTotalnewPaidViaEgov: 0,
+          bpTotalrenewPending: 0,
+          bpTotalrenewPaid: 0,
+          bpTotalrenewPaidViaEgov: 0,
+          bpTotalmalePending: 0,
+          bpTotalmalePaid: 0,
+          bpTotalfemalePending: 0,
+          bpTotalfemalePaid: 0,
+          wpTotalnewPending: 0,
+          wpTotalnewPaid: 0,
+          wpTotalnewPaidViaEgov: 0,
+          wpTotalrenewPending: 0,
+          wpTotalrenewPaid: 0,
+          wpTotalrenewPaidViaEgov: 0,
+          wpTotalmalePending: 0,
+          wpTotalmalePaid: 0,
+          wpTotalfemalePending: 0,
+          wpTotalfemalePaid: 0,
         }));
         dispatch(setTransaction({
           results: [],
@@ -290,10 +522,12 @@ function Admin() {
             endDate: data.endDate,
           },
           totalResults: 0,
-          isPartialData: false
+          isPartialData: false,
+          bpResults: [],
+          wpResults: []
         }));
 
-        console.log(`Starting batch processing for ${totalRegions} regions: [${locations.join(', ')}]`);
+        
 
         for (let i = 0; i < batches.length; i++) {
           if (controller.signal.aborted) {
@@ -305,6 +539,13 @@ function Admin() {
         dispatch(setLoad(false));
         setIsLoading(false);
         console.log(`All ${totalRegions} regions completed successfully!`);
+        
+        // Mark first run as complete if it was a first run
+        const isFirstRun = localStorage.getItem('elgu_first_run');
+        if (isFirstRun === '0') {
+          localStorage.setItem('elgu_first_run', '1');
+          console.log('First run completed, marked as done');
+        }
 
       } catch (error: any) {
         dispatch(setLoad(false));
@@ -330,24 +571,67 @@ function Admin() {
   }
 
   useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
+    // Event listener for manual filter trigger
+    const handleFilterTrigger = () => {
       if (data.locationName.length !== 0 && data.startDate && data.endDate) {
         GetTransaction();
       }
-    }, 1400);
-
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [data.locationName, data.startDate, data.endDate]);
+
+    // Event listener for cancel request
+    const handleCancelRequest = () => {
+      if (controllerRef.current) {
+        controllerRef.current.abort();
+        controllerRef.current = null;
+      }
+      setIsLoading(false);
+      dispatch(setLoad(false));
+      console.log("Request canceled by user");
+    };
+
+    // Add event listeners
+    window.addEventListener('triggerFilterAPI', handleFilterTrigger);
+    window.addEventListener('cancelFilterAPI', handleCancelRequest);
+
+    // Auto-trigger on first run if data is ready
+    const isFirstRun = localStorage.getItem('elgu_first_run');
+    if ((isFirstRun === null || isFirstRun === '0') && data.locationName.length !== 0 && data.startDate && data.endDate) {
+      
+      // Small delay to ensure everything is loaded
+      setTimeout(() => {
+        GetTransaction();
+        // Mark as no longer first run
+        localStorage.setItem('elgu_first_run', '1');
+      }, 1000);
+    }
+
+    // Cleanup event listeners
+    return () => {
+      window.removeEventListener('triggerFilterAPI', handleFilterTrigger);
+      window.removeEventListener('cancelFilterAPI', handleCancelRequest);
+    };
+  }, [data.startDate, data.endDate, data.modules, data.locationName]); // Added data.locationName back to dependencies for auto-trigger
 
   useEffect(() => {
     // Clear storage if needed to prevent quota errors
     clearStorageIfNeeded();
+    
     fetchRegions();
+    
+    // Check if this is the first run
+    const isFirstRun = localStorage.getItem('elgu_first_run');
+    
+    if (isFirstRun === null) {
+      // Very first visit - localStorage doesn't exist yet
+      
+      localStorage.setItem('elgu_first_run', '0'); // Set to 0 to indicate first run pending
+    } else if (isFirstRun === '0') {
+      // Previously detected first run that hasn't completed yet
+     
+    }
   }, []);
-
+ const locations: string[] = Array.isArray(data.real) ? data.real : [data.real];
+const totalRegions = locations.length;
   return (
     <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme">
       <div className="flex h-screen">
@@ -472,7 +756,7 @@ function Admin() {
           }}
           className="fixed bottom-4 text-xs right-4 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-full shadow-lg z-50"
         >
-          Cancel Request  <Loader2Icon className="inline w-4 h-4 animate-spin ml-2" />
+          Cancel Request ({regionStats[0] ? regionStats[0] : 0} / {totalRegions})  <Loader2Icon className="inline w-4 h-4 animate-spin ml-2" />
         </button>
       )}
     </ThemeProvider>

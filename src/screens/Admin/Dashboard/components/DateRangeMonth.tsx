@@ -19,12 +19,14 @@ interface DateRangeMonthProps {
   className?: string;
   value?: { start: Date | string | null; end: Date | string | null };
   onChange?: (range: { start: Date | null; end: Date | null }) => void;
+  onApply?: () => void;
 }
 
 function DateRangeMonth({
   className,
   value,
   onChange,
+  onApply,
 }: DateRangeMonthProps) {
   const now = new Date();
   const currentYear = now.getFullYear();
@@ -64,8 +66,10 @@ function DateRangeMonth({
     }
   }, [value?.start, value?.end, currentMonth, currentYear]);
 
-  // Generate years for dropdown (from currentYear down to currentYear-14)
-  const years = Array.from({ length: 15 }, (_, i) => currentYear - i);
+  // Generate years for dropdown (from 2020 to currentYear + 2)
+  const startYear = 2020;
+  const endYear = currentYear + 2;
+  const years = Array.from({ length: endYear - startYear + 1 }, (_, i) => endYear - i);
   const monthOptions = months.map(m => ({
     value: m,
     label: format(new Date(currentYear, m), "LLLL"),
@@ -103,6 +107,7 @@ function DateRangeMonth({
       }
 
       onChange({ start, end });
+      onApply?.(); // Close the dropdown
     }
   };
 
@@ -121,7 +126,7 @@ function DateRangeMonth({
       <div className="flex flex-col gap-4">
         <div>
           <div className="font-semibold mb-1">Start Month</div>
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2">
             <Select
               options={monthOptions}
               value={fromMonth !== undefined ? monthOptions.find(opt => opt.value === fromMonth) : null}
@@ -142,7 +147,7 @@ function DateRangeMonth({
         </div>
         <div>
           <div className="font-semibold mb-1">End Month</div>
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2">
             <Select
               options={monthOptions}
               value={toMonth !== undefined ? monthOptions.find(opt => opt.value === toMonth) : null}
