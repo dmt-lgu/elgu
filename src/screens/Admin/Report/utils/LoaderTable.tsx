@@ -1,48 +1,38 @@
 import { TableRow, TableCell } from "@/components/ui/table";
 
 type Props = {
-  rows?: number;
   columns?: number;
-  /**
-   * An array of Tailwind CSS width classes (e.g., ['w-14', 'w-40', 'w-auto']).
-   * The order of the classes should match the order of the columns.
-   */
   columnWidths?: string[];
 };
 
-// A default set of widths to ensure the component works even if `columnWidths` isn't provided.
-// This matches the original behavior.
-const DEFAULT_COLUMN_WIDTHS = [
-  "w-14",
-  "w-40",
-  "w-16", "w-16", "w-16", "w-16",
-  "w-16", "w-16", "w-16", "w-16",
-  "w-16", "w-16", "w-16",
-  "w-16", "w-16", "w-16",
+const DEFAULT_FOUR_COLUMN_WIDTHS = [
+  "w-32",
+  "w-48",
+  "w-24",
+  "w-24",
 ];
 
 const LoaderTable = ({
-  rows = 6,
-  columns = 16,
-  columnWidths = DEFAULT_COLUMN_WIDTHS,
+  columns = 4,
+  columnWidths = DEFAULT_FOUR_COLUMN_WIDTHS,
 }: Props) => {
   return (
-    <>
-      {Array.from({ length: rows }).map((_, r) => (
-        <TableRow key={r}>
-          {Array.from({ length: columns }).map((_, c) => (
-            <TableCell key={c} className="px-2 py-2">
-              <div
-                className={`h-4 ${
-                  // Use the width from the prop array, or a fallback if not enough widths are provided.
-                  columnWidths[c] || "w-full"
-                } bg-gray-200 rounded animate-pulse`}
-              />
-            </TableCell>
-          ))}
-        </TableRow>
+    <TableRow>
+      {Array.from({ length: columns }).map((_, c) => (
+        <TableCell 
+          key={c} 
+          // Ania ang kausaban: Gidugang ang 'text-center'
+          className="px-2 py-3 text-center"
+        >
+          <div
+            className={`h-5 ${
+              columnWidths[c] || "w-full"
+            // Gidugang ang 'inline-block' para masiguro ang behavior
+            } bg-gray-200 rounded-md animate-pulse inline-block`}
+          />
+        </TableCell>
       ))}
-    </>
+    </TableRow>
   );
 };
 
