@@ -17,7 +17,6 @@ import reportFilterReducer from './reportFilterSlice';
 import businessPermitTableReducer from './businessPermitSlice';
 import workingPermitTableReducer from './workingPermitTableSlice';
 import brgyClearanceTableReducer from './brgyClearanceTableSlice'; 
-import WpReducer from './wpSlice';
 import BrgyReducer from './brgySlice';
 import buildingPermitReducer from './buildingPermitSlice';
 import certificateOfOccupancyReducer from './CertificateOfOccupancySlice';
@@ -59,7 +58,6 @@ const rootReducer = combineReducers({
   separatedTransaction: separatedTransactionReducer,
   load: loadReducer,
   status: statusReducer,
-  wp:WpReducer,
   reportFilter: reportFilterReducer,
   businessPermitTable: businessPermitTableReducer,
   workingPermitTable: workingPermitTableReducer,

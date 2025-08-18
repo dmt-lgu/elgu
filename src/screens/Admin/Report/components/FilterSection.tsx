@@ -127,14 +127,13 @@ const getCityOptions = (
 
 interface FilterSectionProps {
   onSearch: (filters: any) => void;
-  onDownload?: (type: "pdf" | "excel", permitTypes?: ("business" | "working" | "barangay")[]) => void;
+  onDownload?: (type: "pdf" | "excel", permitTypes?: ("business" | "working" | "barangay" | "building" | "certificate")[]) => void;
   onReset?: () => void;
   hasTableData?: boolean;
   loading?: boolean;
   onCancel?: () => void;
   hasSearched?: boolean;
   isActive?: boolean;
-  
 }
 
 
@@ -147,7 +146,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({
   loading = false,
   onCancel,
   hasSearched = false,
-  isActive = true, 
+  isActive = true,
 }) => {
   // Redux
   const dispatch = useDispatch<AppDispatch>();
@@ -198,44 +197,91 @@ const FilterSection: React.FC<FilterSectionProps> = ({
 
   // --- Module Logic ---
   const toggleModule = (module: string) => {
-  const newModules = filterState.selectedModules.includes(module)
-    ? filterState.selectedModules.filter((m: string) => m !== module)
-    : [...filterState.selectedModules, module];
-  dispatch(updateFilterField({ key: 'selectedModules', value: newModules }));
-  // Notify parent, but skip API
-  onSearch({
-    ...filterState,
-    selectedModules: newModules,
-    skipApi: true,
-  });
-};
+    const newModules = filterState.selectedModules.includes(module)
+      ? filterState.selectedModules.filter((m: string) => m !== module)
+      : [...filterState.selectedModules, module];
+    dispatch(updateFilterField({ key: 'selectedModules', value: newModules }));
+    onSearch({
+      ...filterState,
+      selectedModules: newModules,
+      skipApi: true,
+    });
+  };
 
   const selectAllModules = () => {
-  dispatch(updateFilterField({ key: 'selectedModules', value: [...modules] }));
-  onSearch({
-    ...filterState,
-    selectedModules: [...modules],
-    skipApi: true,
-  });
-};
+    dispatch(updateFilterField({ key: 'selectedModules', value: [...modules] }));
+    onSearch({
+      ...filterState,
+      selectedModules: [...modules],
+      skipApi: true,
+    });
+  };
 
   const deselectAllModules = () => {
-  dispatch(updateFilterField({ key: 'selectedModules', value: [] }));
-  onSearch({
-    ...filterState,
-    selectedModules: [],
-    skipApi: true,
-  });
-};
+    dispatch(updateFilterField({ key: 'selectedModules', value: [] }));
+    onSearch({
+      ...filterState,
+      selectedModules: [],
+      skipApi: true,
+    });
+  };
+
+  const timerRef = useRef<number | null>(null);
+  const [elapsedSec, setElapsedSec] = useState(0);
+
+  useEffect(() => {
+    const shouldRun = loading && hasSearched && isActive;
+
+    if (shouldRun) {
+      // Start only if not already running
+      if (timerRef.current == null) {
+        const start = Date.now();
+        setElapsedSec(0);
+        timerRef.current = window.setInterval(() => {
+          setElapsedSec(Math.floor((Date.now() - start) / 1000));
+        }, 1000);
+      }
+    } else {
+      // Stop and reset
+      if (timerRef.current != null) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      setElapsedSec(0);
+    }
+
+    return () => {
+      if (timerRef.current != null) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [loading, hasSearched, isActive]);
+
+  // Format MM:SS
+  const elapsedLabel = useMemo(() => {
+    const mm = String(Math.floor(elapsedSec / 60)).padStart(2, "0");
+    const ss = String(elapsedSec % 60).padStart(2, "0");
+    return `${mm}:${ss}`;
+  }, [elapsedSec]);
+
+  // Wrap onCancel to clear timer immediately
+  const handleCancelClick = () => {
+    if (timerRef.current != null) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    setElapsedSec(0);
+    onCancel?.();
+  };
 
   // --- Province Logic ---
   const selectAllProvinces = () => {
     setSelectedProvinceOptions([...filteredProvinceOptions]);
     dispatch(updateFilterField({ key: 'selectedProvinces', value: filteredProvinceOptions.map(opt => opt.value) }));
-    setSelectedCityOptions([]); // Reset cities when provinces change
+    setSelectedCityOptions([]); 
     dispatch(updateFilterField({ key: 'selectedCities', value: [] }));
-    // Auto-search when provinces change
-    handleSearchClick();
+    onSearch({ ...filterState, selectedProvinces: filteredProvinceOptions.map(opt => opt.value), selectedCities: [], skipApi: true });
   };
 
    const deselectAllProvinces = () => {
@@ -243,8 +289,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({
     dispatch(updateFilterField({ key: 'selectedProvinces', value: [] }));
     setSelectedCityOptions([]);
     dispatch(updateFilterField({ key: 'selectedCities', value: [] }));
-    // Auto-search when provinces change
-    handleSearchClick();
+    onSearch({ ...filterState, selectedProvinces: [], selectedCities: [], skipApi: true });
   };
 
   // --- City Logic ---
@@ -252,15 +297,13 @@ const FilterSection: React.FC<FilterSectionProps> = ({
     const allCityOptions = getCityOptions(selectedProvinceOptions.map(opt => opt.value), cities);
     setSelectedCityOptions(allCityOptions);
     dispatch(updateFilterField({ key: 'selectedCities', value: allCityOptions.map(opt => opt.value) }));
-    // Auto-search when cities change
-    handleSearchClick();
+    onSearch({ ...filterState, selectedCities: allCityOptions.map(opt => opt.value), skipApi: true });
   };
 
    const deselectAllCities = () => {
     setSelectedCityOptions([]);
     dispatch(updateFilterField({ key: 'selectedCities', value: [] }));
-    // Auto-search when cities change
-    handleSearchClick();
+    onSearch({ ...filterState, selectedCities: [], skipApi: true });
   };
 
   const isSearchDisabled =
@@ -273,109 +316,69 @@ const FilterSection: React.FC<FilterSectionProps> = ({
 
   // --- Download Handler with Permit Choice ---
   const handleDownloadWithPermitChoice = async (type: "pdf" | "excel") => {
-  if (isDownloadDisabled || loading) return;
+    if (isDownloadDisabled || loading) return;
 
-  // Dynamically build checkboxes based on selected modules
-  const selectedModules = filterState.selectedModules || [];
-  const checkboxOptions: { id: string; value: string; label: string }[] = [];
-  if (selectedModules.includes("Business Permit")) {
-    checkboxOptions.push({ id: "swal-bp", value: "business", label: "Business Permit" });
-  }
-  if (selectedModules.includes("Working Permit")) {
-    checkboxOptions.push({ id: "swal-wp", value: "working", label: "Working Permit" });
-  }
-  if (selectedModules.includes("Barangay Clearance")) {
-    checkboxOptions.push({ id: "swal-bc", value: "barangay", label: "Barangay Clearance" });
-  }
+    const selectedModules = filterState.selectedModules || [];
+    const checkboxOptions: { id: string; value: string; label: string }[] = [];
+    if (selectedModules.includes("Business Permit")) checkboxOptions.push({ id: "swal-bp", value: "business", label: "Business Permit" });
+    if (selectedModules.includes("Working Permit")) checkboxOptions.push({ id: "swal-wp", value: "working", label: "Working Permit" });
+    if (selectedModules.includes("Barangay Clearance")) checkboxOptions.push({ id: "swal-bc", value: "barangay", label: "Barangay Clearance" });
+    if (selectedModules.includes("Building Permit")) checkboxOptions.push({ id: "swal-bldg", value: "building", label: "Building Permit" });
+    if (selectedModules.includes("Certificate of Occupancy")) checkboxOptions.push({ id: "swal-co", value: "certificate", label: "Certificate of Occupancy" });
 
-  if (checkboxOptions.length === 0) return;
+    if (checkboxOptions.length === 0) return;
 
-  // If only one permit type, download automatically
-  if (checkboxOptions.length === 1) {
-    if (onDownload) {
-      onDownload(type, [checkboxOptions[0].value as "business" | "working" | "barangay"]);
-    }
-    return;
-  }
-
-  // Build HTML for checkboxes with Select All
-  const html = `
-    <div style="display: flex; flex-direction: column; align-items: flex-start;">
-      <label style="margin-bottom: 8px; font-weight: bold;">
-        <input type="checkbox" id="swal-select-all" />
-        Select All
-      </label>
-      ${checkboxOptions
-        .map(
-          (opt) => `
-        <label style="margin-bottom: 8px;">
-          <input type="checkbox" id="${opt.id}" value="${opt.value}" />
-          ${opt.label}
-        </label>
-      `
-        )
-        .join("")}
-    </div>
-  `;
-
-  await Swal.fire({
-    title: "Choose Permit Type(s)",
-    html,
-    focusConfirm: false,
-    didOpen: () => {
-      // --- Select All logic ---
-      const selectAllBox = document.getElementById("swal-select-all") as HTMLInputElement;
-      const checkboxes = checkboxOptions.map(opt => document.getElementById(opt.id) as HTMLInputElement);
-
-      // Check all by default when modal opens
-      checkboxes.forEach(cb => { cb.checked = true; });
-      selectAllBox.checked = true;
-
-      // When Select All is clicked, check/uncheck all
-      selectAllBox.addEventListener("change", () => {
-        checkboxes.forEach(cb => {
-          cb.checked = selectAllBox.checked;
-        });
-      });
-
-      // When any individual checkbox is changed, update Select All
-      checkboxes.forEach(cb => {
-        cb.addEventListener("change", () => {
-          const allChecked = checkboxes.every(c => c.checked);
-          selectAllBox.checked = allChecked;
-        });
-      });
-    },
-    preConfirm: () => {
-      // Only checked permit types will be included
-      const checked = checkboxOptions.filter(
-        (opt) => (document.getElementById(opt.id) as HTMLInputElement)?.checked
-      );
-      if (checked.length === 0) {
-        Swal.showValidationMessage("Please select at least one permit type!");
-        return false;
-      }
-      // Only return checked permit types
-      return checked.map((opt) => opt.value);
-    },
-
-    confirmButtonText: "Download",
-    showCancelButton: true,
-    cancelButtonText: "Cancel",
-    customClass: {
-      popup: "swal2-popup-custom-width",
-    },
-    confirmButtonColor: "#3b82f6",
-    cancelButtonColor: "#ef4444",
-  }).then((result) => {
-    // Only checked permit types are passed to onDownload
-    if (result.isConfirmed && Array.isArray(result.value)) {
+    if (checkboxOptions.length === 1) {
       if (onDownload) {
-        onDownload(type, result.value as ("business" | "working" | "barangay")[]);
+        onDownload(type, [checkboxOptions[0].value as "business" | "working" | "barangay" | "building" | "certificate"]);
       }
+      return;
     }
-  });
-};
+
+    const html = `
+      <div style="display: flex; flex-direction: column; align-items: flex-start;">
+        <label style="margin-bottom: 8px; font-weight: bold;">
+          <input type="checkbox" id="swal-select-all" />
+          Select All
+        </label>
+        ${checkboxOptions.map(opt => `<label style="margin-bottom: 8px;"><input type="checkbox" id="${opt.id}" value="${opt.value}" /> ${opt.label}</label>`).join("")}
+      </div>
+    `;
+
+    await Swal.fire({
+      title: "Choose Permit Type(s)",
+      html,
+      focusConfirm: false,
+      didOpen: () => {
+        const selectAllBox = document.getElementById("swal-select-all") as HTMLInputElement;
+        const checkboxes = checkboxOptions.map(opt => document.getElementById(opt.id) as HTMLInputElement);
+        checkboxes.forEach(cb => { cb.checked = true; });
+        selectAllBox.checked = true;
+        selectAllBox.addEventListener("change", () => checkboxes.forEach(cb => { cb.checked = selectAllBox.checked; }));
+        checkboxes.forEach(cb => cb.addEventListener("change", () => { selectAllBox.checked = checkboxes.every(c => c.checked); }));
+      },
+      preConfirm: () => {
+        const checked = checkboxOptions.filter(opt => (document.getElementById(opt.id) as HTMLInputElement)?.checked);
+        if (checked.length === 0) {
+          Swal.showValidationMessage("Please select at least one permit type!");
+          return false;
+        }
+        return checked.map((opt) => opt.value);
+      },
+      confirmButtonText: "Download",
+      showCancelButton: true,
+      cancelButtonText: "Cancel",
+      customClass: { popup: "swal2-popup-custom-width" },
+      confirmButtonColor: "#3b82f6",
+      cancelButtonColor: "#ef4444",
+    }).then((result) => {
+      if (result.isConfirmed && Array.isArray(result.value)) {
+        if (onDownload) {
+          onDownload(type, result.value as ("business" | "working" | "barangay" | "building" | "certificate")[]);
+        }
+      }
+    });
+  };
 
   // --- Region Logic ---
   const selectAllRegions = () => {
@@ -393,25 +396,15 @@ const FilterSection: React.FC<FilterSectionProps> = ({
     dispatch(updateFilterField({ key: 'selectedCities', value: [] }));
   };
 
-const handleDateRangeChange = (range: { start: string | null; end: string | null }) => {
-  dispatch(
-    updateFilterField({
-      key: 'dateRange',
-      value: {
-        start: range.start,
-        end: range.end,
-      },
-    })
-  );
-};
+  const handleDateRangeChange = (range: { start: string | null; end: string | null }) => {
+    dispatch(updateFilterField({ key: 'dateRange', value: { start: range.start, end: range.end } }));
+  };
 
-  // Helper: get all provinces from selected regions
   const getProvincesFromRegions = (regions: string[]) => {
     const provs = regions.flatMap(region => (regionProvinceMap as Record<string, string[]>)[region] || []);
     return Array.from(new Set(provs));
   };
 
-  // Province options filtered by selected regions
   const filteredProvinceOptions = useMemo(() =>
     provinceOptions.filter(opt =>
       getProvincesFromRegions(filterState.selectedRegions).includes(opt.value)
@@ -419,21 +412,11 @@ const handleDateRangeChange = (range: { start: string | null; end: string | null
 
   // --- Handlers ---
   const toggleIsland = (island: string) => {
-    let newIslands: string[];
-    if (selectedIslands.includes(island)) {
-      newIslands = selectedIslands.filter((i: string) => i !== island);
-    } else {
-      newIslands = [...selectedIslands, island];
-    }
-
-    // Gather all region codes from selected islands
-    const regionCodes = newIslands.flatMap(isle => islandRegionMap[isle] || []);
-    // Map region codes to internal keys
-    const internalKeys = regionCodes.map(code => regionMapping[code]).filter(Boolean);
-
+    const newIslands = selectedIslands.includes(island) ? selectedIslands.filter((i: string) => i !== island) : [...selectedIslands, island];
+    const regionCodes = newIslands.flatMap((isle:any) => islandRegionMap[isle] || []);
+    const internalKeys = regionCodes.map((code:any) => regionMapping[code]).filter(Boolean);
     dispatch(updateFilterField({ key: 'selectedIslands', value: newIslands }));
     dispatch(updateFilterField({ key: 'selectedRegions', value: internalKeys }));
-
     if (newIslands.length === 0) {
       setSelectedProvinceOptions([]);
       setSelectedCityOptions([]);
@@ -443,12 +426,7 @@ const handleDateRangeChange = (range: { start: string | null; end: string | null
   };
 
   const toggleRegion = (region: string) => {
-    let newRegions: string[];
-    if (filterState.selectedRegions.includes(region)) {
-      newRegions = filterState.selectedRegions.filter((r: string) => r !== region);
-    } else {
-      newRegions = [...filterState.selectedRegions, region];
-    }
+    const newRegions = filterState.selectedRegions.includes(region) ? filterState.selectedRegions.filter((r: string) => r !== region) : [...filterState.selectedRegions, region];
     if (newRegions.length === 0) {
       setSelectedProvinceOptions([]);
       setSelectedCityOptions([]);
@@ -461,31 +439,20 @@ const handleDateRangeChange = (range: { start: string | null; end: string | null
   const handleProvinceChange = (options: any) => {
     setSelectedProvinceOptions(options || []);
     setSelectedCityOptions([]);
-    dispatch(updateFilterField({ key: 'selectedProvinces', value: (options || []).map((opt: any) => opt.value) }));
+    const provinceValues = (options || []).map((opt: any) => opt.value);
+    dispatch(updateFilterField({ key: 'selectedProvinces', value: provinceValues }));
     dispatch(updateFilterField({ key: 'selectedCities', value: [] }));
-    // Always include selectedModules in the filter
-    onSearch({
-      ...filterState,
-      selectedProvinces: (options || []).map((opt: any) => opt.value),
-      selectedCities: [],
-      selectedModules: filterState.selectedModules, // <-- always include this!
-      skipApi: true,
-    });
+    onSearch({ ...filterState, selectedProvinces: provinceValues, selectedCities: [], skipApi: true });
   };
 
   const handleCityChange = (options: any) => {
     setSelectedCityOptions(options || []);
-    dispatch(updateFilterField({ key: 'selectedCities', value: (options || []).map((opt: any) => opt.value) }));
-    // Always include selectedModules in the filter
-    onSearch({
-      ...filterState,
-      selectedCities: (options || []).map((opt: any) => opt.value),
-      selectedModules: filterState.selectedModules, // <-- always include this!
-      skipApi: true,
-    });
+    const cityValues = (options || []).map((opt: any) => opt.value);
+    dispatch(updateFilterField({ key: 'selectedCities', value: cityValues }));
+    onSearch({ ...filterState, selectedCities: cityValues, skipApi: true });
   };
-  // --- Date Range Logic (Redux) ---
-  const selectedDateType = filterState.selectedDateType || ""; // "Day" | "Month" | "Year" | ""
+
+  const selectedDateType = filterState.selectedDateType || "";
 
   const deselectAllDates = () => {
     dispatch(updateFilterField({ key: 'selectedDateType', value: "" }));
@@ -497,7 +464,7 @@ const handleDateRangeChange = (range: { start: string | null; end: string | null
     dispatch(updateFilterField({ key: 'dateRange', value: { start: null, end: null } }));
   };
 
-  // --- UPDATED: Map region codes to internal keys before search ---
+  // --- UPDATED handleSearchClick ---
   const handleSearchClick = () => {
     const allRegionInternalKeys = Object.values(regionMapping);
     const allRegionsSelected =
@@ -505,15 +472,20 @@ const handleDateRangeChange = (range: { start: string | null; end: string | null
       allRegionInternalKeys.every(key => filterState.selectedRegions.includes(key));
 
     onSearch({
-    selectedRegions: allRegionsSelected ? allRegionInternalKeys : filterState.selectedRegions,
-    selectedProvinces: filterState.selectedProvinces,
-    selectedCities: filterState.selectedCities,
-    dateRange: filterState.dateRange,
-    selectedDateType: filterState.selectedDateType,
-    selectedIslands: filterState.selectedIslands,
-    selectedModules: filterState.selectedModules, // <-- make sure this is included!
-    allRegionsSelected,
-  });
+      selectedRegions: allRegionsSelected ? allRegionInternalKeys : filterState.selectedRegions,
+      selectedProvinces: filterState.selectedProvinces,
+      selectedCities: filterState.selectedCities,
+      dateRange: filterState.dateRange,
+      selectedDateType: filterState.selectedDateType,
+      selectedIslands: filterState.selectedIslands,
+      selectedModules: filterState.selectedModules,
+      allRegionsSelected,
+    });
+
+    // --- BAG-ONG CODE: I-CLOSE ANG DROPDOWNS ---
+    setIsModuleOpen(false);
+    setIsRegionOpen(false);
+    setIsDateOpen(false);
   };
 
   const handleReset = () => {
@@ -531,6 +503,7 @@ const handleDateRangeChange = (range: { start: string | null; end: string | null
     }
     setIsDateOpen(false);
     setIsRegionOpen(false);
+    setIsModuleOpen(false); // Siguradoha nga ma-close sad ni
   };
 
   useEffect(() => {
@@ -564,42 +537,18 @@ const handleDateRangeChange = (range: { start: string | null; end: string | null
             <ChevronDown size={18} className={`text-secondary-foreground  transition-transform ${isModuleOpen ? 'transform rotate-180' : ''}`} />
           </button>
           {isModuleOpen && (
-            <div className="w-[250px] md:w-full absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-md shadow-lg z-10">
+            <div className="w-[250px] md:w-full absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-md shadow-lg z-50">
               <div className="flex justify-between p-2 border-b border-gray-200 ">
-                <button
-                  onClick={selectAllModules}
-                  className="text-sm text-blue-600 hover:text-blue-800"
-                >
-                  Select All
-                </button>
-                <button
-                  onClick={deselectAllModules}
-                  className="text-sm text-red-400 hover:text-red-800"
-                >
-                  Deselect All
-                </button>
+                <button onClick={selectAllModules} className="text-sm text-blue-600 hover:text-blue-800">Select All</button>
+                <button onClick={deselectAllModules} className="text-sm text-red-400 hover:text-red-800">Deselect All</button>
               </div>
               <div className="max-h-[200px] overflow-y-auto">
                 {modules.map((module, index) => (
-                  <label
-                    key={`module-${index}`}
-                    className="flex items-center px-3 py-2 hover:bg-blue-200 cursor-pointer"
-                  >
+                  <label key={`module-${index}`} className="flex items-center px-3 py-2 hover:bg-blue-200 cursor-pointer">
                     <div className="relative flex items-center">
-                      <input
-                        type="checkbox"
-                        checked={filterState.selectedModules.includes(module)}
-                        onChange={() => toggleModule(module)}
-                        className="opacity-0 absolute h-4 w-4 cursor-pointer"
-                      />
-                      <div className={`border h-4 w-4 rounded flex items-center justify-center ${
-                        filterState.selectedModules.includes(module)
-                          ? 'bg-blue-600 border-blue-600'
-                          : 'border-gray-400'
-                      }`}>
-                        {filterState.selectedModules.includes(module) && (
-                          <Check size={12} className="text-white" />
-                        )}
+                      <input type="checkbox" checked={filterState.selectedModules.includes(module)} onChange={() => toggleModule(module)} className="opacity-0 absolute h-4 w-4 cursor-pointer" />
+                      <div className={`border h-4 w-4 rounded flex items-center justify-center ${filterState.selectedModules.includes(module) ? 'bg-blue-600 border-blue-600' : 'border-gray-400'}`}>
+                        {filterState.selectedModules.includes(module) && <Check size={12} className="text-white" />}
                       </div>
                       <span className="ml-2 text-sm text-secondary-foreground">{module}</span>
                     </div>
@@ -620,190 +569,57 @@ const handleDateRangeChange = (range: { start: string | null; end: string | null
             className="w-full bg-card border border-border rounded-md py-2 px-3 text-left flex justify-between items-center focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <span className="text-sm text-secondary-foreground">
-              {filterState.selectedRegions.length === 0
-                ? 'All Regions'
-                : `${filterState.selectedRegions.length} selected`}
+              {filterState.selectedRegions.length === 0 ? 'All Regions' : `${filterState.selectedRegions.length} selected`}
             </span>
             <ChevronDown size={18} className={`text-secondary-foreground  transition-transform ${isRegionOpen ? 'transform rotate-180' : ''}`} />
           </button>
           {isRegionOpen && (
-            <div
-              className="w-[350px] md:w-full absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-md shadow-lg z-10"
-              role="dialog"
-              aria-modal="true"
-              aria-label="Region Filter"
-            >
-              {/* Header with Select/Deselect All */}
+            <div className="w-[350px] md:w-full absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-md shadow-lg z-50" role="dialog">
               <div className="flex justify-between p-2 border-b border-gray-200">
-                <button
-                  onClick={selectAllRegions}
-                  className="text-sm text-blue-600 hover:text-blue-800"
-                  type="button"
-                  aria-label="Select all regions"
-                >
-                  Select All
-                </button>
-                <button
-                  onClick={deselectAllRegions}
-                  className="text-sm text-red-400 hover:text-red-800"
-                  type="button"
-                  aria-label="Deselect all regions"
-                >
-                  Deselect All
-                </button>
+                <button onClick={selectAllRegions} className="text-sm text-blue-600 hover:text-blue-800" type="button">Select All</button>
+                <button onClick={deselectAllRegions} className="text-sm text-red-400 hover:text-red-800" type="button">Deselect All</button>
               </div>
-
               <div className="max-h-[400px] overflow-y-auto p-3">
-                {/* Group of Islands */}
                 <div className="mb-4">
-                   <label className="block text-sm font-bold text-blue-700 mb-2">
-                    Group of Islands
-                  </label>
+                   <label className="block text-sm font-bold text-blue-700 mb-2">Group of Islands</label>
                   <div className="flex gap-6 mb-2">
                     {groupOfIslands.map(island => (
-                      <label
-                        key={island}
-                        className="flex items-center gap-1 text-secondary-foreground text-sm"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedIslands.includes(island)}
-                          onChange={() => toggleIsland(island)}
-                          className="accent-blue-600"
-                          aria-checked={selectedIslands.includes(island)}
-                          aria-label={`Toggle island ${island}`}
-                        />
+                      <label key={island} className="flex items-center gap-1 text-secondary-foreground text-sm">
+                        <input type="checkbox" checked={selectedIslands.includes(island)} onChange={() => toggleIsland(island)} className="accent-blue-600" />
                         {island}
                       </label>
                     ))}
                   </div>
                 </div>
-
-                {/* Regions */}
-                <label className="block text-sm font-bold text-blue-700 mb-2">
-                  Regions
-                </label>
-                <div
-                  className="columns-4 gap-2 mb-4"
-                  style={{ columnCount: 4 }}
-                >
+                <label className="block text-sm font-bold text-blue-700 mb-2">Regions</label>
+                <div className="columns-4 gap-2 mb-4" style={{ columnCount: 4 }}>
                   {Object.entries(regionMapping).map(([regionCode, internalKey]) => (
-                    <label
-                      key={regionCode}
-                      className="flex items-center gap-1 text-secondary-foreground text-sm break-inside-avoid-column mb-2"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={filterState.selectedRegions.includes(internalKey)}
-                        onChange={() => toggleRegion(internalKey)}
-                        className="accent-blue-600"
-                        aria-checked={filterState.selectedRegions.includes(internalKey)}
-                        aria-label={`Toggle region ${regionCode}`}
-                      />
-                        <span className=' text-xs lg:text-sm'> {regionCode}</span> 
-                     
+                    <label key={regionCode} className="flex items-center gap-1 text-secondary-foreground text-sm break-inside-avoid-column mb-2">
+                      <input type="checkbox" checked={filterState.selectedRegions.includes(internalKey)} onChange={() => toggleRegion(internalKey)} className="accent-blue-600" />
+                      <span className=' text-xs lg:text-sm'> {regionCode}</span>
                     </label>
                   ))}
                 </div>
-
-                {/* Province (multi-select) */}
                 <div className="mb-2 relative z-50">
-                  <label className="block text-sm font-bold text-blue-700 mb-1">
-                    Province
-                  </label>
+                  <label className="block text-sm font-bold text-blue-700 mb-1">Province</label>
                   <div className="flex justify-between mb-1">
-                    <button
-                      type="button"
-                      className="text-xs text-blue-600 hover:text-blue-800"
-                      onClick={selectAllProvinces}
-                      disabled={filteredProvinceOptions.length === 0}
-                    >
-                      Select All
-                    </button>
-                    <button
-                      type="button"
-                      className="text-xs text-red-400 hover:text-red-800"
-                      onClick={deselectAllProvinces}
-                      disabled={filteredProvinceOptions.length === 0}
-                    >
-                      Deselect All
-                    </button>
+                    <button type="button" className="text-xs text-blue-600 hover:text-blue-800" onClick={selectAllProvinces} disabled={filteredProvinceOptions.length === 0}>Select All</button>
+                    <button type="button" className="text-xs text-red-400 hover:text-red-800" onClick={deselectAllProvinces} disabled={filteredProvinceOptions.length === 0}>Deselect All</button>
                   </div>
                   <div className="relative">
-                    <Select
-                      options={filteredProvinceOptions}
-                      value={selectedProvinceOptions}
-                      onChange={handleProvinceChange}
-                      placeholder="Select province(s)"
-                      isClearable
-                      isMulti
-                      isDisabled={filterState.selectedRegions.length === 0}
-                      classNamePrefix="react-select"
-                      className="text-sm z-50"
-                      menuPortalTarget={document.body}
-                      styles={{
-                        menuPortal: base => ({ ...base, zIndex: 9999 }),
-                        menu: base => ({ ...base, zIndex: 9999 }),
-                      }}
-                      aria-label="Select provinces"
-                    />
+                    <Select options={filteredProvinceOptions} value={selectedProvinceOptions} onChange={handleProvinceChange} placeholder="Select province(s)" isClearable isMulti isDisabled={filterState.selectedRegions.length === 0} classNamePrefix="react-select" className="text-sm z-50" menuPortalTarget={document.body} styles={{ menuPortal: base => ({ ...base, zIndex: 9999 }), menu: base => ({ ...base, zIndex: 9999 }) }} />
                   </div>
                 </div>
-
-                {/* City/Municipality (multi-select) */}
                 <div className="relative z-50">
-                  <label className="block text-sm font-bold text-blue-700 mb-1">
-                    City/Municipality
-                  </label>
+                  <label className="block text-sm font-bold text-blue-700 mb-1">City/Municipality</label>
                   <div className="flex justify-between mb-1">
-                    <button
-                      type="button"
-                      className="text-xs text-blue-600 hover:text-blue-800"
-                      onClick={selectAllCities}
-                      disabled={selectedProvinceOptions.length === 0}
-                    >
-                      Select All
-                    </button>
-                    <button
-                      type="button"
-                      className="text-xs text-red-400 hover:text-red-800"
-                      onClick={deselectAllCities}
-                      disabled={selectedProvinceOptions.length === 0}
-                    >
-                      Deselect All
-                    </button>
+                    <button type="button" className="text-xs text-blue-600 hover:text-blue-800" onClick={selectAllCities} disabled={selectedProvinceOptions.length === 0}>Select All</button>
+                    <button type="button" className="text-xs text-red-400 hover:text-red-800" onClick={deselectAllCities} disabled={selectedProvinceOptions.length === 0}>Deselect All</button>
                   </div>
                   <div className="relative">
-                    {citiesLoading ? (
-                      <div className="text-xs text-muted-foreground py-2 px-2">
-                        Loading cities...
-                      </div>
-                    ) : citiesError ? (
-                      <div className="text-xs text-red-500 py-2 px-2">
-                        Failed to load cities
-                      </div>
-                    ) : (
-                      <Select
-                        options={getCityOptions(
-                          selectedProvinceOptions.map(opt => opt.value),
-                          cities
-                        )}
-                        value={selectedCityOptions}
-                        onChange={handleCityChange}
-                        placeholder="Select city/municipality"
-                        isClearable
-                        isMulti
-                        isDisabled={selectedProvinceOptions.length === 0}
-                        classNamePrefix="react-select"
-                        className="text-sm"
-                        menuPortalTarget={document.body}
-                        styles={{
-                          menuPortal: base => ({ ...base, zIndex: 9999 }),
-                          menu: base => ({ ...base, zIndex: 9999 }),
-                        }}
-                        aria-label="Select cities or municipalities"
-                      />
-                    )}
+                    {citiesLoading ? <div className="text-xs text-muted-foreground py-2 px-2">Loading cities...</div>
+                    : citiesError ? <div className="text-xs text-red-500 py-2 px-2">Failed to load cities</div>
+                    : <Select options={getCityOptions(selectedProvinceOptions.map(opt => opt.value), cities)} value={selectedCityOptions} onChange={handleCityChange} placeholder="Select city/municipality" isClearable isMulti isDisabled={selectedProvinceOptions.length === 0} classNamePrefix="react-select" className="text-sm" menuPortalTarget={document.body} styles={{ menuPortal: base => ({ ...base, zIndex: 9999 }), menu: base => ({ ...base, zIndex: 9999 }) }} />}
                   </div>
                 </div>
               </div>
@@ -816,67 +632,29 @@ const handleDateRangeChange = (range: { start: string | null; end: string | null
       <div className="flex flex-col" ref={dateRef}>
         <label className="text-sm font-medium text-secondary-foreground mb-1">Date Range:</label>
         <div className="relative w-full ">
-          <button
-            type="button"
-            className="w-full bg-card border border-border rounded-md py-2 px-3 text-left flex justify-between items-center focus:outline-none focus:ring-2 focus:ring-blue-500"
-            onClick={() => setIsDateOpen((open) => !open)}
-          >
-            <span className="text-sm text-secondary-foreground">
-              {selectedDateType ? selectedDateType : "Select date type"}
-            </span>
+          <button type="button" className="w-full bg-card border border-border rounded-md py-2 px-3 text-left flex justify-between items-center focus:outline-none focus:ring-2 focus:ring-blue-500" onClick={() => setIsDateOpen((open) => !open)}>
+            <span className="text-sm text-secondary-foreground">{selectedDateType ? selectedDateType : "Select date type"}</span>
             <ChevronDown size={18} className={`text-secondary-foreground transition-transform ${isDateOpen ? "rotate-180" : ""}`} />
           </button>
           {isDateOpen && (
             <div className="absolute w-96 md:w-full left-0 bg-white right-0 mt-2 border border-border rounded-md shadow-lg z-20 p-4">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[15px] font-semibold">Date Range</span>
-                <button
-                  className="text-red-400 text-[15px] font-semibold hover:text-red-600 focus:outline-none"
-                  onClick={deselectAllDates}
-                  type="button"
-                >
-                  Deselect
-                </button>
+                <button className="text-red-400 text-[15px] font-semibold hover:text-red-600 focus:outline-none" onClick={deselectAllDates} type="button">Deselect</button>
               </div>
-              
               <div className="flex flex-col gap-2 mb-3">
                 {dateRange.map((type) => (
                   <label key={type} className="flex items-center gap-2 text-[15px] cursor-pointer">
-                    <input
-                      type="radio"
-                      checked={selectedDateType === type}
-                      onChange={() => handleDateTypeToggle(type)}
-                      className="accent-blue-600"
-                      name="date-type"
-                    />
+                    <input type="radio" checked={selectedDateType === type} onChange={() => handleDateTypeToggle(type)} className="accent-blue-600" name="date-type" />
                     {type}
                   </label>
                 ))}
               </div>
               <div>
-                {!selectedDateType && (
-                  <span className="text-sm text-muted-foreground text-center">
-                    Please select day, month, or year
-                  </span>
-                )}
-                {selectedDateType === 'Day' && (
-                  <DateRangeDay
-                    value={filterState.dateRange}
-                    onChange={handleDateRangeChange}
-                  />
-                )}
-                {selectedDateType === 'Month' && (
-                  <DateRangeMonth
-                    value={filterState.dateRange}
-                    onChange={handleDateRangeChange}
-                  />
-                )}
-                {selectedDateType === 'Year' && (
-                  <DateRangeYear
-                    value={filterState.dateRange}
-                    onChange={handleDateRangeChange}
-                  />
-                )}
+                {!selectedDateType && <span className="text-sm text-muted-foreground text-center">Please select day, month, or year</span>}
+                {selectedDateType === 'Day' && <DateRangeDay value={filterState.dateRange} onChange={handleDateRangeChange} />}
+                {selectedDateType === 'Month' && <DateRangeMonth value={filterState.dateRange} onChange={handleDateRangeChange} />}
+                {selectedDateType === 'Year' && <DateRangeYear value={filterState.dateRange} onChange={handleDateRangeChange} />}
               </div>
             </div>
           )}
@@ -886,59 +664,35 @@ const handleDateRangeChange = (range: { start: string | null; end: string | null
       {/* Action button */}
       <div className="flex flex-col ">
         <div className="grid grid-cols-3 gap-2 mt-[25px] md:mt-0">
-          <Button
-            className="bg-[#CB371C] hover:bg-[#CB371C] h-9 text-[12px] text-white"
-            onClick={handleReset}
-            disabled={loading || !isActive}
-          >
+          <Button className="bg-[#CB371C] hover:bg-[#CB371C] h-9 text-[12px] text-white" onClick={handleReset} disabled={loading || !isActive}>
             Reset
           </Button>
-          {/* Search/Cancel Button */}
           {loading && hasSearched && isActive ? (
             <Button
-              className="bg-red-500 hover:bg-red-600 h-9 text-[12px] text-white"
-              onClick={onCancel}
+              className="bg-red-500 hover:bg-red-600 h-9 text-xs text-white"
+              onClick={handleCancelClick}
               disabled={!loading || !isActive}
               type="button"
             >
-              <Loader2Icon className="inline w-4 h-4 animate-spin ml-1" />
-              Cancel
+              <Loader2Icon className="inline w-4 h-4 animate-spin mr-1" />
+              Cancel <br /> {elapsedLabel}
             </Button>
           ) : (
-            <Button
-              className="bg-primary h-9 text-[12px] text-white"
-              onClick={handleSearchClick}
-              disabled={isSearchDisabled || loading || !isActive}
-            >
+            <Button className="bg-primary h-9 text-[12px] text-white" onClick={handleSearchClick} disabled={isSearchDisabled || loading || !isActive}>
               Search
             </Button>
           )}
           <DropdownMenu>
-            <DropdownMenuTrigger>
-              <Button
-                disabled={isDownloadDisabled || loading || !isActive}
-                className="bg-[#8411DD] hover:bg-[#8411DD] text-white max-w-full text-[10px] h-9 md:w-full"
-              >
+            <DropdownMenuTrigger asChild>
+              <Button disabled={isDownloadDisabled || loading || !isActive} className="bg-[#8411DD] hover:bg-[#8411DD] text-white max-w-full text-[12px] h-9 md:w-full">
                 Download
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
               <DropdownMenuLabel>Download Options</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => isActive && handleDownloadWithPermitChoice("pdf")}
-                className={`cursor-pointer hover:bg-primary hover:text-white ${isDownloadDisabled || loading || !isActive ? 'opacity-50 pointer-events-none' : ''}`}
-                disabled={isDownloadDisabled || loading || !isActive}
-              >
-                PDF
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => isActive && handleDownloadWithPermitChoice("excel")}
-                className={`cursor-pointer ${isDownloadDisabled || loading || !isActive ? 'opacity-50 pointer-events-none' : ''}`}
-                disabled={isDownloadDisabled || loading || !isActive}
-              >
-                Excel
-              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => isActive && handleDownloadWithPermitChoice("pdf")} disabled={isDownloadDisabled || loading || !isActive}>PDF</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => isActive && handleDownloadWithPermitChoice("excel")} disabled={isDownloadDisabled || loading || !isActive}>Excel</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

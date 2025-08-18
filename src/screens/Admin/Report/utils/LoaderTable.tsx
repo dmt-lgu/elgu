@@ -1,16 +1,24 @@
-import "./loader.css"
+import { TableRow, TableCell } from "@/components/ui/table";
 
-export function LoaderTable() {
+type Props = { rows?: number; columns?: number };
+
+const LoaderTable = ({ rows = 6, columns = 16 }: Props) => {
+  const widthByCol = (idx: number) =>
+    idx === 0 ? "w-14" : idx === 1 ? "w-40" : "w-16";
+
   return (
-    <div>
-      <div id="wave">
-  <span className="dot blue"></span>
-  <span className="dot red"></span>
-  <span className="dot yellow"></span>
-</div>
+    <>
+      {Array.from({ length: rows }).map((_, r) => (
+        <TableRow key={r}>
+          {Array.from({ length: columns }).map((_, c) => (
+            <TableCell key={c} className="px-2 py-2">
+              <div className={`h-4 ${widthByCol(c)} bg-gray-200 rounded animate-pulse`} />
+            </TableCell>
+          ))}
+        </TableRow>
+      ))}
+    </>
+  );
+};
 
-    </div>
-  )
-}
-
-export default LoaderTable
+export default LoaderTable;
