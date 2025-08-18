@@ -2,7 +2,7 @@ import React from 'react';
 import { InfoIcon } from 'lucide-react';
 import IncreasingTextAnimation from './textAnimation';
 import { useSelector } from 'react-redux';
-import { selectLoad } from '@/redux/loadSlice';
+import { selectLoad2 } from '@/redux/loadSlice2';
 
 interface StatisticCardProps {
   title: string;
@@ -11,8 +11,9 @@ interface StatisticCardProps {
   className?: string;
 }
 
-const StatisticCard: React.FC<StatisticCardProps> = ({ title, value, showInfo }) => {
-  const loading = useSelector(selectLoad);
+const StatisticCard2: React.FC<StatisticCardProps> = ({ title, value, showInfo }) => {
+  const loading = useSelector(selectLoad2);
+
 
   return (
     <div className={`bg-card p-4 rounded-md border border-border relative`}>
@@ -69,4 +70,4 @@ const StatisticCard: React.FC<StatisticCardProps> = ({ title, value, showInfo })
   );
 };
 
-export default StatisticCard;
+export default StatisticCard2;

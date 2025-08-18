@@ -10,6 +10,7 @@ import dataReducer from './dataSlice';
 import cardReducer from './cardSlice';
 import transactionReducer from './transactionSlice';
 import loadReducer from './loadSlice';
+import load2Reducer from './loadSlice2';
 import statusReducer from './statusSlice';
 import reportFilterReducer from './reportFilterSlice';
 import businessPermitTableReducer from './businessPermitSlice';
@@ -19,28 +20,27 @@ import BrgyReducer from './brgySlice';
 import buildingPermitReducer from './buildingPermitSlice';
 import certificateOfOccupancyReducer from './CertificateOfOccupancySlice';
 
+
 const persistConfig = {
   key: 'root',
   storage,
   whitelist: [
     'reportFilter',
-    'businessPermitTable',
+    'businessPermitTable', 
     'workingPermitTable',
-    'brgyClearanceTable', 
+    'brgyClearanceTable',
     'region',
     'charts',
     'project',
     'dates',
     'datas',
     'card',
-    'transaction',
     'load',
-    'status',
-    'wp',
-    'brgy',
+    'load2',
     'buildingPermit',
-    'certificateOfOccupancy', 
-
+    'certificateOfOccupancy',
+    // Exclude large data slices to prevent quota exceeded errors:
+    // 'transaction', 'status', 'wp', 'brgy' are not persisted
   ],
 };
 
@@ -61,6 +61,7 @@ const rootReducer = combineReducers({
   brgy: BrgyReducer,
   buildingPermit: buildingPermitReducer,
   certificateOfOccupancy: certificateOfOccupancyReducer,
+  load2: load2Reducer,
 
 
 });
@@ -71,7 +72,15 @@ export const store = configureStore({
   reducer: persistedReducer,
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
-      immutableCheck: false,
+      serializableCheck: {
+        ignoredActions: ['persist/PERSIST', 'persist/REHYDRATE'],
+        ignoredActionsPaths: ['register', 'rehydrate'],
+        ignoredPaths: ['register'],
+      },
+      immutableCheck: {
+        // Disable for better performance with large state
+        warnAfter: 128,
+      },
     }),
 });
 

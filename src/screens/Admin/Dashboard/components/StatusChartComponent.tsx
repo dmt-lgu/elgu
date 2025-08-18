@@ -15,7 +15,6 @@ import {
 import ChartDataLabels from 'chartjs-plugin-datalabels';
 import { useSelector } from 'react-redux';
 import { selectCharts } from '@/redux/chartSlice';
-import { parseISO, isAfter, isBefore, isEqual } from 'date-fns';
 
 ChartJS.register(
   CategoryScale,
@@ -34,9 +33,20 @@ interface BarChartProps {
   data: any[];
   title: string;
   period?: string;
-  startDate?: string; // Add these
+  startDate?: string;
   endDate?: string;
-  raw?:any
+  raw?: any;
+  // New props for multi-module support
+  bpData?: any[];
+  wpData?: any[];
+  brgyData?: any[];
+  bpcoData?: any[];
+  bpRaw?: any[];
+  wpRaw?: any[];
+  brgyRaw?: any[];
+  bpcoRaw?: any[];
+  modules?: string[];
+  loading?: boolean;
 }
 
 const chartTypes = [
@@ -65,15 +75,22 @@ function aggregateData(data: any[]) {
 const COLORS = ['#2563eb', '#fbbf24', '#dc2626'];
 
 const StatusChartComponent: React.FC<BarChartProps> = ({
-  data,
-  title,
+  
   period,
-  startDate,
-  endDate,
-  raw
+ 
+  // New props
+  bpData = [],
+  wpData = [],
+  brgyData = [],
+  bpcoData = [],
+  bpRaw = [],
+  wpRaw = [],
+  brgyRaw = [],
+  bpcoRaw = [],
+  modules = [],
+  loading
 }) => {
   const charts = useSelector(selectCharts);
-
 
   let reduxChartType: 'bar' | 'line' | 'pie' = 'bar';
   if (charts.includes('Pie Graph')) reduxChartType = 'pie';
@@ -83,27 +100,115 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
   const [hidden, setHidden] = useState<boolean[]>([false, false, false]);
   const [chartType, setChartType] = useState<'bar' | 'line' | 'pie'>(reduxChartType);
   const [showBreakdown, setShowBreakdown] = useState(false);
+  const [selectedModule, setSelectedModule] = useState<string>(modules.length > 0 ? modules[0] : 'All'); // New state for module selection
 
   useEffect(() => {
     setChartType(reduxChartType);
   }, [reduxChartType]);
 
-  // Filter data by date range if startDate and endDate are provided
-  const filteredData = useMemo(() => {
-    if (!startDate || !endDate) return data;
-    return data.filter(item => {
-      if (!item.date) return true;
-      const itemDate = parseISO(item.date);
-      const start = parseISO(startDate);
-      const end = parseISO(endDate);
-      return (
-        (isAfter(itemDate, start) || isEqual(itemDate, start)) &&
-        (isBefore(itemDate, end) || isEqual(itemDate, end))
-      );
-    });
-  }, [data, startDate, endDate]);
+  useEffect(() => {
+    // Update selectedModule when modules change
+    if (modules.length > 0 && selectedModule === 'All') {
+      setSelectedModule(modules[0]);
+    }
+  }, [modules, selectedModule]);
 
-  const processedData = aggregateData(filteredData);
+  // Combine all module data
+  const combinedData = useMemo(() => {
+    const combined = new Map<string, { operational: number; developmental: number; withdraw: number }>();
+    
+    // Add Business Permit data
+    if (modules.includes("Business Permit")) {
+      bpData.forEach(item => {
+        const key = item.name;
+        if (!combined.has(key)) {
+          combined.set(key, { operational: 0, developmental: 0, withdraw: 0 });
+        }
+        const entry = combined.get(key)!;
+        entry.operational += Number(item.operational) || 0;
+        entry.developmental += Number(item.developmental) || 0;
+        entry.withdraw += Number(item.withdraw) || 0;
+      });
+    }
+
+    // Add Working Permit data
+    if (modules.includes("Working Permit")) {
+      wpData.forEach(item => {
+        const key = item.name;
+        if (!combined.has(key)) {
+          combined.set(key, { operational: 0, developmental: 0, withdraw: 0 });
+        }
+        const entry = combined.get(key)!;
+        entry.operational += Number(item.operational) || 0;
+        entry.developmental += Number(item.developmental) || 0;
+        entry.withdraw += Number(item.withdraw) || 0;
+      });
+    }
+
+    // Add Barangay Clearance data
+    if (modules.includes("Barangay Clearance")) {
+      brgyData.forEach(item => {
+        const key = item.name;
+        if (!combined.has(key)) {
+          combined.set(key, { operational: 0, developmental: 0, withdraw: 0 });
+        }
+        const entry = combined.get(key)!;
+        entry.operational += Number(item.operational) || 0;
+        entry.developmental += Number(item.developmental) || 0;
+        entry.withdraw += Number(item.withdraw) || 0;
+      });
+    }
+
+    // Add Building Permit & Certificate of Occupancy data
+    if (modules.includes("Building Permit & Certificate of Occupancy")) {
+      bpcoData.forEach(item => {
+        const key = item.name;
+        if (!combined.has(key)) {
+          combined.set(key, { operational: 0, developmental: 0, withdraw: 0 });
+        }
+        const entry = combined.get(key)!;
+        entry.operational += Number(item.operational) || 0;
+        entry.developmental += Number(item.developmental) || 0;
+        entry.withdraw += Number(item.withdraw) || 0;
+      });
+    }
+
+    return Array.from(combined.entries()).map(([name, values]) => ({
+      name,
+      ...values,
+    }));
+  }, [bpData, wpData, brgyData, bpcoData, modules]);
+
+  // Get selected module data for breakdown
+  const getSelectedModuleData = () => {
+    switch (selectedModule) {
+      case 'Business Permit':
+        return { data: bpData, raw: bpRaw };
+      case 'Working Permit':
+        return { data: wpData, raw: wpRaw };
+      case 'Barangay Clearance':
+        return { data: brgyData, raw: brgyRaw };
+      case 'Building Permit & Certificate of Occupancy':
+        return { data: bpcoData, raw: bpcoRaw };
+      default:
+        return { data: combinedData, raw: null };
+    }
+  };
+
+  // Use combined data for chart, but selected module data for breakdown
+  const chartDataSource = combinedData;
+  const { raw: selectedRaw } = getSelectedModuleData();
+
+  // Generate dynamic title based on enabled modules
+  const getModuleTitle = () => {
+    if (modules.length === 0) return "No Modules";
+    if (modules.length === 1) return modules[0];
+    if (modules.length === 2) return modules.join(" and ");
+    return modules.slice(0, -1).join(", ") + ", and " + modules[modules.length - 1];
+  };
+
+  // Use the combined data directly (date filtering is handled at the source level)
+  const processedData = aggregateData(chartDataSource);
   const categories = processedData.map(item => item.name);
 
   // Pie chart data with hidden support
@@ -261,12 +366,50 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
   const minWidth = Math.max(400, processedData.length * 80);
 
   return (
-    <div className="bg-card p-4 rounded-md border text-secondary-foreground border-border shadow-sm mb-6">
+    <div className="bg-card relative flex flex-col  p-4 rounded-md border text-secondary-foreground border-border shadow-sm mb-6">
+         {loading && (
+            <div className=" absolute left-0 top-0 w-full h-1 z-50 overflow-hidden rounded-t-md flex">
+              <div className=' h-full w-[100%] ease-in-out animate-[moveLine_1.3s_linear_infinite] flex'>
+                <div
+                className="h-full "
+                style={{
+                  width: '30%',
+                  background: '#eccb58'
+                }}
+              />
+              <div
+                className="h-full  delay-300"
+                style={{
+                  width: '40%',
+                  background: '#b8232e'
+                }}
+              />
+              <div
+                className="h-full  delay-600"
+                style={{
+                  width: '50%',
+                  background: '#0134b2'
+                }}
+              />
+                
+              </div>
+              
+           <style>
+                {`
+                  @keyframes moveLine {
+                    0% { transform: translateX(-100%); }
+                    100% { transform: translateX(250%); }
+                  }
+                `}
+              </style>
+            </div>
+          )}
+      
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-sm font-bold uppercase">
+        <h2 className="text-sm font-bold w-[85%] uppercase">
           {chartType === "pie"
-            ? `Operational vs Developmental vs Withdraw (Percentage)`
-            : title}
+            ? `Operational vs Developmental vs Withdraw (Percentage) - ${getModuleTitle()}`
+            : `Operational vs. Developmental vs. Withdrawal (${getModuleTitle()})`}
         </h2>
         <div className="flex gap-2">
           {chartTypes.map(type => (
@@ -280,7 +423,6 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
               {type.label}
             </button>
           ))}
-          
         </div>
       </div>
       {/* Custom legend styled like ApexCharts */}
@@ -306,7 +448,10 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
         ))}
       </div>
       <div className="w-full overflow-x-auto">
-        <div style={{ minWidth: chartType === 'pie' ? 400 : minWidth, height: 400 }}>
+        <div style={{ minWidth: chartType === 'pie' ? 400 : minWidth, height: 400 }} className="relative">
+          {/* Loading overlay */}
+       
+          
           {chartType === 'bar' && (
             <Bar data={chartData} options={options} plugins={[ChartDataLabels]} />
           )}
@@ -330,9 +475,88 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
           >
             {showBreakdown ? 'Hide Breakdown ▼ ' : 'Show Breakdown ▶ '}
           </button>
-      {showBreakdown && raw && Array.isArray(raw) && (() => {
-  // 1. Sort raw by date (oldest to latest)
-  const sortedRaw = [...raw].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+      {showBreakdown && (
+        <div className="mt-4">
+          {/* Module Selection Dropdown */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-2">Select Module for Breakdown:</label>
+            <select
+              value={selectedModule}
+              onChange={(e) => setSelectedModule(e.target.value)}
+              className="px-3 py-2 border rounded-md text-sm bg-background border-border"
+            >
+              <option value="All">Select Module</option>
+              {modules.includes("Business Permit") && (
+                <option value="Business Permit">Business Permit</option>
+              )}
+              {modules.includes("Working Permit") && (
+                <option value="Working Permit">Working Permit</option>
+              )}
+              {modules.includes("Barangay Clearance") && (
+                <option value="Barangay Clearance">Barangay Clearance</option>
+              )}
+              {modules.includes("Building Permit & Certificate of Occupancy") && (
+                <option value="Building Permit & Certificate of Occupancy">Building Permit & Certificate of Occupancy</option>
+              )}
+            </select>
+          </div>
+
+          {/* Total Status Summary for Most Recent Date */}
+          {selectedModule !== "All" && selectedRaw && Array.isArray(selectedRaw) && selectedRaw.length > 0 && (() => {
+            // Get the most recent date (sorted data)
+            const sortedRaw = [...selectedRaw].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+            const mostRecentData = sortedRaw[0];
+            
+            // Calculate totals for the most recent date
+            const totals = mostRecentData.data.reduce((acc: any, item: any) => ({
+              operational: acc.operational + (Number(item.operational) || 0),
+              developmental: acc.developmental + (Number(item.developmental) || 0),
+              withdraw: acc.withdraw + (Number(item.withdraw) || 0)
+            }), { operational: 0, developmental: 0, withdraw: 0 });
+
+            const grandTotal = totals.operational + totals.developmental + totals.withdraw;
+
+            return (
+              <div className="mb-4 p-4 bg-primary/5 border border-primary/20 rounded-md">
+                <h3 className="text-sm font-semibold mb-3 text-primary">
+                  Total Status Summary - {selectedModule}
+                </h3>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Most Recent Date: <span className="font-medium">{mostRecentData.date}</span>
+                </p>
+                <div className="grid grid-cols-3 gap-4 text-sm">
+                  <div className="text-center p-2 bg-blue-50 rounded border">
+                    <div className="font-bold text-blue-700">{totals.operational}</div>
+                    <div className="text-xs text-blue-600">Operational</div>
+                    <div className="text-xs text-muted-foreground">
+                      {grandTotal > 0 ? `${((totals.operational / grandTotal) * 100).toFixed(1)}%` : '0%'}
+                    </div>
+                  </div>
+                  <div className="text-center p-2 bg-yellow-50 rounded border">
+                    <div className="font-bold text-yellow-700">{totals.developmental}</div>
+                    <div className="text-xs text-yellow-600">Developmental</div>
+                    <div className="text-xs text-muted-foreground">
+                      {grandTotal > 0 ? `${((totals.developmental / grandTotal) * 100).toFixed(1)}%` : '0%'}
+                    </div>
+                  </div>
+                  <div className="text-center p-2 bg-red-50 rounded border">
+                    <div className="font-bold text-red-700">{totals.withdraw}</div>
+                    <div className="text-xs text-red-600">Withdraw</div>
+                    <div className="text-xs text-muted-foreground">
+                      {grandTotal > 0 ? `${((totals.withdraw / grandTotal) * 100).toFixed(1)}%` : '0%'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {showBreakdown && selectedRaw && Array.isArray(selectedRaw) && (() => {
+  // Split raw by date (oldest to latest)
+  const sortedRaw = [...selectedRaw].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   // 2. Get all unique region names in the order of the first date
   const regionNames = sortedRaw[0]?.data.map((item: any) => item.name) || [];

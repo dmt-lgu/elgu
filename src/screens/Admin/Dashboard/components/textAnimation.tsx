@@ -6,6 +6,7 @@ type IncreasingTextAnimationProps = {
   delay?: number;
   speed?: number;
   scrambleSpeed?: number;
+  isNumber?: boolean;
 };
 
 const IncreasingTextAnimation: React.FC<IncreasingTextAnimationProps> = ({
@@ -13,9 +14,19 @@ const IncreasingTextAnimation: React.FC<IncreasingTextAnimationProps> = ({
   delay = 500,
   speed = 300,
   scrambleSpeed = 50,
+  isNumber = false,
 }) => {
   const [displayText, setDisplayText] = useState('');
   const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+
+  // Format number with commas
+  const formatNumber = (num: string) => {
+    if (!isNumber) return num;
+    const number = parseInt(num.replace(/,/g, ''));
+    return isNaN(number) ? num : number.toLocaleString();
+  };
+
+
 
   const spring = useSpring({
     opacity: 1,
@@ -28,16 +39,19 @@ const IncreasingTextAnimation: React.FC<IncreasingTextAnimationProps> = ({
     let scrambleTimeoutId: NodeJS.Timeout;
     let index = 0;
 
+    // Get the formatted text to work with
+    const formattedText = formatNumber(text);
+
     const revealText = () => {
-      if (index <= text.length) {
+      if (index <= formattedText.length) {
         // Shuffle characters before showing the correct one
         scrambleTimeoutId = setInterval(() => {
-          const scrambledText = text
+          const scrambledText = formattedText
             .split('')
             .map((char, i) =>
               i < index
                 ? char
-                : characters[Math.floor(Math.random() * characters.length)]
+                : char === ',' ? ',' : characters[Math.floor(Math.random() * characters.length)]
             )
             .join('');
           setDisplayText(scrambledText);
@@ -46,7 +60,7 @@ const IncreasingTextAnimation: React.FC<IncreasingTextAnimationProps> = ({
         // Once the scramble is done, show the correct character
         timeoutId = setTimeout(() => {
           clearInterval(scrambleTimeoutId);
-          setDisplayText(text.slice(0, index + 1));
+          setDisplayText(formattedText.slice(0, index + 1));
           index++;
           revealText();
         }, speed);
@@ -59,7 +73,7 @@ const IncreasingTextAnimation: React.FC<IncreasingTextAnimationProps> = ({
       clearTimeout(timeoutId);
       clearInterval(scrambleTimeoutId);
     };
-  }, [text, speed, scrambleSpeed]);
+  }, [text, speed, scrambleSpeed, isNumber]);
 
   return <animated.span style={spring}>{displayText}</animated.span>;
 };
