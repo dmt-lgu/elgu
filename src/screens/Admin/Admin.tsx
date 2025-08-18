@@ -298,7 +298,7 @@ function Admin() {
   // Make resetFirstRun available globally for testing
   (window as any).resetFirstRun = resetFirstRun;
 
-  const [regionStats, setRegionStats] = useState<any[]>([]);
+  const [regionStats, setRegionStats] = useState<any[]>([0,17]);
 
   function fetchRegions() {
     dispatch(setLoad(true));
@@ -630,8 +630,7 @@ function Admin() {
      
     }
   }, []);
- const locations: string[] = Array.isArray(data.real) ? data.real : [data.real];
-const totalRegions = locations.length;
+
   return (
     <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme">
       <div className="flex h-screen">
@@ -756,7 +755,7 @@ const totalRegions = locations.length;
           }}
           className="fixed bottom-4 text-xs right-4 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-full shadow-lg z-50"
         >
-          Cancel Request ({regionStats[0] ? regionStats[0] : 0} / {totalRegions})  <Loader2Icon className="inline w-4 h-4 animate-spin ml-2" />
+          Cancel Request ({regionStats[0]} / {regionStats[1]})  <Loader2Icon className="inline w-4 h-4 animate-spin ml-2" />
         </button>
       )}
     </ThemeProvider>
