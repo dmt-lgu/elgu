@@ -31,7 +31,7 @@ interface TableReportProps {
   onTableDataChange?: (hasData: boolean) => void;
 }
 
-// --- Utility Functions (Keep as is) ---
+// --- Utility Functions ---
 function ensureDate(d: Date | string | null | undefined): Date | null {
   if (!d) return null;
   if (d instanceof Date) return d;
@@ -259,7 +259,7 @@ export function getDateRangeLabel(
   end: Date | null,
   selectedDateType: string
 ) {
-  if (!start && !end) return "";
+  if (!start && !end) return "No date range selected";
   if ((selectedDateType === "Month" || selectedDateType === "Year") && start && end) {
     if (isFullMonthRange(start, end)) {
         return `${format(start, "MMMM yyyy")} - ${format(end, "MMMM yyyy")}`;
@@ -267,13 +267,13 @@ export function getDateRangeLabel(
   }
   if (start && end) {
     if (isSameDay(start, end)) {
-      return format(start, "MMM dd, yyyy");
+      return format(start, "MMMM dd, yyyy");
     }
-    return `${format(start, "MMM dd, yyyy")} - ${format(end, "MMM dd, yyyy")}`;
+    return `${format(start, "MMMM dd, yyyy")} - ${format(end, "MMMM dd, yyyy")}`;
   }
-  if (start) return format(start, "MMM dd, yyyy");
-  if (end) return format(end, "MMM dd, yyyy");
-  return "";
+  if (start) return `From ${format(start, "MMMM dd, yyyy")}`;
+  if (end) return `Until ${format(end, "MMMM dd, yyyy")}`;
+  return "Date range not specified";
 }
 
 const BusinessPermitReport = forwardRef<HTMLDivElement, TableReportProps>(({
@@ -359,88 +359,89 @@ const BusinessPermitReport = forwardRef<HTMLDivElement, TableReportProps>(({
   const regionMappingGrouped = useMemo(() => groupResultsByRegion(filteredResults, lguToRegion), [filteredResults, lguToRegion]);
 
   const tableRowsReport = useMemo(() => {
-    
     const rows: React.ReactNode[] = [];
     Object.entries(regionMappingGrouped).forEach(([region, lguList]) => {
       lguList.forEach((lgu: any, idx: number) => {
         if (lgu.sum && Object.keys(lgu.sum).length > 0) {
           const sum = lgu.sum;
           rows.push(
-            <TableRow key={`${region}-${lgu.lgu}`} className="hover:bg-blue-50/50">
+            <TableRow key={`${region}-${lgu.lgu}`} className="hover:bg-blue-50/50 transition-colors duration-200 text-xs">
               {idx === 0 && (
-                <TableCell
-                  className="border px-2 py-1 text-center font-medium left-0 z-10 align-middle"
+              <TableCell
+                  className="p-2 text-center font-bold text-slate-700 align-middle bg-slate-50 border-r text-xs"
                   rowSpan={lguList.length}
                 >
                   {getRegionCode(region)}
                 </TableCell>
               )}
-              <TableCell className="border px-2 py-1 text-start font-medium">
-                {lgu.lgu}
-                <span className="text-[10px] font-normal text-gray-500 ml-1">
-                  {lgu.province ? `(${lgu.province})` : ""}
-                </span>
-                <br />
-                <span className="text-[10px] font-normal text-blue-600">
+              <TableCell className="p-2 text-start font-semibold text-slate-800 text-xs">
+                <div>
+                  {lgu.lgu}
+                  <span className="text-[11px] font-medium text-slate-500 ml-1.5">
+                    {lgu.province ? `(${lgu.province})` : ""}
+                  </span>
+                </div>
+                <div className="text-[10px] font-semibold text-blue-700 mt-0.5">
                   {lgu.months && lgu.months.length > 0 && (
                     lgu.months.length === 1
                       ? `(${formatMonthYear(lgu.months[0])})`
                       : `(${formatMonthYear(lgu.months[0])} - ${formatMonthYear(lgu.months[lgu.months.length - 1])})`
                   )}
-                </span>
+                </div>
               </TableCell>
-              <TableCell className="border px-2 py-1 text-center">{sum.newPaid || 0}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{sum.newPaidViaEgov || 0}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{sum.newPending || 0}</TableCell>
-              <TableCell className="border px-2 py-1 text-center font-semibold bg-slate-100">{(sum.newPaid || 0) + (sum.newPaidViaEgov || 0) + (sum.newPending || 0)}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{sum.renewPaid || 0}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{sum.renewPaidViaEgov || 0}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{sum.renewPending || 0}</TableCell>
-              <TableCell className="border px-2 py-1 text-center font-semibold bg-slate-100">{(sum.renewPaid || 0) + (sum.renewPaidViaEgov || 0) + (sum.renewPending || 0)}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{sum.malePaid || 0}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{sum.malePending || 0}</TableCell>
-              <TableCell className="border px-2 py-1 text-center font-semibold bg-slate-100">{(sum.malePaid || 0) + (sum.malePending || 0)}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{sum.femalePaid || 0}</TableCell>
-              <TableCell className="border px-2 py-1 text-center">{sum.femalePending || 0}</TableCell>
-              <TableCell className="border px-2 py-1 text-center font-semibold bg-slate-100">{(sum.femalePaid || 0) + (sum.femalePending || 0)}</TableCell>
+              <TableCell className="p-2 text-center tabular-nums text-green-700">{sum.newPaid || 0}</TableCell>
+              <TableCell className="p-2 text-center tabular-nums text-green-700">{sum.newPaidViaEgov || 0}</TableCell>
+              <TableCell className="p-2 text-center tabular-nums text-blue-700">{sum.newPending || 0}</TableCell>
+              <TableCell className="p-2 text-center font-bold text-slate-900 bg-slate-100 tabular-nums">{(sum.newPaid || 0) + (sum.newPaidViaEgov || 0) + (sum.newPending || 0)}</TableCell>
+              <TableCell className="p-2 text-center tabular-nums text-green-700">{sum.renewPaid || 0}</TableCell>
+              <TableCell className="p-2 text-center tabular-nums text-green-700">{sum.renewPaidViaEgov || 0}</TableCell>
+              <TableCell className="p-2 text-center tabular-nums text-blue-700">{sum.renewPending || 0}</TableCell>
+              <TableCell className="p-2 text-center font-bold text-slate-900 bg-slate-100 tabular-nums">{(sum.renewPaid || 0) + (sum.renewPaidViaEgov || 0) + (sum.renewPending || 0)}</TableCell>
+              <TableCell className="p-2 text-center tabular-nums text-green-700">{sum.malePaid || 0}</TableCell>
+              <TableCell className="p-2 text-center tabular-nums text-blue-700">{sum.malePending || 0}</TableCell>
+              <TableCell className="p-2 text-center font-bold text-slate-900 bg-slate-100 tabular-nums">{(sum.malePaid || 0) + (sum.malePending || 0)}</TableCell>
+              <TableCell className="p-2 text-center tabular-nums text-green-700">{sum.femalePaid || 0}</TableCell>
+              <TableCell className="p-2 text-center tabular-nums text-blue-700">{sum.femalePending || 0}</TableCell>
+              <TableCell className="p-2 text-center font-bold text-slate-900 bg-slate-100 tabular-nums">{(sum.femalePaid || 0) + (sum.femalePending || 0)}</TableCell>
             </TableRow>
           );
         } else {
           lgu.monthlyResults.forEach((month: any, mIdx: number) => {
             rows.push(
-              <TableRow key={`${region}-${lgu.lgu}-${month.month}-${mIdx}`} className="hover:bg-blue-50/50">
+              <TableRow key={`${region}-${lgu.lgu}-${month.month}-${mIdx}`} className="hover:bg-blue-50/50 transition-colors duration-200 text-xs">
                 {idx === 0 && mIdx === 0 && (
                   <TableCell
-                    className="border px-2 py-1 text-center font-medium left-0 z-10 align-middle"
+                    className="p-2 text-center font-bold text-slate-700 align-middle bg-slate-50 border-r text-xs"
                     rowSpan={lguList.reduce((acc, lgu) => acc + (lgu.monthlyResults?.length || 1), 0)}
                   >
                     {getRegionCode(region)}
                   </TableCell>
                 )}
-                <TableCell className="border px-2 py-1 text-start font-medium">
-                  {lgu.lgu}
-                  <span className="text-[10px] font-normal text-gray-500 ml-1">
-                    {lgu.province ? `(${lgu.province})` : ""}
-                  </span>
-                  <br />
-                  <span className="text-[10px] font-normal text-blue-600">
+                <TableCell className="p-2 text-start font-semibold text-slate-800 text-xs">
+                  <div>
+                    {lgu.lgu}
+                    <span className="text-[11px] font-medium text-slate-500 ml-1.5">
+                      {lgu.province ? `(${lgu.province})` : ""}
+                    </span>
+                  </div>
+                  <div className="text-[10px] font-semibold text-blue-700 mt-0.5">
                     ({formatMonthYear(month.month)})
-                  </span>
+                  </div>
                 </TableCell>
-                <TableCell className="border px-2 py-1 text-center">{month.newPaid || 0}</TableCell>
-                <TableCell className="border px-2 py-1 text-center">{month.newPaidViaEgov || 0}</TableCell>
-                <TableCell className="border px-2 py-1 text-center">{month.newPending || 0}</TableCell>
-                <TableCell className="border px-2 py-1 text-center font-semibold bg-slate-100">{(month.newPaid || 0) + (month.newPaidViaEgov || 0) + (month.newPending || 0)}</TableCell>
-                <TableCell className="border px-2 py-1 text-center">{month.renewPaid || 0}</TableCell>
-                <TableCell className="border px-2 py-1 text-center">{month.renewPaidViaEgov || 0}</TableCell>
-                <TableCell className="border px-2 py-1 text-center">{month.renewPending || 0}</TableCell>
-                <TableCell className="border px-2 py-1 text-center font-semibold bg-slate-100">{(month.renewPaid || 0) + (month.renewPaidViaEgov || 0) + (month.renewPending || 0)}</TableCell>
-                <TableCell className="border px-2 py-1 text-center">{month.malePaid || 0}</TableCell>
-                <TableCell className="border px-2 py-1 text-center">{month.malePending || 0}</TableCell>
-                <TableCell className="border px-2 py-1 text-center font-semibold bg-slate-100">{(month.malePaid || 0) + (month.malePending || 0)}</TableCell>
-                <TableCell className="border px-2 py-1 text-center">{month.femalePaid || 0}</TableCell>
-                <TableCell className="border px-2 py-1 text-center">{month.femalePending || 0}</TableCell>
-                <TableCell className="border px-2 py-1 text-center font-semibold bg-slate-100">{(month.femalePaid || 0) + (month.femalePending || 0)}</TableCell>
+                <TableCell className="p-2 text-center tabular-nums text-green-700">{month.newPaid || 0}</TableCell>
+                <TableCell className="p-2 text-center tabular-nums text-green-700">{month.newPaidViaEgov || 0}</TableCell>
+                <TableCell className="p-2 text-center tabular-nums text-blue-700">{month.newPending || 0}</TableCell>
+                <TableCell className="p-2 text-center font-bold text-slate-900 bg-slate-100 tabular-nums">{(month.newPaid || 0) + (month.newPaidViaEgov || 0) + (month.newPending || 0)}</TableCell>
+                <TableCell className="p-2 text-center tabular-nums text-green-700">{month.renewPaid || 0}</TableCell>
+                <TableCell className="p-2 text-center tabular-nums text-green-700">{month.renewPaidViaEgov || 0}</TableCell>
+                <TableCell className="p-2 text-center tabular-nums text-blue-700">{month.renewPending || 0}</TableCell>
+                <TableCell className="p-2 text-center font-bold text-slate-900 bg-slate-100 tabular-nums">{(month.renewPaid || 0) + (month.renewPaidViaEgov || 0) + (month.renewPending || 0)}</TableCell>
+                <TableCell className="p-2 text-center tabular-nums text-green-700">{month.malePaid || 0}</TableCell>
+                <TableCell className="p-2 text-center tabular-nums text-blue-700">{month.malePending || 0}</TableCell>
+                <TableCell className="p-2 text-center font-bold text-slate-900 bg-slate-100 tabular-nums">{(month.malePaid || 0) + (month.malePending || 0)}</TableCell>
+                <TableCell className="p-2 text-center tabular-nums text-green-700">{month.femalePaid || 0}</TableCell>
+                <TableCell className="p-2 text-center tabular-nums text-blue-700">{month.femalePending || 0}</TableCell>
+                <TableCell className="p-2 text-center font-bold text-slate-900 bg-slate-100 tabular-nums">{(month.femalePaid || 0) + (month.femalePending || 0)}</TableCell>
               </TableRow>
             );
           });
@@ -477,103 +478,120 @@ const BusinessPermitReport = forwardRef<HTMLDivElement, TableReportProps>(({
   }, [apiData]);
 
   return (
-    <div ref={ref} className="bg-white p-4 rounded-xl border border-gray-200 shadow-lg">
+    <div ref={ref} className="bg-slate-50 p-4 sm:p-5 rounded-xl border border-slate-200/80 shadow-lg shadow-slate-200/60">
       {hasSearched && (showLoader || loading) && <Loading />}
-      <div ref={ref}>
-        <div className='flex justify-between items-center mb-4 pb-4 border-b border-gray-200'>
-            <img src={dictImage} alt="dict logo" className='w-52 h-auto'/>
+      <div>
+        <div className='flex justify-between items-center mb-5 pb-5 border-b border-slate-200'>
+            <div className="flex items-center gap-4">
+              <img src={dictImage} alt="dict logo" className='w-44 h-auto'/>
+              <div className="border-l border-slate-300 pl-4">
+                  <h1 className="text-xl font-extrabold text-slate-800 tracking-tight">
+                      Business Permit Report
+                  </h1>
+                  <p className="text-xs font-medium text-slate-500 mt-1">
+                      Generated for the period: <span className="font-semibold text-slate-600">{dateRangeLabel}</span>
+                  </p>
+              </div>
+            </div>
             <div className='text-right'>
-                <h2 className="text-xl font-bold text-gray-800">
-                    Business Permit Report
-                </h2>
-                {dateRangeLabel && (
-                    <p className="text-base text-gray-600">
-                        {dateRangeLabel}
-                    </p>
-                )}
-                <p className="text-xs text-gray-400 mt-1">
-                    Generated on: {format(generatedAt, "MMM dd, yyyy, h:mm:ss a")}
+                <p className="text-[11px] font-semibold text-slate-600">
+                    Generated On
+                </p>
+                <p className="text-xs font-mono text-slate-500">
+                    {format(generatedAt, "MMM dd, yyyy, h:mm a")}
                 </p>
             </div>
         </div>
 
-        <Table className="w-full border-collapse text-xs">
-          <TableHeader>
-            <TableRow>
-              <TableHead rowSpan={2} className="bg-[#9ec6f7] text-black font-bold border-x border-gray-300 px-2 py-2 text-center align-middle sticky top-0 z-10">Region</TableHead>
-              <TableHead rowSpan={2} className="bg-[#9ec6f7] text-black font-bold border-r border-gray-300 px-2 py-2 text-center align-middle sticky top-0 z-10">LGU</TableHead>
-              <TableHead colSpan={4} className="bg-[#9ec6f7] text-black font-bold border-r border-gray-300 px-2 py-2 text-center sticky top-0 z-10 uppercase tracking-wider">New</TableHead>
-              <TableHead colSpan={4} className="bg-[#9ec6f7] text-black font-bold border-r border-gray-300 px-2 py-2 text-center sticky top-0 z-10 uppercase tracking-wider">Renewal</TableHead>
-              <TableHead colSpan={3} className="bg-[#9ec6f7] text-black font-bold border-r border-gray-300 px-2 py-2 text-center sticky top-0 z-10 uppercase tracking-wider">Male</TableHead>
-              <TableHead colSpan={3} className="bg-[#9ec6f7] text-black font-bold border-r border-gray-300 px-2 py-2 text-center sticky top-0 z-10 uppercase tracking-wider">Female</TableHead>
-            </TableRow>
-            <TableRow>
-              <TableHead className="bg-[#e3f0ff] text-black border-r border-gray-300 px-2 py-1 sticky top-[42px] z-10 text-center font-semibold">PAID</TableHead>
-              <TableHead className="bg-[#e3f0ff] text-black border-r border-gray-300 px-2 py-1 sticky top-[42px] z-10 text-center font-semibold">PAID <br />
-                <span className='text-[10px] font-normal'>(eGOVPay)</span>
-              </TableHead>
-              <TableHead className="bg-[#e3f0ff] text-black border-r border-gray-300 px-2 py-1 sticky top-[42px] z-10 text-center font-semibold">ONGOING</TableHead>
-              <TableHead className="bg-[#cce1ff] text-black border-r border-gray-300 px-2 py-1 sticky top-[42px] z-10 text-center font-bold uppercase">total</TableHead>
-              <TableHead className="bg-[#e3f0ff] text-black border-r border-gray-300 px-2 py-1 sticky top-[42px] z-10 text-center font-semibold">PAID</TableHead>
-              <TableHead className="bg-[#e3f0ff] text-black border-r border-gray-300 px-2 py-1 sticky top-[42px] z-10 text-center font-semibold">PAID <br />
-                <span className='text-[10px] font-normal'>(eGOVPay)</span>
-              </TableHead>
-              <TableHead className="bg-[#e3f0ff] text-black border-r border-gray-300 px-2 py-1 sticky top-[42px] z-10 text-center font-semibold">ONGOING</TableHead>
-              <TableHead className="bg-[#cce1ff] text-black border-r border-gray-300 px-2 py-1 sticky top-[42px] z-10 text-center font-bold uppercase">total</TableHead>
-              <TableHead className="bg-[#e3f0ff] text-black border-r border-gray-300 px-2 py-1 sticky top-[42px] z-10 text-center font-semibold">PAID</TableHead>
-              <TableHead className="bg-[#e3f0ff] text-black border-r border-gray-300 px-2 py-1 sticky top-[42px] z-10 text-center font-semibold">ONGOING</TableHead>
-              <TableHead className="bg-[#cce1ff] text-black border-r border-gray-300 px-2 py-1 sticky top-[42px] z-10 text-center font-bold uppercase">total</TableHead>
-              <TableHead className="bg-[#e3f0ff] text-black border-r border-gray-300 px-2 py-1 sticky top-[42px] z-10 text-center font-semibold">PAID</TableHead>
-              <TableHead className="bg-[#e3f0ff] text-black border-r border-gray-300 px-2 py-1 sticky top-[42px] z-10 text-center font-semibold">ONGOING</TableHead>
-              <TableHead className="bg-[#cce1ff] text-black border-r border-gray-300 px-2 py-1 sticky top-[42px] z-10 text-center font-bold uppercase">total</TableHead>
-            </TableRow>
-          </TableHeader>
-           <TableBody className="[&>tr:nth-child(odd)]:bg-gray-100">
-            {hasSearched && (showLoader || loading) ? (
-                <TableRow>
-                  <TableCell colSpan={16} className="text-center py-6 border">
-                    <LoaderTable />
-                  </TableCell>
-                </TableRow>
-              ) : (
-              filteredResults.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={16} className="text-center py-6 border">
-                    <span className='font-semibold text-base text-gray-500'>
-                        {hasSearched ? 'No results found. Please try different filters.' : 'Please select filters to generate a report.'}
-                    </span>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                tableRowsReport
-              )
-            )}
-
-            <TableRow className="bg-[#3a4554] font-bold text-white border-t-4 border-gray-400">
-              <TableCell className="bg-[#3a4554] border-x border-gray-300 px-2 py-2" colSpan={2}>
-                GRAND TOTAL
-                <br />
-                <span className='text-[10px] font-normal text-gray-300'>
-                  ({dateRangeLabel})
-                </span>
-              </TableCell>
-              <TableCell className="border-r border-gray-300 px-2 py-2 text-center bg-[#3a4554]">{(showLoader || loading) ? 0 : grandTotals.newPaid}</TableCell>
-              <TableCell className="border-r border-gray-300 px-2 py-2 text-center bg-[#3a4554]">{(showLoader || loading) ? 0 : grandTotals.newGeoPay}</TableCell>
-              <TableCell className="border-r border-gray-300 px-2 py-2 text-center bg-[#3a4554]">{(showLoader || loading) ? 0 : grandTotals.newPending}</TableCell>
-              <TableCell className="border-r border-gray-300 px-2 py-2 text-center bg-[#3a4554]">{(showLoader || loading) ? 0 : (grandTotals.newPaid + grandTotals.newGeoPay + grandTotals.newPending)}</TableCell>
-              <TableCell className="border-r border-gray-300 px-2 py-2 text-center bg-[#3a4554]">{(showLoader || loading) ? 0 : grandTotals.renewalPaid}</TableCell>
-              <TableCell className="border-r border-gray-300 px-2 py-2 text-center bg-[#3a4554]">{(showLoader || loading) ? 0 : grandTotals.renewalGeoPay}</TableCell>
-              <TableCell className="border-r border-gray-300 px-2 py-2 text-center bg-[#3a4554]">{(showLoader || loading) ? 0 : grandTotals.renewalPending}</TableCell>
-              <TableCell className="border-r border-gray-300 px-2 py-2 text-center bg-[#3a4554]">{(showLoader || loading) ? 0 : (grandTotals.renewalPaid + grandTotals.renewalGeoPay + grandTotals.renewalPending)}</TableCell>
-              <TableCell className="border-r border-gray-300 px-2 py-2 text-center bg-[#3a4554]">{(showLoader || loading) ? 0 : grandTotals.malePaid}</TableCell>
-              <TableCell className="border-r border-gray-300 px-2 py-2 text-center bg-[#3a4554]">{(showLoader || loading) ? 0 : grandTotals.malePending}</TableCell>
-              <TableCell className="border-r border-gray-300 px-2 py-2 text-center bg-[#3a4554]">{(showLoader || loading) ? 0 : (grandTotals.malePaid + grandTotals.malePending)}</TableCell>
-              <TableCell className="border-r border-gray-300 px-2 py-2 text-center bg-[#3a4554]">{(showLoader || loading) ? 0 : grandTotals.femalePaid}</TableCell>
-              <TableCell className="border-r border-gray-300 px-2 py-2 text-center bg-[#3a4554]">{(showLoader || loading) ? 0 : grandTotals.femalePending}</TableCell>
-              <TableCell className="border-r border-gray-300 px-2 py-2 text-center bg-[#3a4554]">{(showLoader || loading) ? 0 : (grandTotals.femalePaid + grandTotals.femalePending)}</TableCell>
-            </TableRow>
-          </TableBody>
-        </Table>
+        <div className="overflow-x-auto rounded-md border border-slate-300">
+          <Table className="w-full border-collapse">
+            <TableHeader className="[&_tr]:border-b-0">
+              <TableRow>
+                <TableHead rowSpan={2} className="bg-[#9ec6f7] text-black font-bold p-2 text-center align-middle sticky top-0 z-20 text-[11px] border-b border-r border-slate-300">Region</TableHead>
+                <TableHead rowSpan={2} className="bg-[#9ec6f7] text-black font-bold p-2 text-center align-middle sticky top-0 z-20 text-[11px] border-b border-r border-slate-300">LGU</TableHead>
+                <TableHead colSpan={4} className="bg-[#9ec6f7] text-black font-bold p-2 text-center sticky top-0 z-20 uppercase tracking-wider text-[11px] border-b border-r border-slate-300">New</TableHead>
+                <TableHead colSpan={4} className="bg-[#9ec6f7] text-black font-bold p-2 text-center sticky top-0 z-20 uppercase tracking-wider text-[11px] border-b border-r border-slate-300">Renewal</TableHead>
+                <TableHead colSpan={3} className="bg-[#9ec6f7] text-black font-bold p-2 text-center sticky top-0 z-20 uppercase tracking-wider text-[11px] border-b border-r border-slate-300">Male</TableHead>
+                <TableHead colSpan={3} className="bg-[#9ec6f7] text-black font-bold p-2 text-center sticky top-0 z-20 uppercase tracking-wider text-[11px] border-b border-slate-300">Female</TableHead>
+              </TableRow>
+              <TableRow>
+                <TableHead className="bg-blue-100 text-black p-2 sticky top-[45px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">PAID</TableHead>
+                <TableHead className="bg-blue-100 text-black p-2 sticky top-[45px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">PAID <br />
+                  <span className='font-medium'>(eGOVPay)</span>
+                </TableHead>
+                <TableHead className="bg-blue-100 text-black p-2 sticky top-[45px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">ONGOING</TableHead>
+                <TableHead className="bg-blue-200 text-black p-2 sticky top-[45px] z-20 text-center font-bold uppercase text-[10px] border-b border-r border-slate-300">Total</TableHead>
+                <TableHead className="bg-blue-100 text-black p-2 sticky top-[45px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">PAID</TableHead>
+                <TableHead className="bg-blue-100 text-black p-2 sticky top-[45px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">PAID <br />
+                  <span className='font-medium'>(eGOVPay)</span>
+                </TableHead>
+                <TableHead className="bg-blue-100 text-black p-2 sticky top-[45px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">ONGOING</TableHead>
+                <TableHead className="bg-blue-200 text-black p-2 sticky top-[45px] z-20 text-center font-bold uppercase text-[10px] border-b border-r border-slate-300">Total</TableHead>
+                <TableHead className="bg-blue-100 text-black p-2 sticky top-[45px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">PAID</TableHead>
+                <TableHead className="bg-blue-100 text-black p-2 sticky top-[45px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">ONGOING</TableHead>
+                <TableHead className="bg-blue-200 text-black p-2 sticky top-[45px] z-20 text-center font-bold uppercase text-[10px] border-b border-r border-slate-300">Total</TableHead>
+                <TableHead className="bg-blue-100 text-black p-2 sticky top-[45px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">PAID</TableHead>
+                <TableHead className="bg-blue-100 text-black p-2 sticky top-[45px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">ONGOING</TableHead>
+                <TableHead className="bg-blue-200 text-black p-2 sticky top-[45px] z-20 text-center font-bold uppercase text-[10px] border-b border-slate-300">Total</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody className="[&>tr:nth-child(even)]:bg-white [&>tr:nth-child(odd)]:bg-slate-50/50">
+              {hasSearched && (showLoader || loading) ? (
+                  <TableRow>
+                    <TableCell colSpan={16} className="text-center py-12">
+                      <LoaderTable />
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                filteredResults.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={16} className="text-center py-16 bg-white">
+                      <div className='flex flex-col items-center justify-center'>
+                          <div className="rounded-full bg-slate-100 p-3">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 10.5a.5.5 0 01.5-.5h3a.5.5 0 010 1h-3a.5.5 0 01-.5-.5z" />
+                              </svg>
+                          </div>
+                          <p className='font-bold text-sm text-slate-600 mt-4'>
+                              {hasSearched ? 'No Results Found' : 'Generate a Report'}
+                          </p>
+                          <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+                            {hasSearched ? 'There is no data matching your selected filters. Please try adjusting your criteria.' : 'Use the filters above to generate your business permit report.'}
+                          </p>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  tableRowsReport
+                )
+              )}
+            </TableBody>
+            <tfoot>
+              <TableRow className="bg-slate-800 text-white font-bold border-t-2 border-slate-400">
+                <TableCell className="bg-slate-800 p-2 text-left" colSpan={2}>
+                  <div className="font-extrabold tracking-wider text-sm">GRAND TOTAL</div>
+                  <div className='text-[10px] font-medium text-slate-300'>
+                    ({dateRangeLabel})
+                  </div>
+                </TableCell>
+                <TableCell className="p-2 text-center tabular-nums text-sm bg-slate-800">{(showLoader || loading) ? '-' : grandTotals.newPaid}</TableCell>
+                <TableCell className="p-2 text-center tabular-nums text-sm bg-slate-800">{(showLoader || loading) ? '-' : grandTotals.newGeoPay}</TableCell>
+                <TableCell className="p-2 text-center tabular-nums text-sm bg-slate-800">{(showLoader || loading) ? '-' : grandTotals.newPending}</TableCell>
+                <TableCell className="p-2 text-center tabular-nums text-sm bg-slate-800">{(showLoader || loading) ? '-' : (grandTotals.newPaid + grandTotals.newGeoPay + grandTotals.newPending)}</TableCell>
+                <TableCell className="p-2 text-center tabular-nums text-sm bg-slate-800">{(showLoader || loading) ? '-' : grandTotals.renewalPaid}</TableCell>
+                <TableCell className="p-2 text-center tabular-nums text-sm bg-slate-800">{(showLoader || loading) ? '-' : grandTotals.renewalGeoPay}</TableCell>
+                <TableCell className="p-2 text-center tabular-nums text-sm bg-slate-800">{(showLoader || loading) ? '-' : grandTotals.renewalPending}</TableCell>
+                <TableCell className="p-2 text-center tabular-nums text-sm bg-slate-800">{(showLoader || loading) ? '-' : (grandTotals.renewalPaid + grandTotals.renewalGeoPay + grandTotals.renewalPending)}</TableCell>
+                <TableCell className="p-2 text-center tabular-nums text-sm bg-slate-800">{(showLoader || loading) ? '-' : grandTotals.malePaid}</TableCell>
+                <TableCell className="p-2 text-center tabular-nums text-sm bg-slate-800">{(showLoader || loading) ? '-' : grandTotals.malePending}</TableCell>
+                <TableCell className="p-2 text-center tabular-nums text-sm bg-slate-800">{(showLoader || loading) ? '-' : (grandTotals.malePaid + grandTotals.malePending)}</TableCell>
+                <TableCell className="p-2 text-center tabular-nums text-sm bg-slate-800">{(showLoader || loading) ? '-' : grandTotals.femalePaid}</TableCell>
+                <TableCell className="p-2 text-center tabular-nums text-sm bg-slate-800">{(showLoader || loading) ? '-' : grandTotals.femalePending}</TableCell>
+                <TableCell className="p-2 text-center tabular-nums text-sm bg-slate-800">{(showLoader || loading) ? '-' : (grandTotals.femalePaid + grandTotals.femalePending)}</TableCell>
+              </TableRow>
+            </tfoot>
+          </Table>
+        </div>
       </div>
     </div>
   );

@@ -282,25 +282,34 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
     onTableDataChange?.(filteredResults.length > 0);
   }, [filteredResults.length, onTableDataChange]);
 
-  const dateRangeLabel = useMemo(() => {
-    // Re-using getDateRangeLabel from WorkingPermit for consistency if it's external,
-    // otherwise ensuring the logic is identical to previous Business/Working Permit
-    if (!normalizedDateRange.start && !normalizedDateRange.end) return "";
-    
-    // Check for full month range specifically for "Month" or "Year" selectedDates
-    if ((selectedDates?.[0] === "Month" || selectedDates?.[0] === "Year") && normalizedDateRange.start && normalizedDateRange.end && isFullMonthRange(normalizedDateRange.start, normalizedDateRange.end)) {
-        return `${format(normalizedDateRange.start, "MMMM yyyy")} - ${format(normalizedDateRange.end, "MMMM yyyy")}`;
-    }
-    // Default date range format
-    if (normalizedDateRange.start && normalizedDateRange.end) {
-        if (isSameDay(normalizedDateRange.start, normalizedDateRange.end)) return format(normalizedDateRange.start, "MMM dd, yyyy");
-        return `${format(normalizedDateRange.start, "MMM dd, yyyy")} - ${format(normalizedDateRange.end, "MMM dd, yyyy")}`;
-    }
-    if (normalizedDateRange.start) return format(normalizedDateRange.start, "MMM dd, yyyy");
-    if (normalizedDateRange.end) return format(normalizedDateRange.end, "MMM dd, yyyy");
-    return "";
-  }, [normalizedDateRange, selectedDates]);
+  const dateRangeLabel = getDateRangeLabel(
+      normalizedDateRange.start,
+      normalizedDateRange.end,
+      selectedDates?.[0] || 'Day'
+    );
 
+    
+ function getDateRangeLabel(
+  start: Date | null,
+  end: Date | null,
+  selectedDateType: string
+) {
+  if (!start && !end) return "No date range selected";
+  if ((selectedDateType === "Month" || selectedDateType === "Year") && start && end) {
+    if (isFullMonthRange(start, end)) {
+        return `${format(start, "MMMM yyyy")} - ${format(end, "MMMM yyyy")}`;
+    }
+  }
+  if (start && end) {
+    if (isSameDay(start, end)) {
+      return format(start, "MMMM dd, yyyy");
+    }
+    return `${format(start, "MMMM dd, yyyy")} - ${format(end, "MMMM dd, yyyy")}`;
+  }
+  if (start) return `From ${format(start, "MMMM dd, yyyy")}`;
+  if (end) return `Until ${format(end, "MMMM dd, yyyy")}`;
+  return "Date range not specified";
+}
 
   const regionMappingGrouped = useMemo(() => groupResultsByRegion(filteredResults, lguToRegion), [filteredResults, lguToRegion]);
 
@@ -310,19 +319,19 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
       lguList.forEach((lgu: any, idx: number) => {
         if (lgu.sum && Object.keys(lgu.sum).length > 0) {
           rows.push(
-            <TableRow key={`${region}-${lgu.lgu}`} className="hover:bg-blue-50/50">
+            <TableRow key={`${region}-${lgu.lgu}`} className="hover:bg-blue-50/50 transition-colors duration-200 text-xs">
               {idx === 0 && (
-                <TableCell className="border px-2 py-1.5 text-center font-medium left-0 z-10 align-middle" rowSpan={lguList.length}>
+                <TableCell className="p-2 text-center font-bold text-slate-700 align-middle bg-slate-50 border-r text-xs" rowSpan={lguList.length}>
                   {getRegionCode(region)}
                 </TableCell>
               )}
-              <TableCell className="border px-2 py-1.5 text-center font-medium">
+              <TableCell className="p-2 text-center font-semibold text-slate-800 text-xs">
                 {lgu.lgu}
-                <span className="text-[10px] font-normal text-gray-500 ml-1">
+                <span className="text-[11px] font-medium text-slate-500 ml-1.5">
                   {lgu.province ? `(${lgu.province})` : ""}
                 </span>
                 <br />
-                <span className="text-[10px] font-normal text-blue-600">
+                <span className="text-[10px] font-semibold text-blue-700 mt-0.5">
                   {lgu.months?.length > 1
                     ? `(${formatMonthYear(lgu.months[0])} - ${formatMonthYear(lgu.months[lgu.months.length - 1])})`
                     : lgu.months?.length === 1
@@ -330,31 +339,29 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
                     : ""}
                 </span>
               </TableCell>
-
-              <TableCell className="border px-2 py-1.5 text-center font-semibold">{lgu.totalCount || 0}</TableCell>
+              <TableCell className="p-2 text-center font-bold tabular-nums text-slate-800">{lgu.totalCount || 0}</TableCell>
             </TableRow>
           );
         } else {
           lgu.monthlyResults.forEach((month: any, mIdx: number) => {
             rows.push(
-              <TableRow key={`${region}-${lgu.lgu}-${month.month}-${mIdx}`} className="hover:bg-blue-50/50">
+              <TableRow key={`${region}-${lgu.lgu}-${month.month}-${mIdx}`} className="hover:bg-blue-50/50 transition-colors duration-200 text-xs">
                 {idx === 0 && mIdx === 0 && (
-                  <TableCell className="border px-2 py-1.5 text-center font-medium left-0 z-10 align-middle" rowSpan={lguList.reduce((acc, lguItem) => acc + (lguItem.monthlyResults?.length || 1), 0)}>
+                  <TableCell className="p-2 text-center font-bold text-slate-700 align-middle bg-slate-50 border-r text-xs" rowSpan={lguList.reduce((acc, lguItem) => acc + (lguItem.monthlyResults?.length || 1), 0)}>
                     {getRegionCode(region)}
                   </TableCell>
                 )}
-                <TableCell className="border px-2 py-1.5 text-center font-medium">
+                <TableCell className="p-2 text-center font-semibold text-slate-800 text-xs">
                   {lgu.lgu}
-                  <span className="text-[10px] font-normal text-gray-500 ml-1">
+                  <span className="text-[11px] font-medium text-slate-500 ml-1.5">
                     {lgu.province ? `(${lgu.province})` : ""}
                   </span>
                   <br />
-                  <span className="text-[10px] font-normal text-blue-600">
+                  <span className="text-[10px] font-semibold text-blue-700 mt-0.5">
                     ({formatMonthYear(month.month)})
                   </span>
                 </TableCell>
-
-                <TableCell className="border px-2 py-1.5 text-center font-semibold">{month.totalCount ?? ""}</TableCell>
+                <TableCell className="p-2 text-center font-bold tabular-nums text-slate-800">{month.totalCount ?? 0}</TableCell>
               </TableRow>
             );
           });
@@ -376,76 +383,88 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
     }, 0);
   }, [filteredResults]);
 
-  const renderTableBody = () => {
-    if (hasSearched && (showLoader || loading)) {
-      return (
-        <TableRow>
-          <TableCell colSpan={3} className="text-center py-6 border">
-            <LoaderTable />
-          </TableCell>
-        </TableRow>
-      );
-    }
-    if (filteredResults.length === 0) {
-      return (
-        <TableRow>
-          <TableCell colSpan={3} className="text-center py-6 border">
-            <span className='font-semibold text-base text-gray-500'>
-              {hasSearched ? 'No results found. Please try different filters.' : 'Please select filters to generate a report.'}
-            </span>
-          </TableCell>
-        </TableRow>
-      );
-    }
-    return tableRowsReport;
-  };
+  
 
   return (
-    <div ref={ref} className="bg-white p-4 rounded-xl border border-gray-200 shadow-lg">
-     {(hasSearched && (showLoader || loading)) && <Loading />}
+    <div ref={ref} className="bg-slate-50 p-4 sm:p-5 rounded-xl border border-slate-200/80 shadow-lg shadow-slate-200/60">
+      {(hasSearched && (showLoader || loading)) && <Loading />}
       
       <div>
-        <div className='flex justify-between items-center mb-4 pb-4 border-b border-gray-200'>
-            <img src={dictImage} alt="dict logo" className='w-52 h-auto'/>
+        <div className='flex justify-between items-center mb-5 pb-5 border-b border-slate-200'>
+            <div className="flex items-center gap-4">
+              <img src={dictImage} alt="dict logo" className='w-44 h-auto'/>
+              <div className="border-l border-slate-300 pl-4">
+                  <h1 className="text-xl font-extrabold text-slate-800 tracking-tight">
+                      Barangay Clearance Report
+                  </h1>
+                  <p className="text-xs font-medium text-slate-500 mt-1">
+                      Generated for the period: <span className="font-semibold text-slate-600">{dateRangeLabel}</span>
+                  </p>
+              </div>
+            </div>
             <div className='text-right'>
-                <h2 className="text-xl font-bold text-gray-800">
-                    Barangay Clearance
-                </h2>
-                {dateRangeLabel && (
-                    <p className="text-base text-gray-600">
-                        {dateRangeLabel}
-                    </p>
-                )}
-                <p className="text-xs text-gray-400 mt-1">
-                    Generated on: {format(generatedAt, "MMM dd, yyyy, h:mm:ss a")}
+                <p className="text-[11px] font-semibold text-slate-600">
+                    Generated On
+                </p>
+                <p className="text-xs font-mono text-slate-500">
+                    {format(generatedAt, "MMM dd, yyyy, h:mm a")}
                 </p>
             </div>
         </div>
 
-        <Table className="w-full border-collapse text-xs"> {/* Adjusted to text-xs */}
-          <TableHeader>
-            <TableRow>
-              <TableHead className="bg-[#9ec6f7] text-black font-bold border px-2 py-2 text-center align-middle sticky top-0 z-10 uppercase">Region</TableHead> {/* Adjusted padding and font size */}
-              <TableHead className="bg-[#9ec6f7] text-black font-bold border px-2 py-2 text-center align-middle sticky top-0 z-10 uppercase">LGU</TableHead> {/* Adjusted padding and font size */}
-              <TableHead className="bg-[#9ec6f7] text-black font-bold border px-2 py-2 text-center align-middle sticky top-0 z-10 uppercase">Total Results</TableHead> {/* Adjusted padding and font size */}
-            </TableRow>
-          </TableHeader>
-          <TableBody className="[&>tr:nth-child(odd)]:bg-gray-100">
-            {renderTableBody()}
-            <TableRow className="bg-[#3a4554] font-bold text-white border-t-4 border-gray-400">
-              <TableCell className="bg-[#3a4554] border px-2 py-2" colSpan={2}> {/* Adjusted padding */}
-                GRAND TOTAL
-                <br />
-                <span className='text-[10px] font-normal text-gray-300'> {/* Consistent with WorkingPermit */}
-                  ({dateRangeLabel})
-                </span>
-              </TableCell>
-              <TableCell className="bg-[#3a4554] border px-2 py-2 text-center"> {/* Adjusted padding */}
-                {(loading || showLoader) ? 0 : grandTotal}
-              </TableCell>
-            </TableRow>
-          </TableBody>
-        </Table>
+        <div className="overflow-x-auto rounded-md border border-slate-300">
+          <Table className="w-full border-collapse">
+            <TableHeader>
+              <TableRow>
+                <TableHead className="bg-[#9ec6f7] text-black font-bold p-2 text-center align-middle sticky top-0 z-10 uppercase text-[11px] border-b border-r border-slate-300">Region</TableHead>
+                <TableHead className="bg-[#9ec6f7] text-black font-bold p-2 text-center align-middle sticky top-0 z-10 uppercase text-[11px] border-b border-r border-slate-300">LGU</TableHead>
+                <TableHead className="bg-[#9ec6f7] text-black font-bold p-2 text-center align-middle sticky top-0 z-10 uppercase text-[11px] border-b border-slate-300">Total Results</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody className="[&>tr:nth-child(odd)]:bg-white [&>tr:nth-child(even)]:bg-slate-50/50">
+                {hasSearched && (showLoader || loading) ? (
+                    <TableRow>
+                        <TableCell colSpan={3} className="text-center py-12">
+                            <LoaderTable />
+                        </TableCell>
+                    </TableRow>
+                ) : filteredResults.length === 0 ? (
+                    <TableRow>
+                        <TableCell colSpan={3} className="text-center py-16 bg-white">
+                            <div className='flex flex-col items-center justify-center'>
+                                <div className="rounded-full bg-slate-100 p-3">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 10.5a.5.5 0 01.5-.5h3a.5.5 0 010 1h-3a.5.5 0 01-.5-.5z" />
+                                    </svg>
+                                </div>
+                                <p className='font-bold text-sm text-slate-600 mt-4'>
+                                    {hasSearched ? 'No Results Found' : 'Generate a Report'}
+                                </p>
+                                <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+                                    {hasSearched ? 'There is no data matching your selected filters. Please try adjusting your criteria.' : 'Use the filters above to generate your barangay clearance report.'}
+                                </p>
+                            </div>
+                        </TableCell>
+                    </TableRow>
+                ) : (
+                    tableRowsReport
+                )}
+            </TableBody>
+            <tfoot>
+              <TableRow className="bg-slate-800 font-bold text-white border-t-2 border-slate-400">
+                <TableCell className="bg-slate-800 p-2" colSpan={2}>
+                  <div className="font-extrabold tracking-wider text-sm">GRAND TOTAL</div>
+                  <div className='text-[10px] font-medium text-slate-300'>
+                    ({dateRangeLabel})
+                  </div>
+                </TableCell>
+                <TableCell className="bg-slate-800 p-2 text-center text-sm tabular-nums">
+                  {(loading || showLoader) ? '-' : grandTotal}
+                </TableCell>
+              </TableRow>
+            </tfoot>
+          </Table>
+        </div>
       </div>
     </div>
   );

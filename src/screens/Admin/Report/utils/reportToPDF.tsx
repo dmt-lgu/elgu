@@ -29,7 +29,7 @@ interface ExportTableReportToPDFParams {
 // --- CONSTANTS ---
 
 const columnWidths = {
-  bc: ["20%", "60%", "20%"],
+  bc: ["20%", "40%", "40%"],
   co: ["20%", "40%", "20%", "20%"],
   bldg: ["20%", "40%", "20%", "20%"],
   bp: [
@@ -38,7 +38,7 @@ const columnWidths = {
   ],
 };
 
-// --- HELPERS (no changes needed here) ---
+// --- HELPERS ---
 
 const formatMonthYear = (monthStr: string): string => {
   if (!monthStr) return "";
@@ -60,157 +60,191 @@ const getMonthRangeLabel = (months?: string[]): string => {
 };
 
 const makeTd = (val: any, opts: any = {}): HTMLTableCellElement => {
-  const td = document.createElement("td");
-  td.innerHTML = val != null && val !== "" ? String(val) : "0";
-  td.style.border = "#e5e5e5 0.5px solid";
-  td.style.padding = "5px";
-  td.style.textAlign = opts.align || "center";
-  td.style.fontFamily = "'Rubik', sans-serif";
-  td.style.verticalAlign = "middle";
-  td.style.fontSize = opts.fontSize || "11px";
-  if (opts.bold) td.style.fontWeight = "bold";
-  if (opts.color) td.style.color = opts.color;
-  if (opts.bg) td.style.background = opts.bg;
-  if (opts.striped) td.style.background = "#f4f4f5";
-  if (opts.colSpan) td.colSpan = opts.colSpan;
-  return td;
+    const td = document.createElement("td");
+    td.innerHTML = val != null && val !== "" ? String(val) : "0";
+    td.style.border = "#e5e5e5 0.5px solid";
+    td.style.padding = "5px";
+    td.style.textAlign = opts.align || "center";
+    td.style.fontFamily = "'Rubik', sans-serif";
+    td.style.verticalAlign = "middle";
+    td.style.fontSize = opts.fontSize || "11px";
+    if (opts.bold) td.style.fontWeight = "bold";
+    if (opts.color) td.style.color = opts.color;
+    if (opts.bg) td.style.background = opts.bg;
+    if (opts.striped) td.style.background = "#f4f4f5";
+    if (opts.colSpan) td.colSpan = opts.colSpan;
+    return td;
 };
 
 const createPdfHeader = (
-  logoUrl: string,
-  moduleLabel: string,
-  dateRangeLabel: string,
-  generatedAt: Date
+    logoUrl: string,
+    moduleLabel: string,
+    dateRangeLabel: string,
+    generatedAt: Date
 ): HTMLDivElement => {
-  const headerContainer = document.createElement("div");
-  headerContainer.style.display = "flex";
-  headerContainer.style.justifyContent = "space-between";
-  headerContainer.style.alignItems = "flex-start";
-  headerContainer.style.marginBottom = "16px";
-
-  const logoImg = document.createElement("img");
-  logoImg.src = logoUrl;
-  logoImg.style.width = "300px";
-  logoImg.style.height = "auto";
-  headerContainer.appendChild(logoImg);
-
-  const infoDiv = document.createElement("div");
-  infoDiv.style.textAlign = "right";
-  infoDiv.innerHTML = `
-      <h2 style="font-size: 20px; font-weight: bold; margin: 0; font-family: 'Rubik', sans-serif;">${
-        moduleLabel || "Report"
-      }</h2>
-      ${
-        dateRangeLabel
-          ? `<p style="font-size: 13px; font-weight: bold; color: #333; margin: 5px 0 0 0; font-family: 'Rubik', sans-serif;">${dateRangeLabel}</p>`
-          : ""
-      }
-      <p style="font-size: 11px; color: #555; margin: 8px 0 0 0; font-family: 'Rubik', sans-serif;">Generated on: ${format(
-        generatedAt,
-        "MMM dd, yyyy, h:mm:ss a"
-      )}</p>
-    `;
-  headerContainer.appendChild(infoDiv);
-  return headerContainer;
+    const headerContainer = document.createElement("div");
+    headerContainer.style.display = "flex";
+    headerContainer.style.justifyContent = "space-between";
+    headerContainer.style.alignItems = "center";
+    headerContainer.style.marginBottom = "20px";
+    headerContainer.style.paddingBottom = "20px";
+    headerContainer.style.borderBottom = "1px solid #e2e8f0";
+    const leftSide = document.createElement("div");
+    leftSide.style.display = "flex";
+    leftSide.style.alignItems = "center";
+    leftSide.style.gap = "16px";
+    const logoImg = document.createElement("img");
+    logoImg.src = logoUrl;
+    logoImg.style.width = "300px";
+    logoImg.style.height = "auto";
+    leftSide.appendChild(logoImg);
+    const titleContainer = document.createElement("div");
+    titleContainer.style.borderLeft = "1px solid #cbd5e1";
+    titleContainer.style.paddingLeft = "16px";
+    const title = document.createElement("h1");
+    title.textContent = moduleLabel || "Report";
+    title.style.fontSize = "20px";
+    title.style.fontWeight = "800";
+    title.style.color = "#1e293b";
+    title.style.letterSpacing = "-0.025em";
+    title.style.margin = "0";
+    title.style.fontFamily = "'Rubik', sans-serif";
+    titleContainer.appendChild(title);
+    const subtitle = document.createElement("p");
+    subtitle.style.fontSize = "12px";
+    subtitle.style.fontWeight = "500";
+    subtitle.style.color = "#64748b";
+    subtitle.style.marginTop = "4px";
+    subtitle.style.marginBlock = "0";
+    subtitle.style.fontFamily = "'Rubik', sans-serif";
+    const dateRangeSpan = document.createElement("span");
+    dateRangeSpan.textContent = dateRangeLabel;
+    dateRangeSpan.style.fontWeight = "600";
+    dateRangeSpan.style.color = "#475569";
+    subtitle.append("Generated for the period: ", dateRangeSpan);
+    titleContainer.appendChild(subtitle);
+    leftSide.appendChild(titleContainer);
+    headerContainer.appendChild(leftSide);
+    const rightSide = document.createElement("div");
+    rightSide.style.textAlign = "right";
+    const generatedOnText = document.createElement("p");
+    generatedOnText.textContent = "Generated On";
+    generatedOnText.style.fontSize = "11px";
+    generatedOnText.style.fontWeight = "600";
+    generatedOnText.style.color = "#475569";
+    generatedOnText.style.margin = "0";
+    generatedOnText.style.fontFamily = "'Rubik', sans-serif";
+    rightSide.appendChild(generatedOnText);
+    const generatedDate = document.createElement("p");
+    generatedDate.textContent = format(generatedAt, "MMM dd, yyyy, h:mm a");
+    generatedDate.style.fontSize = "12px";
+    generatedDate.style.fontFamily = "monospace";
+    generatedDate.style.color = "#64748b";
+    generatedDate.style.margin = "0";
+    generatedDate.style.marginTop = "2px";
+    rightSide.appendChild(generatedDate);
+    headerContainer.appendChild(rightSide);
+    return headerContainer;
 };
 
 const createReportTableHeader = (
-  _moduleLabel: any,
-  isCO: boolean,
-  isBldg: boolean,
-  isBC: boolean
+    _moduleLabel: any,
+    isCO: boolean,
+    isBldg: boolean,
+    isBC: boolean
 ): HTMLTableSectionElement => {
-  const thead = document.createElement("thead");
-  const applyThBase = (th: HTMLTableCellElement) => {
-    th.style.background = "#9ec6f7";
-    th.style.fontWeight = "bold";
-    th.style.border = "#e5e5e5 0.5px solid";
-    th.style.textAlign = "center";
-    th.style.verticalAlign = "middle";
-    th.style.whiteSpace = "normal";
-    th.style.wordBreak = "break-word";
-    th.style.lineHeight = "1.15";
-  };
+    const thead = document.createElement("thead");
 
-  if (isBC) {
-    const headerRow = document.createElement("tr");
-    ["Region", "LGU", "Total Results"].forEach((label, idx) => {
-      const th = document.createElement("th");
-      th.textContent = label;
-      th.style.width = columnWidths.bc[idx];
-      applyThBase(th);
-      th.style.padding = "10px 10px";
-      th.style.fontSize = "16px";
-      headerRow.appendChild(th);
-    });
-    thead.appendChild(headerRow);
-  } else if (isCO || isBldg) {
-    const headerRow = document.createElement("tr");
-    const labels = ["Region", "LGU", "Pending", "Paid"];
-    const widths = isCO ? columnWidths.co : columnWidths.bldg;
-    labels.forEach((label, idx) => {
-      const th = document.createElement("th");
-      th.textContent = label;
-      th.style.width = widths[idx];
-      applyThBase(th);
-      th.style.padding = "8px 6px";
-      th.style.fontSize = "12px";
-      headerRow.appendChild(th);
-    });
-    thead.appendChild(headerRow);
-  } else {
-    const headerRow1 = document.createElement("tr");
-    [
-      { label: "Region", rowSpan: 2 }, { label: "LGU", rowSpan: 2 },
-      { label: "NEW", colSpan: 4 }, { label: "RENEWAL", colSpan: 4 },
-      { label: "MALE", colSpan: 3 }, { label: "FEMALE", colSpan: 3 },
-    ].forEach((col, idx) => {
-      const th = document.createElement("th");
-      th.textContent = col.label;
-      if (idx < 2) th.style.width = columnWidths.bp[idx];
-      applyThBase(th);
-      th.style.padding = "8px 6px";
-      th.style.fontSize = "12px";
-      if (col.rowSpan) th.rowSpan = col.rowSpan;
-      if (col.colSpan) th.colSpan = col.colSpan;
-      headerRow1.appendChild(th);
-    });
+    const applyCommonStyles = (th: HTMLTableCellElement) => {
+        th.style.color = "black";
+        th.style.padding = "8px";
+        th.style.textAlign = "center";
+        th.style.verticalAlign = "middle";
+        th.style.borderRight = "1px solid #cbd5e1";
+        th.style.borderBottom = "1px solid #cbd5e1";
+    };
 
-    const headerRow2 = document.createElement("tr");
-    const labels2 = [
-      "PAID", "PAID (eGOVPay)", "PENDING", "GRANDTOTAL PER LGU",
-      "PAID", "PAID (eGOVPay)", "PENDING", "GRANDTOTAL PER LGU",
-      "PAID", "PENDING", "GRANDTOTAL PER LGU",
-      "PAID", "PENDING", "GRANDTOTAL PER LGU",
-    ] as const;
+    if (isBC || isCO || isBldg) {
+        const headerRow = document.createElement("tr");
+        const labels = isBC ? ["Region", "LGU", "Total Results"] : ["Region", "LGU", "Paid", "Ongoing"];
+        const widths = isBC ? columnWidths.bc : isCO ? columnWidths.co : columnWidths.bldg;
+        labels.forEach((label, idx) => {
+            const th = document.createElement("th");
+            th.textContent = label;
+            th.style.width = widths[idx];
+            th.style.background = "#9ec6f7";
+            th.style.fontWeight = "bold";
+            th.style.fontSize = "14px";
+            applyCommonStyles(th);
+            headerRow.appendChild(th);
+        });
+        thead.appendChild(headerRow);
+    } else {
+        const headerRow1 = document.createElement("tr");
+        const mainHeaders = [
+            { label: "Region", rowSpan: 2 },
+            { label: "LGU", rowSpan: 2 },
+            { label: "New", colSpan: 4 },
+            { label: "Renewal", colSpan: 4 },
+            { label: "Male", colSpan: 3 },
+            { label: "Female", colSpan: 3 },
+        ];
 
-    labels2.forEach((label, idx) => {
-      const th = document.createElement("th");
-      if (label.includes("(eGOVPay)")) {
-        th.innerHTML = "PAID<br /><span style='font-size:9px; font-weight:normal;'>(Per OR<br/>Paid with<br/>eGOVPay)</span>";
-        th.style.fontSize = "10px";
-      } else if (label.includes("GRANDTOTAL")) {
-        th.innerHTML = "GRAND TOTAL<br/><span style='font-size:8px; font-weight:bold;'>PER LGU</span>";
-        th.style.fontSize = "10px";
-        (th.style as any).minWidth = "100px";
-        th.style.padding = "6px 4px";
-        th.style.letterSpacing = "0.2px";
-      } else {
-        th.textContent = label;
-        th.style.fontSize = "11px";
-      }
-      th.style.width = columnWidths.bp[idx + 2];
-      applyThBase(th);
-      if (!label.includes("GRANDTOTAL")) {
-        th.style.padding = label.includes("(eGOVPay)") ? "4px 3px" : "6px 4px";
-      }
-      headerRow2.appendChild(th);
-    });
+        mainHeaders.forEach(header => {
+            const th = document.createElement("th");
+            th.textContent = header.label;
+            th.style.background = "#9ec6f7";
+            th.style.fontWeight = "bold";
+            th.style.textTransform = "uppercase";
+            th.style.letterSpacing = "0.05em";
+            th.style.fontSize = "14px";
+            th.style.padding = "8px";
+            th.style.textAlign = "center";
+            applyCommonStyles(th);
 
-    thead.appendChild(headerRow1);
-    thead.appendChild(headerRow2);
-  }
-  return thead;
+            if (header.rowSpan) th.rowSpan = header.rowSpan;
+            if (header.colSpan) th.colSpan = header.colSpan;
+            headerRow1.appendChild(th);
+        });
+        thead.appendChild(headerRow1);
+
+        const headerRow2 = document.createElement("tr");
+        const subHeaders = [
+            { label: "PAID", isTotal: false },
+            { label: "PAID <br /> <span style='font-weight:500;'>(eGOVPay)</span>", isTotal: false },
+            { label: "ONGOING", isTotal: false },
+            { label: "Total", isTotal: true },
+            { label: "PAID", isTotal: false },
+            { label: "PAID <br /> <span style='font-weight:500;'>(eGOVPay)</span>", isTotal: false },
+            { label: "ONGOING", isTotal: false },
+            { label: "Total", isTotal: true },
+            { label: "PAID", isTotal: false },
+            { label: "ONGOING", isTotal: false },
+            { label: "Total", isTotal: true },
+            { label: "PAID", isTotal: false },
+            { label: "ONGOING", isTotal: false },
+            { label: "Total", isTotal: true },
+        ];
+
+        subHeaders.forEach(header => {
+            const th = document.createElement("th");
+            th.innerHTML = header.label;
+            th.style.fontSize = "11px"; 
+            applyCommonStyles(th);
+
+            if (header.isTotal) {
+                th.style.background = "#bfdbfe";
+                th.style.fontWeight = "bold";
+                th.style.textTransform = "uppercase";
+            } else {
+                th.style.background = "#dbeafe";
+                th.style.fontWeight = "600";
+            }
+            headerRow2.appendChild(th);
+        });
+        thead.appendChild(headerRow2);
+    }
+    return thead;
 };
 
 const createReportGrandTotalRow = (
@@ -222,28 +256,40 @@ const createReportGrandTotalRow = (
   totalTr.style.color = "white";
   totalTr.style.fontWeight = "bold";
 
-  const grandTotalCell = makeTd("", { bold: true, align: "left", bg: "#3a4554", color: "#fff", fontSize: "12px" });
+  const grandTotalCell = makeTd("", { bold: true, align: "left", bg: "#3a4554", color: "#fff", fontSize: "14px" });
   grandTotalCell.colSpan = 2;
-  grandTotalCell.innerHTML = `GRAND TOTAL FOR <br/><span style="font-size:9px; font-weight:normal;">(${dateRangeLabel})</span>`;
+  grandTotalCell.innerHTML = `GRAND TOTAL <br/><span style="font-size:10px; font-weight:normal;">(${dateRangeLabel})</span>`;
   totalTr.appendChild(grandTotalCell);
 
-  const commonProps = { bold: true, bg: "#3a4554", color: "#fff" };
+  const commonProps = { bold: true, bg: "#3a4554", color: "#fff", fontSize: "14px" };
 
   if (isBC) {
     const total = filteredResults.reduce((sum, lgu) => {
-      if (isDayMode && lgu.monthlyResults) {
-        return sum + lgu.monthlyResults.reduce((mSum: number, month: any) => mSum + (month.totalCount || 0), 0);
+      if (isDayMode) {
+        const monthlySum = (lgu.monthlyResults || []).reduce((mSum: number, month: any) => mSum + (month.totalCount || 0), 0);
+        return sum + monthlySum;
       }
-      return sum + (lgu.totalCount || lgu.sum?.totalCount || 0);
+      return sum + (lgu.totalCount || 0);
     }, 0);
-    totalTr.appendChild(makeTd(total, { ...commonProps, fontSize: "16px" }));
+    totalTr.appendChild(makeTd(total, commonProps));
   } else if (isCO || isBldg) {
     const pendingKey = isCO ? "coPending" : "buildingPending";
     const paidKey = isCO ? "coPaid" : "buildingPaid";
-    const totalPending = filteredResults.reduce((sum, lgu) => sum + (lgu.sum?.[pendingKey] || lgu?.[pendingKey] || 0), 0);
-    const totalPaid = filteredResults.reduce((sum, lgu) => sum + (lgu.sum?.[paidKey] || lgu?.[paidKey] || 0), 0);
-    totalTr.appendChild(makeTd(totalPending, commonProps));
-    totalTr.appendChild(makeTd(totalPaid, commonProps));
+    const totals = filteredResults.reduce((acc, lgu) => {
+        if (isDayMode) {
+            (lgu.monthlyResults || []).forEach((month: any) => {
+                acc.paid += month[paidKey] || 0;
+                acc.pending += month[pendingKey] || 0;
+            });
+        } else {
+            acc.paid += lgu.sum?.[paidKey] || 0;
+            acc.pending += lgu.sum?.[pendingKey] || 0;
+        }
+        return acc;
+    }, { paid: 0, pending: 0 });
+    
+    totalTr.appendChild(makeTd(totals.paid, commonProps));
+    totalTr.appendChild(makeTd(totals.pending, commonProps));
   } else {
     const totals = filteredResults.reduce((acc, lgu) => {
       const dataToSum = isDayMode ? lgu.monthlyResults || [] : lgu.sum ? [lgu.sum] : [];
@@ -283,28 +329,40 @@ const createReportGrandTotalRow = (
 
 const createPageContent = (
   rows: RowData[], isLastPage: boolean, params: ExportTableReportToPDFParams, generatedAt: Date,
-  _isSimpleReport: boolean, isBC: boolean, isCO: boolean, isBldg: boolean,
+  isSimpleReport: boolean, isBC: boolean, isCO: boolean, isBldg: boolean,
   isDayMode: boolean, isLandscape: boolean
 ): HTMLDivElement => {
   const { logoUrl, moduleLabel = "Report", dateRangeLabel, filteredResults } = params;
   const wrapperDiv = document.createElement("div");
   const isBP = moduleLabel === "Business Permit";
   const isWP = moduleLabel === "Working Permit";
-  const isSimpleModule = isBC || isCO || isBldg;
-  const isWideModule = isBP || isWP || isSimpleModule;
-  const desiredWidthPx = isLandscape ? (isWideModule ? 1280 : 1100) : (isSimpleModule ? 1100 : 1000);
+  const isWideModule = isBP || isWP;
 
-  wrapperDiv.style.cssText = `display: inline-block; background: #fff; font-family: 'Rubik', sans-serif; padding: 16px; width: ${desiredWidthPx}px;`;
+  const desiredWidthPx = isLandscape 
+    ? (isWideModule ? 1500 : 1100) 
+    : (isSimpleReport ? 1100 : 1000);
+
+  wrapperDiv.style.cssText = `display: inline-block; background: #fff; font-family: 'Rubik', sans-serif; padding: 20px; width: ${desiredWidthPx}px;`;
 
   const header = createPdfHeader(logoUrl, moduleLabel, dateRangeLabel, generatedAt);
   wrapperDiv.appendChild(header);
 
   const tableChunk = document.createElement("table");
-  tableChunk.setAttribute("style", `width: 100%; font-size: 11px; font-family: Rubik, sans-serif; border-collapse: collapse; table-layout: fixed;`);
+  tableChunk.setAttribute("style", `width: 100%; font-size: 16px; font-family: Rubik, sans-serif; border-collapse: collapse; table-layout: fixed;`);
+  
   const thead = createReportTableHeader(moduleLabel, isCO, isBldg, isBC);
-  tableChunk.appendChild(thead);
   const tbodyChunk = document.createElement("tbody");
 
+  if (isSimpleReport && !isLastPage) {
+    wrapperDiv.style.height = isLandscape ? '720px' : '1050px';
+    wrapperDiv.style.display = 'flex';
+    wrapperDiv.style.flexDirection = 'column';
+    tableChunk.style.flexGrow = '1';
+  }
+
+  tableChunk.appendChild(thead);
+  tableChunk.appendChild(tbodyChunk);
+  
   let prevRegionKey: string | null = null;
   const regionCountsOnPage: Record<string, number> = {};
   rows.forEach((r) => { regionCountsOnPage[r.regionKey] = (regionCountsOnPage[r.regionKey] || 0) + 1; });
@@ -314,9 +372,8 @@ const createPageContent = (
     const isStriped = idx % 2 === 0;
     if (row.regionKey !== prevRegionKey) {
       const regionText = regionKeyToCode[row.regionKey] || row.regionKey || "N/A";
-      const regionFontSize = isBC ? "18px" : (isLandscape ? "14px" : "13px");
-      const td = makeTd(regionText, { bold: true, fontSize: regionFontSize });
-      (td.style as any).padding = isBC ? "10px 6px" : "8px 6px";
+      const td = makeTd(regionText, { bold: true, fontSize: "14px" });
+      td.style.padding = "8px 6px";
       td.rowSpan = regionCountsOnPage[row.regionKey];
       tr.appendChild(td);
       prevRegionKey = row.regionKey;
@@ -324,98 +381,60 @@ const createPageContent = (
     const lguParts = (row.lgu?.lgu || "").split(",");
     const lguName = lguParts[0] ? lguParts[0].trim() : "";
     const provinceName = row.lgu?.province || (lguParts[1] ? lguParts[1].trim() : "");
-    const lguNameSize = isBC ? "16px" : "11px";
-    const provinceNameSize = isBC ? "13px" : "10px";
-    const dateSize = isBC ? "12px" : "9px";
+    
+    const lguNameSize = "12px";
+    const provinceNameSize = "11px";
+    const dateSize = "10px";
 
     const lguHtml = `<span style="font-weight:bold; font-size:${lguNameSize};">${lguName}</span>
-      ${provinceName ? `<br><span style="font-weight:normal; font-size:${provinceNameSize};">${provinceName}</span>` : ""}
-      <br/><span style="font-size:${dateSize}; color:#1d4ed8;">
+      ${provinceName ? `<span style="font-weight:500; font-size:${provinceNameSize};">, ${provinceName}</span>` : ""}
+      <br/><span style="font-size:${dateSize}; font-weight:bold; color:#1d4ed8;">
         ${isDayMode ? `(${formatMonthYear(row.month || "")})` : getMonthRangeLabel(row.lgu?.months)}
       </span>`;
-    tr.appendChild(makeTd(lguHtml, { align: "center", striped: isStriped }));
+    tr.appendChild(makeTd(lguHtml, { align: "left", striped: isStriped }));
 
     if (isBC) {
       const data = isDayMode ? row.monthData : row.lgu;
-      tr.appendChild(makeTd((data?.totalCount ?? 0), { striped: isStriped, fontSize: "12px" }));
+      tr.appendChild(makeTd((data?.totalCount ?? 0), { striped: isStriped, fontSize: "14px", bold: true }));
     } else if (isCO || isBldg) {
       const src = isDayMode ? row.monthData : (row.lgu?.sum ?? row.lgu ?? {});
       const pendingKey = isCO ? "coPending" : "buildingPending";
       const paidKey = isCO ? "coPaid" : "buildingPaid";
-      tr.appendChild(makeTd(src?.[pendingKey] ?? 0, { striped: isStriped }));
-      tr.appendChild(makeTd(src?.[paidKey] ?? 0, { striped: isStriped }));
+      tr.appendChild(makeTd(src?.[paidKey] ?? 0, { striped: isStriped, fontSize: "14px", bold: true, color: '#166534' }));
+      tr.appendChild(makeTd(src?.[pendingKey] ?? 0, { striped: isStriped, fontSize: "14px", bold: true, color: '#1d4ed8' }));
     } else {
       const data = isDayMode ? row.monthData : (row.lgu?.sum || {});
-      tr.appendChild(makeTd(data?.newPaid ?? 0, { striped: isStriped }));
-      tr.appendChild(makeTd(data?.newPaidViaEgov ?? 0, { striped: isStriped }));
-      tr.appendChild(makeTd(data?.newPending ?? 0, { striped: isStriped }));
-      tr.appendChild(makeTd((data?.newPaid ?? 0) + (data?.newPaidViaEgov ?? 0) + (data?.newPending ?? 0), { bold: true, striped: isStriped }));
-      tr.appendChild(makeTd(data?.renewPaid ?? 0, { striped: isStriped }));
-      tr.appendChild(makeTd(data?.renewPaidViaEgov ?? 0, { striped: isStriped }));
-      tr.appendChild(makeTd(data?.renewPending ?? 0, { striped: isStriped }));
-      tr.appendChild(makeTd((data?.renewPaid ?? 0) + (data?.renewPaidViaEgov ?? 0) + (data?.renewPending ?? 0), { bold: true, striped: isStriped }));
-      tr.appendChild(makeTd(data?.malePaid ?? 0, { striped: isStriped }));
-      tr.appendChild(makeTd(data?.malePending ?? 0, { striped: isStriped }));
-      tr.appendChild(makeTd((data?.malePaid ?? 0) + (data?.malePending ?? 0), { bold: true, striped: isStriped }));
-      tr.appendChild(makeTd(data?.femalePaid ?? 0, { striped: isStriped }));
-      tr.appendChild(makeTd(data?.femalePending ?? 0, { striped: isStriped }));
-      tr.appendChild(makeTd((data?.femalePaid ?? 0) + (data?.femalePending ?? 0), { bold: true, striped: isStriped }));
+      const cellOpts = { striped: isStriped, fontSize: "14px", bold: true };
+
+      tr.appendChild(makeTd(data?.newPaid ?? 0, cellOpts));
+      tr.appendChild(makeTd(data?.newPaidViaEgov ?? 0, cellOpts));
+      tr.appendChild(makeTd(data?.newPending ?? 0, cellOpts));
+      tr.appendChild(makeTd((data?.newPaid ?? 0) + (data?.newPaidViaEgov ?? 0) + (data?.newPending ?? 0), cellOpts));
+      tr.appendChild(makeTd(data?.renewPaid ?? 0, cellOpts));
+      tr.appendChild(makeTd(data?.renewPaidViaEgov ?? 0, cellOpts));
+      tr.appendChild(makeTd(data?.renewPending ?? 0, cellOpts));
+      tr.appendChild(makeTd((data?.renewPaid ?? 0) + (data?.renewPaidViaEgov ?? 0) + (data?.renewPending ?? 0), cellOpts));
+      tr.appendChild(makeTd(data?.malePaid ?? 0, cellOpts));
+      tr.appendChild(makeTd(data?.malePending ?? 0, cellOpts));
+      tr.appendChild(makeTd((data?.malePaid ?? 0) + (data?.malePending ?? 0), cellOpts));
+      tr.appendChild(makeTd(data?.femalePaid ?? 0, cellOpts));
+      tr.appendChild(makeTd(data?.femalePending ?? 0, cellOpts));
+      tr.appendChild(makeTd((data?.femalePaid ?? 0) + (data?.femalePending ?? 0), cellOpts));
     }
     tbodyChunk.appendChild(tr);
   });
 
   const totalTr = createReportGrandTotalRow(filteredResults, isBC, isCO, isBldg, isDayMode, dateRangeLabel, isLastPage);
   tbodyChunk.appendChild(totalTr);
-  tableChunk.appendChild(tbodyChunk);
   wrapperDiv.appendChild(tableChunk);
   return wrapperDiv;
-};
-
-const sliceCanvasIntoPdf = async (opts: any) => {
-  const { pdf, canvas, pageWidth, pageHeight, marginX, marginY, centerHorizontally = false, progressBar, progressLabel, flushFrame } = opts;
-  const maxWidth = pageWidth - marginX * 2;
-  const maxHeight = pageHeight - marginY * 2;
-  const aspect = (canvas.width || 1) / (canvas.height || 1);
-  let drawWidth = maxWidth;
-  let drawHeight = drawWidth / aspect;
-  if (drawHeight > maxHeight) {
-    drawHeight = maxHeight;
-    drawWidth = drawHeight * aspect;
-  }
-  const scaleX = drawWidth / (canvas.width || 1);
-  const sliceHeightPx = Math.max(1, Math.floor(maxHeight / scaleX));
-  const totalSlices = Math.ceil((canvas.height || 1) / sliceHeightPx);
-  const temp = document.createElement("canvas");
-  const tctx = temp.getContext("2d");
-  temp.width = canvas.width;
-
-  for (let i = 0; i < totalSlices; i++) {
-    const startY = i * sliceHeightPx;
-    const thisSlicePx = Math.max(1, Math.min(sliceHeightPx, canvas.height - startY));
-    temp.height = thisSlicePx;
-    tctx?.clearRect(0, 0, temp.width, temp.height);
-    tctx?.drawImage(canvas, 0, startY, canvas.width, thisSlicePx, 0, 0, canvas.width, thisSlicePx);
-    const imgData = temp.toDataURL("image/jpeg", 0.7);
-    const sliceDrawHeight = thisSlicePx * scaleX;
-    const xPos = centerHorizontally ? (pageWidth - drawWidth) / 2 : marginX;
-    if (i > 0) pdf.addPage();
-    pdf.addImage(imgData, "JPEG", xPos, marginY, drawWidth, sliceDrawHeight, undefined, "FAST");
-    
-    const progress = Math.round(((i + 1) / totalSlices) * 100);
-    if (progressBar && progressLabel) {
-      progressBar.style.width = `${progress}%`;
-      progressLabel.textContent = `${progress}%`;
-    }
-    if ((i + 1) % 5 === 0) await flushFrame();
-  }
-  try { tctx?.clearRect(0, 0, temp.width, temp.height); (temp as any).width = 1; (temp as any).height = 1; } catch {}
 };
 
 /**
  * Main function to export tabular report data to a PDF file.
  */
 export async function exportTableReportToPDF(params: ExportTableReportToPDFParams): Promise<void> {
-  const { filteredResults, lguToRegion, fileLabel = "report", moduleLabel, selectedDateType, captureElement, captureSelector } = params;
+  const { filteredResults, lguToRegion, fileLabel = "report", moduleLabel, selectedDateType } = params;
   const generatedAt = new Date();
   const isBC = moduleLabel === "Barangay Clearance";
   const isCO = moduleLabel === "Certificate of Occupancy";
@@ -446,7 +465,9 @@ export async function exportTableReportToPDF(params: ExportTableReportToPDFParam
   }
 
   const isSimpleReport = isBC || isCO || isBldg;
-  const ROWS_PER_PAGE = isSimpleReport ? 22 : 10;
+  // GI-UPDATE: Ang fixed ROWS_PER_PAGE nga logic para consistent ang tanan.
+  const ROWS_PER_PAGE = isSimpleReport ? 15 : 7;
+  
   const rowChunks: RowData[][] = [];
   if (allRows.length > 0) {
     for (let i = 0; i < allRows.length; i += ROWS_PER_PAGE) {
@@ -458,10 +479,8 @@ export async function exportTableReportToPDF(params: ExportTableReportToPDFParam
 
   const flushFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 
-  // --- DYNAMIC MODAL TEXT ---
   const modalTitle = moduleLabel ? `Generating ${moduleLabel} Report` : 'Compiling Your Document';
   const modalSubtitle = moduleLabel ? `Please wait, we're preparing your ${moduleLabel.toLowerCase()} data.` : 'Gathering data and creating the PDF...';
-  // --- END DYNAMIC TEXT ---
 
   await Swal.fire({
     width: 380,
@@ -469,7 +488,6 @@ export async function exportTableReportToPDF(params: ExportTableReportToPDFParam
     html: `
       <style>
         .swal-modal-container { display: flex; flex-direction: column; align-items: center; gap: 20px; padding-top: 10px; }
-        /* From Uiverse.io by Nawsome */ 
         .typewriter { --blue: #5C86FF; --blue-dark: #275EFE; --key: #fff; --paper: #EEF0FD; --text: #D3D4EC; --tool: #FBC56C; --duration: 3s; position: relative; -webkit-animation: bounce05 var(--duration) linear infinite; animation: bounce05 var(--duration) linear infinite; }
         .typewriter .slide { width: 92px; height: 20px; border-radius: 3px; margin-left: 14px; transform: translateX(14px); background: linear-gradient(var(--blue), var(--blue-dark)); -webkit-animation: slide05 var(--duration) ease infinite; animation: slide05 var(--duration) ease infinite; }
         .typewriter .slide:before, .typewriter .slide:after, .typewriter .slide i:before { content: ""; position: absolute; background: var(--tool); }
@@ -517,7 +535,7 @@ export async function exportTableReportToPDF(params: ExportTableReportToPDFParam
       setTimeout(async () => {
         let pdf: jsPDF | null = null;
         try {
-          const orientation = (isBP || isWP) ? "landscape" : (isSimpleReport ? "portrait" : "landscape");
+          const orientation = (isBP || isWP) ? "landscape" : "portrait";
           const isLandscape = orientation === "landscape";
           pdf = new jsPDF({ orientation, unit: "pt", format: "a4", compress: true, putOnlyUsedFonts: true } as any);
           const pageWidth = pdf.internal.pageSize.getWidth();
@@ -525,55 +543,54 @@ export async function exportTableReportToPDF(params: ExportTableReportToPDFParam
           const marginX = isSimpleReport ? 8 : 20;
           const marginY = 20;
           
-          let elementToCapture: HTMLElement | null =
-            captureElement instanceof HTMLElement
-              ? captureElement
-              : (captureSelector
-                  ? (document.querySelector(captureSelector) as HTMLElement | null)
-                  : null);
+          let firstPageImgWidth = 0;
 
-          if (elementToCapture) {
+          const totalChunks = rowChunks.length > 0 ? rowChunks.length : 1;
+          for (let i = 0; i < totalChunks; i++) {
+            if (i > 0) pdf.addPage();
+            const chunk = rowChunks[i] || [];
+            const isLastPage = i === totalChunks - 1;
+            const tableDiv = createPageContent(chunk, isLastPage, params, generatedAt, isSimpleReport, isBC, isCO, isBldg, isDayMode, isLandscape);
+            const hiddenDiv = document.createElement("div");
+            hiddenDiv.style.position = "fixed"; hiddenDiv.style.left = "-9999px"; hiddenDiv.style.display = "inline-block";
+            document.body.appendChild(hiddenDiv);
+            hiddenDiv.appendChild(tableDiv);
             await new Promise(res => setTimeout(res, 30));
-            const canvas = await html2canvas(elementToCapture, { scale: 1.5, useCORS: true, backgroundColor: "#fff", scrollY: -window.scrollY });
-            await sliceCanvasIntoPdf({ pdf, canvas, pageWidth, pageHeight, marginX, marginY, centerHorizontally: isBC && !isLandscape, progressBar, progressLabel, flushFrame });
-            try { const ctx = canvas.getContext("2d"); ctx?.clearRect(0, 0, canvas.width, canvas.height); (canvas as any).width = 1; (canvas as any).height = 1; } catch {}
-          } else {
-            const totalChunks = rowChunks.length > 0 ? rowChunks.length : 1;
-            for (let i = 0; i < totalChunks; i++) {
-              if (i > 0) pdf.addPage();
-              const chunk = rowChunks[i] || [];
-              const isLastPage = i === totalChunks - 1;
-              const tableDiv = createPageContent(chunk, isLastPage, params, generatedAt, isSimpleReport, isBC, isCO, isBldg, isDayMode, isLandscape);
-              const hiddenDiv = document.createElement("div");
-              hiddenDiv.style.position = "fixed"; hiddenDiv.style.left = "-9999px"; hiddenDiv.style.display = "inline-block";
-              document.body.appendChild(hiddenDiv);
-              hiddenDiv.appendChild(tableDiv);
-              await new Promise(res => setTimeout(res, 30));
-              
-              const canvas = await html2canvas(tableDiv, { scale: 1.25, useCORS: true, backgroundColor: "#fff" });
-              const imgData = canvas.toDataURL("image/jpeg", 0.7);
-              const maxWidth = pageWidth - marginX * 2;
-              const maxHeight = pageHeight - marginY * 2;
-              const imgAspectRatio = canvas.width / canvas.height || 1;
-              let imgWidth = maxWidth;
-              let imgHeight = imgWidth / imgAspectRatio;
+            
+            const canvas = await html2canvas(tableDiv, { scale: 1.25, useCORS: true, backgroundColor: "#fff" });
+            const imgData = canvas.toDataURL("image/jpeg", 0.7);
+            const maxWidth = pageWidth - marginX * 2;
+            const maxHeight = pageHeight - marginY * 2;
+            const imgAspectRatio = canvas.width / canvas.height || 1;
+            
+            let imgWidth, imgHeight;
+
+            if (firstPageImgWidth === 0) {
+              imgWidth = maxWidth;
+              imgHeight = imgWidth / imgAspectRatio;
               if (imgHeight > maxHeight) {
-                imgHeight = maxHeight;
-                imgWidth = imgHeight * imgAspectRatio;
+                  imgHeight = maxHeight;
+                  imgWidth = imgHeight * imgAspectRatio;
               }
-              const xPos = isBC && !isLandscape ? (pageWidth - imgWidth) / 2 : marginX;
-              pdf.addImage(imgData, "JPEG", xPos, marginY, imgWidth, imgHeight, undefined, "FAST");
-              try { document.body.removeChild(hiddenDiv); } catch {}
-              try { const ctx = canvas.getContext("2d"); if(ctx) ctx.clearRect(0, 0, canvas.width, canvas.height); (canvas as any).width = 1; (canvas as any).height = 1; } catch {}
-              
-              const progress = Math.round(((i + 1) / totalChunks) * 100);
-              if (progressBar && progressLabel) {
-                progressBar.style.width = `${progress}%`;
-                progressLabel.textContent = `${progress}%`;
-              }
-              if ((i + 1) % 5 === 0) await flushFrame();
+              firstPageImgWidth = imgWidth;
+            } else {
+              imgWidth = firstPageImgWidth;
+              imgHeight = imgWidth / imgAspectRatio;
             }
+
+            const xPos = (pageWidth - imgWidth) / 2;
+            pdf.addImage(imgData, "JPEG", xPos, marginY, imgWidth, imgHeight, undefined, "FAST");
+            try { document.body.removeChild(hiddenDiv); } catch {}
+            try { const ctx = canvas.getContext("2d"); if(ctx) ctx.clearRect(0, 0, canvas.width, canvas.height); (canvas as any).width = 1; (canvas as any).height = 1; } catch {}
+            
+            const progress = Math.round(((i + 1) / totalChunks) * 100);
+            if (progressBar && progressLabel) {
+              progressBar.style.width = `${progress}%`;
+              progressLabel.textContent = `${progress}%`;
+            }
+            if ((i + 1) % 5 === 0) await flushFrame();
           }
+          
           if (progressBar && progressLabel) {
             progressBar.style.width = `100%`;
             progressLabel.textContent = `100%`;
@@ -590,3 +607,4 @@ export async function exportTableReportToPDF(params: ExportTableReportToPDFParam
     },
   });
 }
+
