@@ -30,6 +30,7 @@ interface BuildingPermitProps {
   selectedIslands?: string[];
   hasSearched?: boolean;
   onTableDataChange?: (hasData: boolean) => void;
+  isProgressive?: boolean;
 }
 
 // --- UTILITY FUNCTIONS ---
@@ -159,12 +160,17 @@ const BuildingPermitReport = forwardRef<HTMLDivElement, BuildingPermitProps>(({
   selectedRegions, dateRange, apiData, loading, lguToRegion,
   selectedProvinces, selectedCities, selectedDates, selectedIslands,
   hasSearched, onTableDataChange,
+  isProgressive = false,
 }, ref) => {
 
   const [generatedAt, setGeneratedAt] = useState(new Date());
-  useEffect(() => { setGeneratedAt(new Date()); }, [apiData]);
+  useEffect(() => {
+    if (apiData) {
+      setGeneratedAt(new Date());
+    }
+  }, [apiData]);
 
-  const [showLoader, setShowLoader] = useState(false);
+  const [_showLoader, setShowLoader] = useState(false);
 
   // --- Redux State ---
   const persistedBldgTableData = useSelector((state: RootState) => state.buildingPermit.tableData);
@@ -205,16 +211,18 @@ const BuildingPermitReport = forwardRef<HTMLDivElement, BuildingPermitProps>(({
 
   const filteredResults = useMemo(() => {
     return filterTableResults({
-      apiData: effectiveApiData, selectedRegions, selectedProvinces, selectedCities,
+      apiData, selectedRegions, selectedProvinces, selectedCities,
       selectedDates, selectedIslands, lguToRegion, dateRange,
     });
-  }, [effectiveApiData, selectedRegions, selectedProvinces, selectedCities, selectedDates, selectedIslands, lguToRegion, dateRange]);
+  }, [apiData, selectedRegions, selectedProvinces, selectedCities, selectedDates, selectedIslands, lguToRegion, dateRange]);
 
-  useEffect(() => { onTableDataChange?.(filteredResults.length > 0); }, [filteredResults, onTableDataChange]);
+
+   useEffect(() => { onTableDataChange?.(filteredResults.length > 0); }, [filteredResults, onTableDataChange]);
   
   const normalizedDateRange = useMemo(() => normalizeDateRange(dateRange), [dateRange]);
  
   const regionMappingGrouped = useMemo(() => groupResultsByRegion(filteredResults, lguToRegion), [filteredResults, lguToRegion]);
+
 
   function isFullMonthRange(start: Date, end: Date) {
   return (
@@ -222,11 +230,7 @@ const BuildingPermitReport = forwardRef<HTMLDivElement, BuildingPermitProps>(({
     isSameDay(end, endOfMonth(end))
   );
 }
-   const dateRangeLabel = getDateRangeLabel(
-      normalizedDateRange.start,
-      normalizedDateRange.end,
-      selectedDates?.[0] || 'Day'
-    );
+   const dateRangeLabel = getDateRangeLabel(normalizedDateRange.start, normalizedDateRange.end, selectedDates?.[0] || 'Day');
 
     function getDateRangeLabel(
       start: Date | null,
@@ -315,14 +319,14 @@ const BuildingPermitReport = forwardRef<HTMLDivElement, BuildingPermitProps>(({
   }, [regionMappingGrouped, selectedDates]);
 
   return (
-    <div ref={ref} className="bg-slate-50 p-4 sm:p-5 rounded-xl border border-slate-200/80 shadow-lg shadow-slate-200/60">
-      {(hasSearched && (showLoader || loading)) && <Loading />}
+    <div ref={ref} className="bg-slate-50 p-4 sm:p-5 rounded-md border border-slate-200/80 shadow-lg shadow-slate-200/60">
+       {(loading || isProgressive) && filteredResults.length === 0 && <Loading />}
       <div>
         <div className='flex justify-between items-center mb-5 pb-5 border-b border-slate-200'>
           <div className="flex items-center gap-4">
             <img src={dictImage} alt="dict logo" className='w-44 h-auto' />
             <div className="border-l border-slate-300 pl-4">
-              <h1 className="text-xl font-extrabold text-slate-800 tracking-tight">Building Permit Report</h1>
+              <h1 className="text-xl font-extrabold text-slate-800 tracking-tight">Building Permit</h1>
               <p className="text-xs font-medium text-slate-500 mt-1">
                 Generated for the period: <span className="font-semibold text-slate-600">{dateRangeLabel}</span>
               </p>
@@ -344,11 +348,22 @@ const BuildingPermitReport = forwardRef<HTMLDivElement, BuildingPermitProps>(({
               </TableRow>
             </TableHeader>
             <TableBody className="[&>tr:nth-child(odd)]:bg-white [&>tr:nth-child(even)]:bg-slate-50/50">
-              {(hasSearched && (showLoader || loading)) ? (
+              {filteredResults.length > 0 ? (
+                <>
+                  {tableRowsReport}
+                  {isProgressive && (
+                    <TableRow>
+                      <TableCell colSpan={4} className="p-0">
+                        <LoaderTable message="Please wait for other regions..." />
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </>
+              ) : loading ? (
                 <TableRow>
                   <TableCell colSpan={4} className="text-center py-12"><LoaderTable /></TableCell>
                 </TableRow>
-              ) : filteredResults.length === 0 ? (
+              ) : (
                 <TableRow>
                   <TableCell colSpan={4} className="text-center py-16 bg-white">
                     <div className='flex flex-col items-center justify-center'>
@@ -366,20 +381,17 @@ const BuildingPermitReport = forwardRef<HTMLDivElement, BuildingPermitProps>(({
                     </div>
                   </TableCell>
                 </TableRow>
-              ) : (
-                tableRowsReport
               )}
             </TableBody>
             <tfoot>
               <TableRow className="bg-slate-800 font-bold text-white border-t-2 border-slate-400">
                 <TableCell className="bg-slate-800 p-2" colSpan={2}>
                   <div className="font-extrabold tracking-wider text-sm">GRAND TOTAL</div>
-                  <div className='text-[10px] font-medium text-slate-300'>
-                    ({dateRangeLabel})
-                  </div>
+                  <div className='text-[10px] font-medium text-slate-300'>({dateRangeLabel})</div>
                 </TableCell>
-                <TableCell className="bg-slate-800 p-2 text-center text-sm tabular-nums">{loading || showLoader ? '-' : grandTotals.paid}</TableCell>
-                <TableCell className="bg-slate-800 p-2 text-center text-sm tabular-nums">{loading || showLoader ? '-' : grandTotals.pending}</TableCell>
+                {/* --- KINI ANG GI-USAB NGA BAHIN --- */}
+                <TableCell className="bg-slate-800 p-2 text-center text-sm tabular-nums">{loading && filteredResults.length === 0 ? '-' : grandTotals.paid}</TableCell>
+                <TableCell className="bg-slate-800 p-2 text-center text-sm tabular-nums">{loading && filteredResults.length === 0 ? '-' : grandTotals.pending}</TableCell>
               </TableRow>
             </tfoot>
           </Table>

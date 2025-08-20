@@ -19,12 +19,14 @@ interface DateRangeMonthProps {
   className?: string;
   value?: { start: Date | string | null; end: Date | string | null };
   onChange?: (range: { start: string | null; end: string | null }) => void;
+  onClose?: () => void;
 }
 
 function DateRangeMonth({
   className,
   value,
   onChange,
+  onClose,
 }: DateRangeMonthProps) {
   const now = new Date();
   const currentYear = now.getFullYear();
@@ -106,6 +108,7 @@ function DateRangeMonth({
       }
 
       onChange({ start, end });
+      onClose?.();
     }
   };
 

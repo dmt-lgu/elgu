@@ -1,38 +1,18 @@
-import { TableRow, TableCell } from "@/components/ui/table";
+import React from 'react';
+import '../utils/loader.css';
 
-type Props = {
-  columns?: number;
-  columnWidths?: string[];
-};
+interface LoaderTableProps {
+  message?: string;
+}
 
-const DEFAULT_FOUR_COLUMN_WIDTHS = [
-  "w-32",
-  "w-48",
-  "w-24",
-  "w-24",
-];
-
-const LoaderTable = ({
-  columns = 4,
-  columnWidths = DEFAULT_FOUR_COLUMN_WIDTHS,
-}: Props) => {
+const LoaderTable: React.FC<LoaderTableProps> = ({ message }) => {
   return (
-    <TableRow>
-      {Array.from({ length: columns }).map((_, c) => (
-        <TableCell 
-          key={c} 
-          // Ania ang kausaban: Gidugang ang 'text-center'
-          className="px-2 py-3 text-center"
-        >
-          <div
-            className={`h-5 ${
-              columnWidths[c] || "w-full"
-            // Gidugang ang 'inline-block' para masiguro ang behavior
-            } bg-gray-200 rounded-md animate-pulse inline-block`}
-          />
-        </TableCell>
-      ))}
-    </TableRow>
+    <div className='flex flex-col items-center justify-center gap-4 py-4'>
+      <div className="loader animate-pulse"></div>
+      <p className='text-sm font-semibold text-slate-500 animate-pulse'>
+        {message || 'Loading data, please wait...'}
+      </p>
+    </div>
   );
 };
 

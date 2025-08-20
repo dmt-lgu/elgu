@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import Select from 'react-select';
-import { Check, ChevronDown, Loader2Icon } from 'lucide-react';
+import { Calendar, Check, ChevronDown, Loader2Icon, MapPin, Settings2 } from 'lucide-react';
 import DateRangeDay from './DateRangeDay';
 import DateRangeMonth from './DateRangeMonth';
 import DateRangeYear from './DateRangeYear';
-import './css/style.css'; // Import the stylesheet
+import './css/style.css';
 import {
   modules,
   groupOfIslands,
@@ -25,7 +25,7 @@ import {
 import axios from '../../../../plugin/axios';
 import { useSelector, useDispatch } from 'react-redux';
 import { updateFilterField } from '../../../../redux/reportFilterSlice';
-import { AppDispatch } from '@/redux/store';
+import { AppDispatch, RootState } from '@/redux/store';
 import Swal from 'sweetalert2';
 
 // --- (Utility Functions are unchanged) ---
@@ -47,37 +47,29 @@ function normalizeApiCities(apiCities: Record<string, string[]>): Record<string,
 }
 function useCities() {
   const [cities, setCities] = useState<Record<string, string[]>>({});
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     let mounted = true;
     axios.get(`${import.meta.env.VITE_URL}/api/bp/municipality-list`).then(res => {
       if (mounted) setCities(normalizeApiCities(res.data));
     }).catch(err => {
-      if (mounted) setError(err.message || 'Failed to fetch cities');
-    }).finally(() => {
-      if (mounted) setLoading(false);
+      console.error("Failed to fetch cities:", err);
     });
     return () => { mounted = false; };
   }, []);
-  return { cities, loading, error };
+  return { cities };
 }
 function useProvinces() {
   const [provinces, setProvinces] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     let mounted = true;
     axios.get(`${import.meta.env.VITE_URL}/api/bp/municipality-list`).then(res => {
       if (mounted) setProvinces(Object.keys(res.data));
     }).catch(err => {
-      if (mounted) setError(err.message || 'Failed to fetch provinces');
-    }).finally(() => {
-      if (mounted) setLoading(false);
+      console.error("Failed to fetch provinces:", err);
     });
     return () => { mounted = false; };
   }, []);
-  return { provinces, loading, error };
+  return { provinces };
 }
 const getCityOptions = (selectedProvinces: string[], cities: Record<string, string[]>) => {
   let cityList: { value: string; label: string; province?: string }[] = [];
@@ -109,7 +101,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({
   onCancel, hasSearched = false, isActive = true,
 }) => {
   const dispatch = useDispatch<AppDispatch>();
-  const filterState = useSelector((state: any) => state.reportFilter);
+  const filterState = useSelector((state: RootState) => state.reportFilter);
 
   const [isDateOpen, setIsDateOpen] = useState(false);
   const [isModuleOpen, setIsModuleOpen] = useState(false);
@@ -123,7 +115,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({
   const regionRef = useRef<HTMLDivElement>(null);
   const dateRef = useRef<HTMLDivElement>(null);
 
-  const { cities, loading: citiesLoading, error: citiesError } = useCities();
+  const { cities } = useCities();
   const { provinces } = useProvinces();
 
   const provinceOptions = useMemo(() => provinces.map(p => ({ value: p, label: p })), [provinces]);
@@ -191,31 +183,31 @@ const FilterSection: React.FC<FilterSectionProps> = ({
     setElapsedSec(0);
     onCancel?.();
   };
-  const selectAllProvinces = () => {
-    setSelectedProvinceOptions([...filteredProvinceOptions]);
-    dispatch(updateFilterField({ key: 'selectedProvinces', value: filteredProvinceOptions.map(opt => opt.value) }));
-    setSelectedCityOptions([]); 
-    dispatch(updateFilterField({ key: 'selectedCities', value: [] }));
-    onSearch({ ...filterState, selectedProvinces: filteredProvinceOptions.map(opt => opt.value), selectedCities: [], skipApi: true });
-  };
-  const deselectAllProvinces = () => {
-    setSelectedProvinceOptions([]);
-    dispatch(updateFilterField({ key: 'selectedProvinces', value: [] }));
-    setSelectedCityOptions([]);
-    dispatch(updateFilterField({ key: 'selectedCities', value: [] }));
-    onSearch({ ...filterState, selectedProvinces: [], selectedCities: [], skipApi: true });
-  };
-  const selectAllCities = () => {
-    const allCityOptions = getCityOptions(selectedProvinceOptions.map(opt => opt.value), cities);
-    setSelectedCityOptions(allCityOptions);
-    dispatch(updateFilterField({ key: 'selectedCities', value: allCityOptions.map(opt => opt.value) }));
-    onSearch({ ...filterState, selectedCities: allCityOptions.map(opt => opt.value), skipApi: true });
-  };
-  const deselectAllCities = () => {
-    setSelectedCityOptions([]);
-    dispatch(updateFilterField({ key: 'selectedCities', value: [] }));
-    onSearch({ ...filterState, selectedCities: [], skipApi: true });
-  };
+  // const selectAllProvinces = () => {
+  //   setSelectedProvinceOptions([...filteredProvinceOptions]);
+  //   dispatch(updateFilterField({ key: 'selectedProvinces', value: filteredProvinceOptions.map(opt => opt.value) }));
+  //   setSelectedCityOptions([]);
+  //   dispatch(updateFilterField({ key: 'selectedCities', value: [] }));
+  //   onSearch({ ...filterState, selectedProvinces: filteredProvinceOptions.map(opt => opt.value), selectedCities: [], skipApi: true });
+  // };
+  // const deselectAllProvinces = () => {
+  //   setSelectedProvinceOptions([]);
+  //   dispatch(updateFilterField({ key: 'selectedProvinces', value: [] }));
+  //   setSelectedCityOptions([]);
+  //   dispatch(updateFilterField({ key: 'selectedCities', value: [] }));
+  //   onSearch({ ...filterState, selectedProvinces: [], selectedCities: [], skipApi: true });
+  // };
+  // const selectAllCities = () => {
+  //   const allCityOptions = getCityOptions(selectedProvinceOptions.map(opt => opt.value), cities);
+  //   setSelectedCityOptions(allCityOptions);
+  //   dispatch(updateFilterField({ key: 'selectedCities', value: allCityOptions.map(opt => opt.value) }));
+  //   onSearch({ ...filterState, selectedCities: allCityOptions.map(opt => opt.value), skipApi: true });
+  // };
+  // const deselectAllCities = () => {
+  //   setSelectedCityOptions([]);
+  //   dispatch(updateFilterField({ key: 'selectedCities', value: [] }));
+  //   onSearch({ ...filterState, selectedCities: [], skipApi: true });
+  // };
   const isSearchDisabled = filterState.selectedRegions.length === 0 || filterState.selectedModules.length === 0 || !filterState.dateRange.start || !filterState.dateRange.end;
   const isDownloadDisabled = isSearchDisabled || !hasTableData;
 
@@ -276,7 +268,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({
       confirmButtonText: "Download",
       showCancelButton: true,
       cancelButtonText: "Cancel",
-      customClass: { 
+      customClass: {
         popup: "swal-wide",
         confirmButton: 'swal-button swal-button-confirm',
         cancelButton: 'swal-button swal-button-cancel',
@@ -303,11 +295,43 @@ const FilterSection: React.FC<FilterSectionProps> = ({
   const handleDateRangeChange = (range: { start: string | null; end: string | null }) => {
     dispatch(updateFilterField({ key: 'dateRange', value: { start: range.start, end: range.end } }));
   };
-  const getProvincesFromRegions = (regions: string[]) => {
-    const provs = regions.flatMap(region => (regionProvinceMap as Record<string, string[]>)[region] || []);
+  const getProvincesFromRegions = useMemo(() => (regions: string[]): string[] => {
+    if (!regions || regions.length === 0) return provinces;
+    const provs = regions.flatMap(region => regionProvinceMap[region] || []);
     return Array.from(new Set(provs));
-  };
-  const filteredProvinceOptions = useMemo(() => provinceOptions.filter(opt => getProvincesFromRegions(filterState.selectedRegions).includes(opt.value)), [provinceOptions, filterState.selectedRegions]);
+  }, [provinces]);
+
+  const filteredProvinceOptions = useMemo(() => {
+    const validProvinces = getProvincesFromRegions(filterState.selectedRegions);
+    return provinceOptions.filter(opt => validProvinces.includes(opt.value));
+  }, [provinceOptions, filterState.selectedRegions, getProvincesFromRegions]);
+
+  useEffect(() => {
+    const validProvinces = getProvincesFromRegions(filterState.selectedRegions);
+    const currentSelectedInRedux = filterState.selectedProvinces || [];
+    
+    // 1. I-validate ang Redux state batok sa valid provinces
+    const validSelections = currentSelectedInRedux.filter((p:any) => validProvinces.includes(p));
+
+    if (validSelections.length !== currentSelectedInRedux.length) {
+      // Kung naay invalid, i-update ang Redux
+      dispatch(updateFilterField({ key: 'selectedProvinces', value: validSelections }));
+      // I-clear pud ang cities kay nausab ang parent (province)
+      dispatch(updateFilterField({ key: 'selectedCities', value: [] }));
+    }
+
+    // 2. I-sync ang local state (para sa react-select) sa valid Redux state
+    setSelectedProvinceOptions(
+      validSelections.map((p:any) => ({ value: p, label: p }))
+    );
+
+    // 3. I-sync ang local city state
+    setSelectedCityOptions(
+      getCityOptions(validSelections, cities).filter(opt => (filterState.selectedCities || []).includes(opt.value))
+    );
+
+  }, [filterState.selectedRegions, filterState.selectedProvinces, provinces, cities, dispatch]);
+
   const toggleIsland = (island: string) => {
     const newIslands = selectedIslands.includes(island) ? selectedIslands.filter((i: string) => i !== island) : [...selectedIslands, island];
     const regionCodes = newIslands.flatMap((isle:any) => islandRegionMap[isle] || []);
@@ -332,18 +356,15 @@ const FilterSection: React.FC<FilterSectionProps> = ({
     dispatch(updateFilterField({ key: 'selectedRegions', value: newRegions }));
   };
   const handleProvinceChange = (options: any) => {
-    setSelectedProvinceOptions(options || []);
-    setSelectedCityOptions([]);
     const provinceValues = (options || []).map((opt: any) => opt.value);
     dispatch(updateFilterField({ key: 'selectedProvinces', value: provinceValues }));
-    dispatch(updateFilterField({ key: 'selectedCities', value: [] }));
-    onSearch({ ...filterState, selectedProvinces: provinceValues, selectedCities: [], skipApi: true });
+    dispatch(updateFilterField({ key: 'selectedCities', value: [] })); // Clear cities
+    // GIKUHA ANG onSearch(...) dinhi
   };
   const handleCityChange = (options: any) => {
-    setSelectedCityOptions(options || []);
     const cityValues = (options || []).map((opt: any) => opt.value);
     dispatch(updateFilterField({ key: 'selectedCities', value: cityValues }));
-    onSearch({ ...filterState, selectedCities: cityValues, skipApi: true });
+    // GIKUHA ANG onSearch(...) dinhi
   };
   const selectedDateType = filterState.selectedDateType || "";
   const deselectAllDates = () => {
@@ -354,18 +375,19 @@ const FilterSection: React.FC<FilterSectionProps> = ({
     dispatch(updateFilterField({ key: 'selectedDateType', value: dateType }));
     dispatch(updateFilterField({ key: 'dateRange', value: { start: null, end: null } }));
   };
-  const handleSearchClick = () => {
+    const handleSearchClick = () => {
     const allRegionInternalKeys = Object.values(regionMapping);
     const allRegionsSelected = filterState.selectedRegions.length === allRegionInternalKeys.length && allRegionInternalKeys.every(key => filterState.selectedRegions.includes(key));
+    
     onSearch({
-      selectedRegions: allRegionsSelected ? allRegionInternalKeys : filterState.selectedRegions,
+      selectedRegions: filterState.selectedRegions,
       selectedProvinces: filterState.selectedProvinces,
       selectedCities: filterState.selectedCities,
       dateRange: filterState.dateRange,
       selectedDateType: filterState.selectedDateType,
       selectedIslands: filterState.selectedIslands,
       selectedModules: filterState.selectedModules,
-      allRegionsSelected,
+      allRegionsSelected, // KINI ANG IMPORTANTE NGA GIDUGANG
     });
     setIsModuleOpen(false);
     setIsRegionOpen(false);
@@ -392,155 +414,298 @@ const FilterSection: React.FC<FilterSectionProps> = ({
   }, [filterState.selectedProvinces, filterState.selectedCities, filteredProvinceOptions, cities]);
 
   return (
-    <div className="grid grid-cols-4 md:grid-cols-1 gap-4 mb-6">
-      <div className="filter-group" ref={moduleRef}>
-        <label className="filter-label">Module</label>
-        <div className="relative">
-          <button onClick={() => setIsModuleOpen(!isModuleOpen)} className={`filter-button ${isModuleOpen && 'filter-button-active'}`}>
-            <span className="filter-button-value">{filterState.selectedModules.length > 0 ? `${filterState.selectedModules.length} selected` : 'Select modules'}</span>
-            <ChevronDown size={18} className={`filter-chevron ${isModuleOpen && 'filter-chevron-open'}`} />
-          </button>
-          {isModuleOpen && (
-            <div className="filter-dropdown w-full"> 
-              <div className="filter-dropdown-header">
-                <button onClick={selectAllModules} className="filter-link-button select-all">Select All</button>
-                <button onClick={deselectAllModules} className="filter-link-button deselect-all">Deselect All</button>
-              </div>
-              <div className="filter-dropdown-body max-h-[200px]">
-                {modules.map((module) => (
-                  <label key={module} className="custom-checkbox-label">
-                    <input type="checkbox" className="hidden" checked={filterState.selectedModules.includes(module)} onChange={() => toggleModule(module)} />
-                    <span className="custom-checkbox"><Check size={12}/></span>
-                    <span>{module}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
+    <div className="p-6 bg-white border border-gray-200 rounded-md shadow-sm">
+      {/* --- GI-DUGANG NGA LABEL DESIGN --- */}
+      <div className="mb-6 pb-4 border-b border-gray-200">
+        <h2 className="text-lg font-bold text-[#2162e7]">Filter Reports</h2>
+        <p className="text-sm text-gray-500 mt-1">
+          Adjust the filters below to generate a specific report.
+        </p>
       </div>
+      {/* --- END SA GI-DUGANG NGA LABEL DESIGN --- */}
 
-      <div className="filter-group" ref={regionRef}>
-        <label className="filter-label">Region</label>
-        <div className="relative">
-          <button onClick={() => setIsRegionOpen(!isRegionOpen)} className={`filter-button ${isRegionOpen && 'filter-button-active'}`}>
-            <span className="filter-button-value">{filterState.selectedRegions.length === 0 ? 'All Regions' : `${filterState.selectedRegions.length} selected`}</span>
-            <ChevronDown size={18} className={`filter-chevron ${isRegionOpen && 'filter-chevron-open'}`} />
-          </button>
-          {isRegionOpen && (
-            <div className="filter-dropdown">
-              <div className="filter-dropdown-header">
-                <button onClick={selectAllRegions} className="filter-link-button select-all">Select All</button>
-                <button onClick={deselectAllRegions} className="filter-link-button deselect-all">Deselect All</button>
+      <div className="grid grid-cols-4 md:grid-cols-1 gap-4">
+        <div className="filter-group" ref={moduleRef}>
+          <div className="flex items-center gap-2 mb-3">
+              <div className="w-8 h-8 bg-[#2162e7]/10 rounded-md flex items-center justify-center">
+                <Settings2 size={16} className="text-[#2162e7]" />
               </div>
-              <div className="filter-dropdown-body">
-                <div className="mb-2">
-                  <h4 className="filter-dropdown-title">Group of Islands</h4>
-                  <div className="flex gap-2"> 
-                    {groupOfIslands.map(island => (
-                      <label key={island} className="custom-checkbox-label">
-                        <input type="checkbox" className="hidden" checked={selectedIslands.includes(island)} onChange={() => toggleIsland(island)} />
-                        <span className="custom-checkbox"><Check size={12}/></span>
-                        {island}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-                <div className="mb-3">
-                  <h4 className="filter-dropdown-title">Regions</h4>
-                  <div className="region-grid">
-                    {Object.entries(regionMapping).map(([regionCode, internalKey]) => (
-                      <label key={regionCode} className="custom-checkbox-label break-inside-avoid">
-                        <input type="checkbox" className="hidden" checked={filterState.selectedRegions.includes(internalKey)} onChange={() => toggleRegion(internalKey)} />
-                        <span className="custom-checkbox"><Check size={12}/></span>
-                        <span className="text-xs">{regionCode}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-                <div className="mb-3">
-                  <div className="flex justify-between items-center mb-1"><h4 className="filter-dropdown-title">Province</h4>
-                    <div className="flex gap-3">
-                      <button type="button" className="filter-link-button select-all" onClick={selectAllProvinces} disabled={filteredProvinceOptions.length === 0}>Select All</button>
-                    <button type="button" className="filter-link-button deselect-all" onClick={deselectAllProvinces}>Deselect</button>
-                  </div>
-                  </div>
-                  <Select options={filteredProvinceOptions} value={selectedProvinceOptions} onChange={handleProvinceChange} placeholder="Select province(s)" isMulti isDisabled={filterState.selectedRegions.length === 0} className="react-select-container" classNamePrefix="react-select" menuPortalTarget={document.body} />
-                </div>
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <h4 className="filter-dropdown-title">City/Municipality</h4>
-                    <div className="flex gap-3">
-                      <button type="button" className="filter-link-button select-all" onClick={selectAllCities} disabled={selectedProvinceOptions.length === 0}>Select All</button><button type="button" className="filter-link-button deselect-all" onClick={deselectAllCities}>Deselect</button></div></div>
-                   {citiesLoading ? <div className="text-xs text-slate-400 p-2">Loading cities...</div>
-                    : citiesError ? <div className="text-xs text-red-500 p-2">Failed to load cities</div>
-                    : <Select options={getCityOptions(selectedProvinceOptions.map(opt => opt.value), cities)} value={selectedCityOptions} onChange={handleCityChange} placeholder="Select city/municipality" isMulti isDisabled={selectedProvinceOptions.length === 0} className="react-select-container" classNamePrefix="react-select" menuPortalTarget={document.body} />}
-                </div>
-              </div>
+              <label className="text-sm font-semibold text-gray-800">Module Selection</label>
             </div>
-          )}
-        </div>
-      </div>
-
-      <div className="filter-group" ref={dateRef}>
-        <label className="filter-label">Date Range</label>
-        <div className="relative">
-          <button type="button" className={`filter-button ${isDateOpen && 'filter-button-active'}`} onClick={() => setIsDateOpen(o => !o)}>
-            <span className="filter-button-value">{selectedDateType ? selectedDateType : "Select date type"}</span>
-            <ChevronDown size={18} className={`filter-chevron ${isDateOpen && 'filter-chevron-open'}`} />
-          </button>
-          {isDateOpen && (
-            <div className="filter-dropdown w-[360px]">
-              <div className="filter-dropdown-header">
-                <h3 className="font-semibold text-slate-700">Select Date Type</h3>
-                <button className="filter-link-button deselect-all" onClick={deselectAllDates} type="button">Deselect</button>
-              </div>
-              <div className="filter-dropdown-body">
-                <div className="flex flex-col gap-1 mb-4">
-                  {dateRange.map((type) => (
-                    <label key={type} className="custom-radio-label">
-                      <input type="radio" className="hidden" checked={selectedDateType === type} onChange={() => handleDateTypeToggle(type)} name="date-type" />
-                      <span className="custom-radio"></span>
-                      <span>{type}</span>
+          <div className="relative">
+            <button
+              onClick={() => setIsModuleOpen(!isModuleOpen)}
+              className="w-full bg-gray-50 border border-gray-200 rounded-md py-3 px-4 text-left flex justify-between items-center hover:border-[#2162e7] hover:bg-[#2162e7]/5 focus:outline-none focus:ring-2 focus:ring-[#2162e7]/20 focus:border-[#2162e7] transition-all duration-200 shadow-sm"
+            >
+              <span className="text-sm font-medium text-gray-700">
+                {filterState.selectedModules.length > 0
+                  ? `${filterState.selectedModules.length} module${filterState.selectedModules.length > 1 ? 's' : ''} selected`
+                  : 'Select modules'}
+              </span>
+              <ChevronDown size={18} className={`text-gray-400 transition-all duration-300 ${isModuleOpen ? 'transform rotate-180 text-[#2162e7]' : ''}`} />
+            </button>
+            {isModuleOpen && (
+              <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-md shadow-lg z-[9999] animate-in slide-in-from-top-2 duration-200">
+                  <div className="flex justify-between p-4 bg-gray-50 border-b border-gray-200">
+                  <button onClick={selectAllModules} className="text-sm text-[#2162e7] hover:text-[#2162e7]/80 font-semibold hover:bg-[#2162e7]/10 px-3 py-1 rounded-sm transition-colors">Select All</button>
+                  <button onClick={deselectAllModules} className="text-sm text-red-500 hover:text-red-600 font-semibold hover:bg-red-50 px-3 py-1 rounded-sm transition-colors">Clear All</button>
+                </div>
+                <div className="max-h-[300px] overflow-y-auto">
+                  {modules.map((module, index) => (
+                    <label
+                      key={`module-${index}`}
+                      className="flex items-center px-4 py-3 hover:bg-gray-50 cursor-pointer transition-all duration-150 group"
+                    >
+                      <div className="relative flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={filterState.selectedModules.includes(module)}
+                          onChange={() => toggleModule(module)}
+                          className="opacity-0 absolute h-5 w-5 cursor-pointer"
+                        />
+                        <div className={`border-2 h-5 w-5 rounded-sm flex items-center justify-center transition-all duration-200 ${
+                          filterState.selectedModules.includes(module)
+                            ? 'bg-[#2162e7] border-[#2162e7] shadow-sm'
+                            : 'border-gray-300 hover:border-[#2162e7] group-hover:bg-gray-50'
+                        }`}>
+                          {filterState.selectedModules.includes(module) && (
+                            <Check size={12} className="text-white" />
+                          )}
+                        </div>
+                        <span className="ml-3 text-sm font-medium text-gray-700 group-hover:text-[#2162e7]">{module}</span>
+                      </div>
                     </label>
                   ))}
                 </div>
-                <div className="border-t border-slate-100 pt-3">
-                  {!selectedDateType && <div className="text-sm text-slate-400 text-center p-4">Please select a date type above.</div>}
-                  {selectedDateType === 'Day' && <DateRangeDay value={filterState.dateRange} onChange={handleDateRangeChange} />}
-                  {selectedDateType === 'Month' && <DateRangeMonth value={filterState.dateRange} onChange={handleDateRangeChange} />}
-                  {selectedDateType === 'Year' && <DateRangeYear value={filterState.dateRange} onChange={handleDateRangeChange} />}
-                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
-      </div>
 
-      <div className="filter-group justify-end">
-        <div className="grid grid-cols-3 gap-2 mt-4">
-          <Button className="bg-red-500 hover:bg-red-600 h-10 text-white font-semibold text-xs" onClick={handleReset} disabled={loading || !isActive}>Reset</Button>
-          {loading && hasSearched && isActive ? (
-            <Button className="bg-red-500 hover:bg-red-600 h-10 text-xs text-white col-span-2" onClick={handleCancelClick} disabled={!loading || !isActive}>
-              <Loader2Icon className="inline w-4 h-4 animate-spin mr-1" />
-              Cancel ({elapsedLabel})
-            </Button>
-          ) : (
-            <>
-              <Button className="bg-blue-600 hover:bg-blue-700 h-10 text-xs text-white" onClick={handleSearchClick} disabled={isSearchDisabled || loading || !isActive}>Search</Button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button disabled={isDownloadDisabled || loading || !isActive} className="bg-purple-600 hover:bg-purple-700 text-white text-xs h-10">Download</Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuLabel>Download Options</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem className='cursor-pointer' onClick={() => isActive && handleDownloadWithPermitChoice("pdf")} disabled={isDownloadDisabled || loading || !isActive}>PDF</DropdownMenuItem>
-                  <DropdownMenuItem className='cursor-pointer' onClick={() => isActive && handleDownloadWithPermitChoice("excel")} disabled={isDownloadDisabled || loading || !isActive}>Excel</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </>
-          )}
+        <div className="filter-group" ref={regionRef}>
+          <div className="flex items-center gap-2 mb-3">
+              <div className="w-8 h-8 bg-[#2162e7]/10 rounded-md flex items-center justify-center">
+                <MapPin size={16} className="text-[#2162e7]" />
+              </div>
+              <label className="text-sm font-semibold text-gray-800">Region Selection</label>
+            </div>
+          <div className="relative">
+            <button onClick={() => setIsRegionOpen(!isRegionOpen)} className={`w-full bg-gray-50 border border-gray-200 rounded-md py-3 px-4 text-left flex justify-between items-center hover:border-[#2162e7] hover:bg-[#2162e7]/5 focus:outline-none focus:ring-2 focus:ring-[#2162e7]/20 focus:border-[#2162e7] transition-all duration-200 shadow-sm ${isRegionOpen}`}>
+              <span className="text-sm font-medium text-gray-700">
+                  {filterState.selectedRegions.length === 0
+                    ? 'All Regions'
+                    : `${filterState.selectedRegions.length} region${filterState.selectedRegions.length > 1 ? 's' : ''} selected`}
+                </span>
+              <ChevronDown size={18} className={`text-gray-400 transition-all duration-300 ${isRegionOpen ? 'transform rotate-180 text-[#2162e7]' : ''}`} />
+            </button>
+                      {isRegionOpen && (
+                <div className="w-[400px] absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-md shadow-lg z-[9999] animate-in slide-in-from-top-2 duration-200">
+                  <div className="flex justify-between p-4 bg-gray-50 border-b border-gray-200">
+                    <button
+                      onClick={selectAllRegions}
+                      className="text-sm text-[#2162e7] hover:text-[#2162e7]/80 font-semibold hover:bg-[#2162e7]/10 px-3 py-1 rounded-sm transition-colors"
+                    >
+                      Select All
+                    </button>
+                    <button
+                      onClick={deselectAllRegions}
+                      className="text-sm text-red-500 hover:text-red-600 font-semibold hover:bg-red-50 px-3 py-1 rounded-sm transition-colors"
+                    >
+                      Clear All
+                    </button>
+                  </div>
+                  <div className="max-h-[400px] overflow-y-auto p-4">
+                    {/* Group of Islands */}
+                    <div className="mb-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <label className="text-sm font-bold text-gray-800">Island Groups</label>
+                      </div>
+                      <div className="flex gap-6 mb-3">
+                        {groupOfIslands.map(island => (
+                          <label key={island} className="flex items-center gap-2 text-gray-700 text-sm font-medium hover:text-[#2162e7] cursor-pointer transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={selectedIslands.includes(island)}
+                              onChange={() => toggleIsland(island)}
+                              className="accent-[#2162e7] w-4 h-4 rounded-sm"
+                            />
+                            {island}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    {/* Regions */}
+                    <div className="mb-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <label className="text-sm font-bold text-gray-800">Regions</label>
+                      </div>
+                      {/* --- ANIA ANG MGA GI-USAB --- */}
+                      <div className="columns-4 gap-x-4 mb-3">
+                        {Object.entries(regionMapping).map(([regionCode, internalKey]) => (
+                          <label key={internalKey} className="flex items-center gap-2 text-gray-700 text-sm hover:text-[#2162e7] cursor-pointer transition-colors break-inside-avoid mb-2">
+                            <input
+                              type="checkbox"
+                              checked={filterState.selectedRegions.includes(internalKey)}
+                              onChange={() => toggleRegion(internalKey)}
+                              className="accent-[#2162e7] w-4 h-4 rounded-sm"
+                            />
+                            <span className="text-xs font-medium">{regionCode}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    {/* Province */}
+                    <div className="flex flex-col mb-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Settings2 size={14} className="text-[#2162e7]" />
+                        <label className="text-sm font-bold text-gray-800">Province</label>
+                      </div>
+                      <Select
+                      // --- KINI ANG GI-AYO ---
+                      options={filteredProvinceOptions} 
+                      value={selectedProvinceOptions}
+                      onChange={handleProvinceChange}
+                      placeholder="Select province(s)"
+                      isClearable isMulti
+                      isDisabled={filteredProvinceOptions.length === 0}
+                      classNamePrefix="react-select" className="text-sm" menuPortalTarget={document.body}
+                      styles={{ menuPortal: base => ({ ...base, zIndex: 99999 }), menu: base => ({ ...base, zIndex: 99999 }), control: (base, state) => ({ ...base, borderColor: state.isFocused ? '#2162e7' : '#d1d5db', boxShadow: state.isFocused ? '0 0 0 3px rgba(33, 98, 231, 0.1)' : 'none', backgroundColor: '#f9fafb', '&:hover': { borderColor: '#2162e7' } }) }}
+                    />
+                    </div>
+                    {/* City/Municipality (multi) */}
+                    <div className="relative z-50">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Settings2 size={14} className="text-[#2162e7]" />
+                        <label className="text-sm font-bold text-gray-800">City/Municipality</label>
+                      </div>
+                      <div className="relative">
+                        <Select
+                          options={getCityOptions(selectedProvinceOptions.map(opt => opt.value), cities)}
+                          value={selectedCityOptions}
+                          onChange={handleCityChange}
+                          placeholder="Select city/municipality"
+                          isClearable
+                          isMulti
+                          isDisabled={selectedProvinceOptions.length === 0}
+                          classNamePrefix="react-select"
+                          className="text-sm"
+                          menuPortalTarget={document.body}
+                          styles={{
+                            menuPortal: base => ({ ...base, zIndex: 99999 }),
+                            menu: base => ({ ...base, zIndex: 99999 }),
+                            control: (base, state) => ({
+                              ...base,
+                              borderColor: state.isFocused ? '#2162e7' : '#d1d5db',
+                              boxShadow: state.isFocused ? '0 0 0 3px rgba(33, 98, 231, 0.1)' : 'none',
+                              backgroundColor: '#f9fafb',
+                              '&:hover': {
+                                borderColor: '#2162e7'
+                              }
+                            })
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+          </div>
+        </div>
+
+        <div className="filter-group" ref={dateRef}>
+          <div className="flex items-center gap-2 mb-3">
+              <div className="w-8 h-8 bg-[#2162e7]/10 rounded-md flex items-center justify-center">
+                <Calendar size={16} className="text-[#2162e7]" />
+              </div>
+              <label className="text-sm font-semibold text-gray-800">Date Range</label>
+            </div>
+          <div className="relative w-full">
+            <button
+              type="button"
+              className="w-full bg-gray-50 border border-gray-200 rounded-md py-3 px-4 text-left flex justify-between items-center hover:border-[#2162e7] hover:bg-[#2162e7]/5 focus:outline-none focus:ring-2 focus:ring-[#2162e7]/20 focus:border-[#2162e7] transition-all duration-200 shadow-sm"
+              onClick={() => setIsDateOpen((open) => !open)}
+            >
+              <span className="text-sm font-medium text-gray-700">
+                {selectedDateType ? selectedDateType : "Select date type"}
+              </span>
+              <ChevronDown size={18} className={`text-gray-400 transition-all duration-300 ${isDateOpen ? "rotate-180 text-[#2162e7]" : ""}`} />
+            </button>
+            {isDateOpen && (
+                <div className="w-[400px] absolute left-0 right-0 mt-2 bg-white border border-gray-200 rounded-md shadow-lg z-[9999] animate-in slide-in-from-top-2 duration-200">
+                  <div className="flex items-center justify-between p-4 bg-gray-50 border-b border-gray-200">
+                    <span className="text-sm font-bold text-gray-800">Date Range</span>
+                    <button
+                      className="text-sm text-red-500 hover:text-red-600 font-semibold hover:bg-red-50 px-3 py-1 rounded-sm transition-colors focus:outline-none"
+                      onClick={deselectAllDates}
+                      type="button"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                  <div className="p-4">
+                    <div className="flex flex-col gap-3 mb-4">
+                      {dateRange.map((type) => (
+                        <label key={type} className="flex items-center gap-3 text-sm cursor-pointer text-gray-700 hover:text-[#2162e7] transition-colors group">
+                          <input
+                            type="radio"
+                            checked={selectedDateType === type}
+                            onChange={() => handleDateTypeToggle(type)}
+                            className="accent-[#2162e7] w-4 h-4"
+                            name="date-type"
+                          />
+                          <span className="font-medium group-hover:font-semibold">{type}</span>
+                        </label>
+                      ))}
+                    </div>
+                    <div className="border-t border-gray-200 pt-4">
+                      {!selectedDateType && (
+                        <div className="flex items-center justify-center py-6">
+                          <span className="text-sm text-gray-500 text-center">
+                            Please select day, month, or year
+                          </span>
+                        </div>
+                      )}
+                      {selectedDateType === 'Day' && (
+                        <DateRangeDay value={filterState.dateRange} onChange={handleDateRangeChange} onClose={() => setIsDateOpen(false)} />
+                      )}
+                      {selectedDateType === 'Month' && (
+                        <DateRangeMonth value={filterState.dateRange} onChange={handleDateRangeChange} onClose={() => setIsDateOpen(false)}/>
+                      )}
+                      {selectedDateType === 'Year' && (
+                        <DateRangeYear value={filterState.dateRange} onChange={handleDateRangeChange} onClose={() => setIsDateOpen(false)}/>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-4 mt-4 justify-end">
+          <div className="grid grid-cols-3 gap-2">
+            <Button className="bg-red-500 hover:bg-red-600 h-12 text-white font-semibold text-xs" onClick={handleReset} disabled={loading || !isActive}>Reset</Button>
+            {loading && hasSearched && isActive ? (
+              <Button className="bg-red-500 hover:bg-red-600 h-12 text-xs text-white col-span-2" onClick={handleCancelClick} disabled={!loading || !isActive}>
+                <Loader2Icon className="inline w-4 h-4 animate-spin mr-1" />
+                Cancel ({elapsedLabel})
+              </Button>
+            ) : (
+              <>
+                <Button className="bg-blue-600 hover:bg-blue-700 h-12 text-xs text-white" onClick={handleSearchClick} disabled={isSearchDisabled || loading || !isActive}>Search</Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button disabled={isDownloadDisabled || loading || !isActive} className="bg-purple-600 hover:bg-purple-700 text-white text-xs h-12">Download</Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuLabel>Download Options</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem className='cursor-pointer' onClick={() => isActive && handleDownloadWithPermitChoice("pdf")} disabled={isDownloadDisabled || loading || !isActive}>PDF</DropdownMenuItem>
+                    <DropdownMenuItem className='cursor-pointer' onClick={() => isActive && handleDownloadWithPermitChoice("excel")} disabled={isDownloadDisabled || loading || !isActive}>Excel</DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>
