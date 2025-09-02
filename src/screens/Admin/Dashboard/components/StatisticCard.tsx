@@ -10,6 +10,9 @@ interface StatisticCardProps {
   value: string | number;
   bpValue?: string | number;
   wpValue?: string | number;
+  bpcoValue?: string | number;
+  bpbpValue?: string | number;
+  brgyValue?: string | number;
   showInfo?: string; // Tooltip text
   className?: string;
 }
@@ -19,6 +22,9 @@ const StatisticCard: React.FC<StatisticCardProps> = ({
   value, 
   bpValue, 
   wpValue, 
+  bpcoValue,
+  bpbpValue,
+  brgyValue,
   showInfo 
 }) => {
   const loading = useSelector(selectLoad);
@@ -30,6 +36,12 @@ const StatisticCard: React.FC<StatisticCardProps> = ({
       return bpValue;
     } else if (filter === 'Working Permit' && wpValue !== undefined) {
       return wpValue;
+    } else if (filter === 'Certificate of Occupancy' && bpcoValue !== undefined) {
+      return bpcoValue;
+    } else if (filter === 'Building Permit' && bpbpValue !== undefined) {
+      return bpbpValue;
+    } else if (filter === 'Barangay Clearance' && brgyValue !== undefined) {
+      return brgyValue;
     } else {
       // All modules or fallback - always return the combined value
       return value;

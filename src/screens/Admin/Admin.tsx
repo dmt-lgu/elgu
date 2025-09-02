@@ -20,6 +20,11 @@ import { setLoad } from "@/redux/loadSlice";
 import { setCard } from "@/redux/cardSlice";
 import { setTransaction } from "@/redux/transactionSlice";
 import { clearStorageIfNeeded, handleStorageError } from "@/lib/storageUtils";
+import { setLoad2 } from '@/redux/loadSlice2';
+import { setWp, selectWp } from '@/redux/wpSlice';
+import { setBrgy, selectBrgy } from '@/redux/brgySlice';
+import { setStatus } from '@/redux/statusSlice';
+import axios2 from "./../../plugin/axios2";
 
 const regionMapping = [
   { id: "region1", text: "I", municipalities: [] },
@@ -80,93 +85,223 @@ interface TotalResults {
   wpTotalmalePaid?: number;
   wpTotalfemalePending?: number;
   wpTotalfemalePaid?: number;
+  bpcoTotalnewPending?: number;
+  bpcoTotalnewPaid?: number;
+  bpcoTotalnewPaidViaEgov?: number;
+  bpcoTotalrenewPending?: number;
+  bpcoTotalrenewPaid?: number;
+  bpcoTotalrenewPaidViaEgov?: number;
+  bpcoTotalmalePending?: number;
+  bpcoTotalmalePaid?: number;
+  bpcoTotalfemalePending?: number;
+  bpcoTotalfemalePaid?: number;
+  bpbpTotalnewPending?: number;
+  bpbpTotalnewPaid?: number;
+  bpbpTotalnewPaidViaEgov?: number;
+  bpbpTotalrenewPending?: number;
+  bpbpTotalrenewPaid?: number;
+  bpbpTotalrenewPaidViaEgov?: number;
+  bpbpTotalmalePending?: number;
+  bpbpTotalmalePaid?: number;
+  bpbpTotalfemalePending?: number;
+  bpbpTotalfemalePaid?: number;
+  brgyTotalnewPending?: number;
+  brgyTotalnewPaid?: number;
+  brgyTotalnewPaidViaEgov?: number;
+  brgyTotalrenewPending?: number;
+  brgyTotalrenewPaid?: number;
+  brgyTotalrenewPaidViaEgov?: number;
+  brgyTotalmalePending?: number;
+  brgyTotalmalePaid?: number;
+  brgyTotalfemalePending?: number;
+  brgyTotalfemalePaid?: number;
 }
 
-const mergeModuleResults = (bpResults: any[], wpResults: any[]): any[] => {
+const mergeModuleResults = (bpResults: any[], wpResults: any[], bpcoResults: any[], bpbpResults: any[], brgyResults: any[]): any[] => {
   const mergedMap = new Map();
 
-  // Add BP results
+  // Initialize default month structure
+  const createDefaultMonth = () => ({
+    bpNewPending: 0,
+    bpNewPaid: 0,
+    bpNewPaidViaEgov: 0,
+    bpRenewPending: 0,
+    bpRenewPaid: 0,
+    bpRenewPaidViaEgov: 0,
+    bpMalePending: 0,
+    bpMalePaid: 0,
+    bpFemalePending: 0,
+    bpFemalePaid: 0,
+    wpNewPending: 0,
+    wpNewPaid: 0,
+    wpNewPaidViaEgov: 0,
+    wpRenewPending: 0,
+    wpRenewPaid: 0,
+    wpRenewPaidViaEgov: 0,
+    wpMalePending: 0,
+    wpMalePaid: 0,
+    wpFemalePending: 0,
+    wpFemalePaid: 0,
+    bpcoNewPending: 0,
+    bpcoNewPaid: 0,
+    bpcoNewPaidViaEgov: 0,
+    bpcoRenewPending: 0,
+    bpcoRenewPaid: 0,
+    bpcoRenewPaidViaEgov: 0,
+    bpcoMalePending: 0,
+    bpcoMalePaid: 0,
+    bpcoFemalePending: 0,
+    bpcoFemalePaid: 0,
+    bpbpNewPending: 0,
+    bpbpNewPaid: 0,
+    bpbpNewPaidViaEgov: 0,
+    bpbpRenewPending: 0,
+    bpbpRenewPaid: 0,
+    bpbpRenewPaidViaEgov: 0,
+    bpbpMalePending: 0,
+    bpbpMalePaid: 0,
+    bpbpFemalePending: 0,
+    bpbpFemalePaid: 0,
+    brgyNewPending: 0,
+    brgyNewPaid: 0,
+    brgyNewPaidViaEgov: 0,
+    brgyRenewPending: 0,
+    brgyRenewPaid: 0,
+    brgyRenewPaidViaEgov: 0,
+    brgyMalePending: 0,
+    brgyMalePaid: 0,
+    brgyFemalePending: 0,
+    brgyFemalePaid: 0,
+  });
+
+  // Helper function to merge month data for a specific module
+  const mergeMonthData = (existingMonth: any, newMonth: any, modulePrefix: string) => {
+    return {
+      ...existingMonth,
+      [`${modulePrefix}NewPending`]: newMonth.newPending || 0,
+      [`${modulePrefix}NewPaid`]: newMonth.newPaid || 0,
+      [`${modulePrefix}NewPaidViaEgov`]: newMonth.newPaidViaEgov || 0,
+      [`${modulePrefix}RenewPending`]: newMonth.renewPending || 0,
+      [`${modulePrefix}RenewPaid`]: newMonth.renewPaid || 0,
+      [`${modulePrefix}RenewPaidViaEgov`]: newMonth.renewPaidViaEgov || 0,
+      [`${modulePrefix}MalePending`]: newMonth.malePending || 0,
+      [`${modulePrefix}MalePaid`]: newMonth.malePaid || 0,
+      [`${modulePrefix}FemalePending`]: newMonth.femalePending || 0,
+      [`${modulePrefix}FemalePaid`]: newMonth.femalePaid || 0,
+    };
+  };
+
+  // Process BP results
   bpResults.forEach(bpLgu => {
     mergedMap.set(bpLgu.lgu, {
       lgu: bpLgu.lgu,
       region: bpLgu.region,
-      monthlyResults: bpLgu.monthlyResults.map((month: any) => ({
-        ...month,
-        bpNewPending: month.newPending,
-        bpNewPaid: month.newPaid,
-        bpNewPaidViaEgov: month.newPaidViaEgov || 0,
-        bpRenewPending: month.renewPending,
-        bpRenewPaid: month.renewPaid,
-        bpRenewPaidViaEgov: month.renewPaidViaEgov || 0,
-        bpMalePending: month.malePending,
-        bpMalePaid: month.malePaid,
-        bpFemalePending: month.femalePending,
-        bpFemalePaid: month.femalePaid,
-        wpNewPending: 0,
-        wpNewPaid: 0,
-        wpNewPaidViaEgov: 0,
-        wpRenewPending: 0,
-        wpRenewPaid: 0,
-        wpRenewPaidViaEgov: 0,
-        wpMalePending: 0,
-        wpMalePaid: 0,
-        wpFemalePending: 0,
-        wpFemalePaid: 0,
-      }))
+      monthlyResults: bpLgu.monthlyResults.map((month: any) => 
+        mergeMonthData({ ...createDefaultMonth(), month: month.month }, month, 'bp')
+      )
     });
   });
 
-  // Add WP results
+  // Process WP results
   wpResults.forEach(wpLgu => {
     const existing = mergedMap.get(wpLgu.lgu);
     if (existing) {
-      // Merge with existing BP data
       existing.monthlyResults = existing.monthlyResults.map((month: any) => {
         const wpMonth = wpLgu.monthlyResults.find((wp: any) => wp.month === month.month);
-        if (wpMonth) {
+        return wpMonth ? mergeMonthData(month, wpMonth, 'wp') : month;
+      });
+    } else {
+      mergedMap.set(wpLgu.lgu, {
+        lgu: wpLgu.lgu,
+        region: wpLgu.region,
+        monthlyResults: wpLgu.monthlyResults.map((month: any) => 
+          mergeMonthData({ ...createDefaultMonth(), month: month.month }, month, 'wp')
+        )
+      });
+    }
+  });
+
+  // Process BPCO results
+  bpcoResults.forEach(bpcoLgu => {
+    const existing = mergedMap.get(bpcoLgu.lgu);
+    if (existing) {
+      existing.monthlyResults = existing.monthlyResults.map((month: any) => {
+        const bpcoMonth = bpcoLgu.monthlyResults.find((bpco: any) => bpco.month === month.month);
+        return bpcoMonth ? mergeMonthData(month, bpcoMonth, 'bpco') : month;
+      });
+    } else {
+      mergedMap.set(bpcoLgu.lgu, {
+        lgu: bpcoLgu.lgu,
+        region: bpcoLgu.region,
+        monthlyResults: bpcoLgu.monthlyResults.map((month: any) => 
+          mergeMonthData({ ...createDefaultMonth(), month: month.month }, month, 'bpco')
+        )
+      });
+    }
+  });
+
+  // Process BPBP results
+  bpbpResults.forEach(bpbpLgu => {
+    const existing = mergedMap.get(bpbpLgu.lgu);
+    if (existing) {
+      existing.monthlyResults = existing.monthlyResults.map((month: any) => {
+        const bpbpMonth = bpbpLgu.monthlyResults.find((bpbp: any) => bpbp.month === month.month);
+        return bpbpMonth ? mergeMonthData(month, bpbpMonth, 'bpbp') : month;
+      });
+    } else {
+      mergedMap.set(bpbpLgu.lgu, {
+        lgu: bpbpLgu.lgu,
+        region: bpbpLgu.region,
+        monthlyResults: bpbpLgu.monthlyResults.map((month: any) => 
+          mergeMonthData({ ...createDefaultMonth(), month: month.month }, month, 'bpbp')
+        )
+      });
+    }
+  });
+
+  // Process Barangay Clearance results - BRGY has different structure (totalCount instead of detailed fields)
+  brgyResults.forEach(brgyLgu => {
+    const existing = mergedMap.get(brgyLgu.lgu);
+    if (existing) {
+      existing.monthlyResults = existing.monthlyResults.map((month: any) => {
+        const brgyMonth = brgyLgu.monthlyResults.find((brgy: any) => brgy.month === month.month);
+        if (brgyMonth) {
+          // Map totalCount to brgy fields - BRGY data structure is different
           return {
             ...month,
-            wpNewPending: wpMonth.newPending,
-            wpNewPaid: wpMonth.newPaid,
-            wpNewPaidViaEgov: wpMonth.newPaidViaEgov || 0,
-            wpRenewPending: wpMonth.renewPending,
-            wpRenewPaid: wpMonth.renewPaid,
-            wpRenewPaidViaEgov: wpMonth.renewPaidViaEgov || 0,
-            wpMalePending: wpMonth.malePending,
-            wpMalePaid: wpMonth.malePaid,
-            wpFemalePending: wpMonth.femalePending,
-            wpFemalePaid: wpMonth.femalePaid,
+            brgyNewPending: 0, // BRGY doesn't have pending data
+            brgyNewPaid: brgyMonth.totalCount || 0, // Map totalCount to newPaid
+            brgyNewPaidViaEgov: 0, // BRGY doesn't have eGov data
+            brgyRenewPending: 0, // BRGY doesn't have renew data
+            brgyRenewPaid: 0, // BRGY doesn't have renew data
+            brgyRenewPaidViaEgov: 0, // BRGY doesn't have renew eGov data
+            brgyMalePending: 0, // BRGY doesn't have gender data
+            brgyMalePaid: 0, // BRGY doesn't have gender data
+            brgyFemalePending: 0, // BRGY doesn't have gender data
+            brgyFemalePaid: 0, // BRGY doesn't have gender data
+            totalCount: brgyMonth.totalCount || 0, // Keep original field for reference
           };
         }
         return month;
       });
     } else {
-      // Create new entry for WP only
-      mergedMap.set(wpLgu.lgu, {
-        lgu: wpLgu.lgu,
-        region: wpLgu.region,
-        monthlyResults: wpLgu.monthlyResults.map((month: any) => ({
-          ...month,
-          bpNewPending: 0,
-          bpNewPaid: 0,
-          bpNewPaidViaEgov: 0,
-          bpRenewPending: 0,
-          bpRenewPaid: 0,
-          bpRenewPaidViaEgov: 0,
-          bpMalePending: 0,
-          bpMalePaid: 0,
-          bpFemalePending: 0,
-          bpFemalePaid: 0,
-          wpNewPending: month.newPending,
-          wpNewPaid: month.newPaid,
-          wpNewPaidViaEgov: month.newPaidViaEgov || 0,
-          wpRenewPending: month.renewPending,
-          wpRenewPaid: month.renewPaid,
-          wpRenewPaidViaEgov: month.renewPaidViaEgov || 0,
-          wpMalePending: month.malePending,
-          wpMalePaid: month.malePaid,
-          wpFemalePending: month.femalePending,
-          wpFemalePaid: month.femalePaid,
+      mergedMap.set(brgyLgu.lgu, {
+        lgu: brgyLgu.lgu,
+        region: brgyLgu.region,
+        monthlyResults: brgyLgu.monthlyResults.map((month: any) => ({
+          ...createDefaultMonth(),
+          month: month.month,
+          brgyNewPending: 0, // BRGY doesn't have pending data
+          brgyNewPaid: month.totalCount || 0, // Map totalCount to newPaid
+          brgyNewPaidViaEgov: 0, // BRGY doesn't have eGov data
+          brgyRenewPending: 0, // BRGY doesn't have renew data
+          brgyRenewPaid: 0, // BRGY doesn't have renew data
+          brgyRenewPaidViaEgov: 0, // BRGY doesn't have renew eGov data
+          brgyMalePending: 0, // BRGY doesn't have gender data
+          brgyMalePaid: 0, // BRGY doesn't have gender data
+          brgyFemalePending: 0, // BRGY doesn't have gender data
+          brgyFemalePaid: 0, // BRGY doesn't have gender data
+          totalCount: month.totalCount || 0, // Keep original field for reference
         }))
       });
     }
@@ -208,6 +343,36 @@ const calculateTotals = (data: any): TotalResults => {
     wpTotalmalePaid: 0,
     wpTotalfemalePending: 0,
     wpTotalfemalePaid: 0,
+    bpcoTotalnewPending: 0,
+    bpcoTotalnewPaid: 0,
+    bpcoTotalnewPaidViaEgov: 0,
+    bpcoTotalrenewPending: 0,
+    bpcoTotalrenewPaid: 0,
+    bpcoTotalrenewPaidViaEgov: 0,
+    bpcoTotalmalePending: 0,
+    bpcoTotalmalePaid: 0,
+    bpcoTotalfemalePending: 0,
+    bpcoTotalfemalePaid: 0,
+    bpbpTotalnewPending: 0,
+    bpbpTotalnewPaid: 0,
+    bpbpTotalnewPaidViaEgov: 0,
+    bpbpTotalrenewPending: 0,
+    bpbpTotalrenewPaid: 0,
+    bpbpTotalrenewPaidViaEgov: 0,
+    bpbpTotalmalePending: 0,
+    bpbpTotalmalePaid: 0,
+    bpbpTotalfemalePending: 0,
+    bpbpTotalfemalePaid: 0,
+    brgyTotalnewPending: 0,
+    brgyTotalnewPaid: 0,
+    brgyTotalnewPaidViaEgov: 0,
+    brgyTotalrenewPending: 0,
+    brgyTotalrenewPaid: 0,
+    brgyTotalrenewPaidViaEgov: 0,
+    brgyTotalmalePending: 0,
+    brgyTotalmalePaid: 0,
+    brgyTotalfemalePending: 0,
+    brgyTotalfemalePaid: 0,
   };
 
   data.results.forEach((lgu: any) => {
@@ -235,17 +400,50 @@ const calculateTotals = (data: any): TotalResults => {
       const wpFemalePending = result.wpFemalePending || 0;
       const wpFemalePaid = result.wpFemalePaid || 0;
 
-      // Combined totals
-      totals.totalnewPending += bpNewPending + wpNewPending;
-      totals.totalnewPaid += bpNewPaid + wpNewPaid;
-      totals.totalnewPaidViaEgov += bpNewPaidViaEgov + wpNewPaidViaEgov;
-      totals.totalrenewPending += bpRenewPending + wpRenewPending;
-      totals.totalrenewPaid += bpRenewPaid + wpRenewPaid;
-      totals.totalrenewPaidViaEgov += bpRenewPaidViaEgov + wpRenewPaidViaEgov;
-      totals.totalmalePending += bpMalePending + wpMalePending;
-      totals.totalmalePaid += bpMalePaid + wpMalePaid;
-      totals.totalfemalePending += bpFemalePending + wpFemalePending;
-      totals.totalfemalePaid += bpFemalePaid + wpFemalePaid;
+      const bpcoNewPending = result.bpcoNewPending || 0;
+      const bpcoNewPaid = result.bpcoNewPaid || 0;
+      const bpcoNewPaidViaEgov = result.bpcoNewPaidViaEgov || 0;
+      const bpcoRenewPending = result.bpcoRenewPending || 0;
+      const bpcoRenewPaid = result.bpcoRenewPaid || 0;
+      const bpcoRenewPaidViaEgov = result.bpcoRenewPaidViaEgov || 0;
+      const bpcoMalePending = result.bpcoMalePending || 0;
+      const bpcoMalePaid = result.bpcoMalePaid || 0;
+      const bpcoFemalePending = result.bpcoFemalePending || 0;
+      const bpcoFemalePaid = result.bpcoFemalePaid || 0;
+
+      const bpbpNewPending = result.bpbpNewPending || 0;
+      const bpbpNewPaid = result.bpbpNewPaid || 0;
+      const bpbpNewPaidViaEgov = result.bpbpNewPaidViaEgov || 0;
+      const bpbpRenewPending = result.bpbpRenewPending || 0;
+      const bpbpRenewPaid = result.bpbpRenewPaid || 0;
+      const bpbpRenewPaidViaEgov = result.bpbpRenewPaidViaEgov || 0;
+      const bpbpMalePending = result.bpbpMalePending || 0;
+      const bpbpMalePaid = result.bpbpMalePaid || 0;
+      const bpbpFemalePending = result.bpbpFemalePending || 0;
+      const bpbpFemalePaid = result.bpbpFemalePaid || 0;
+
+      const brgyNewPending = result.brgyNewPending || 0;
+      const brgyNewPaid = result.brgyNewPaid || 0;
+      const brgyNewPaidViaEgov = result.brgyNewPaidViaEgov || 0;
+      const brgyRenewPending = result.brgyRenewPending || 0;
+      const brgyRenewPaid = result.brgyRenewPaid || 0;
+      const brgyRenewPaidViaEgov = result.brgyRenewPaidViaEgov || 0;
+      const brgyMalePending = result.brgyMalePending || 0;
+      const brgyMalePaid = result.brgyMalePaid || 0;
+      const brgyFemalePending = result.brgyFemalePending || 0;
+      const brgyFemalePaid = result.brgyFemalePaid || 0;
+
+      // Combined totals - now including BPCO, BPBP and BRGY
+      totals.totalnewPending += bpNewPending + wpNewPending + bpcoNewPending + bpbpNewPending + brgyNewPending;
+      totals.totalnewPaid += bpNewPaid + wpNewPaid + bpcoNewPaid + bpbpNewPaid + brgyNewPaid;
+      totals.totalnewPaidViaEgov += bpNewPaidViaEgov + wpNewPaidViaEgov + bpcoNewPaidViaEgov + bpbpNewPaidViaEgov + brgyNewPaidViaEgov;
+      totals.totalrenewPending += bpRenewPending + wpRenewPending + bpcoRenewPending + bpbpRenewPending + brgyRenewPending;
+      totals.totalrenewPaid += bpRenewPaid + wpRenewPaid + bpcoRenewPaid + bpbpRenewPaid + brgyRenewPaid;
+      totals.totalrenewPaidViaEgov += bpRenewPaidViaEgov + wpRenewPaidViaEgov + bpcoRenewPaidViaEgov + bpbpRenewPaidViaEgov + brgyRenewPaidViaEgov;
+      totals.totalmalePending += bpMalePending + wpMalePending + bpcoMalePending + bpbpMalePending + brgyMalePending;
+      totals.totalmalePaid += bpMalePaid + wpMalePaid + bpcoMalePaid + bpbpMalePaid + brgyMalePaid;
+      totals.totalfemalePending += bpFemalePending + wpFemalePending + bpcoFemalePending + bpbpFemalePending + brgyFemalePending;
+      totals.totalfemalePaid += bpFemalePaid + wpFemalePaid + bpcoFemalePaid + bpbpFemalePaid + brgyFemalePaid;
 
       // BP specific totals
       totals.bpTotalnewPending! += bpNewPending;
@@ -270,6 +468,42 @@ const calculateTotals = (data: any): TotalResults => {
       totals.wpTotalmalePaid! += wpMalePaid;
       totals.wpTotalfemalePending! += wpFemalePending;
       totals.wpTotalfemalePaid! += wpFemalePaid;
+
+      // BPCO specific totals
+      totals.bpcoTotalnewPending! += bpcoNewPending;
+      totals.bpcoTotalnewPaid! += bpcoNewPaid;
+      totals.bpcoTotalnewPaidViaEgov! += bpcoNewPaidViaEgov;
+      totals.bpcoTotalrenewPending! += bpcoRenewPending;
+      totals.bpcoTotalrenewPaid! += bpcoRenewPaid;
+      totals.bpcoTotalrenewPaidViaEgov! += bpcoRenewPaidViaEgov;
+      totals.bpcoTotalmalePending! += bpcoMalePending;
+      totals.bpcoTotalmalePaid! += bpcoMalePaid;
+      totals.bpcoTotalfemalePending! += bpcoFemalePending;
+      totals.bpcoTotalfemalePaid! += bpcoFemalePaid;
+
+      // BPBP specific totals
+      totals.bpbpTotalnewPending! += bpbpNewPending;
+      totals.bpbpTotalnewPaid! += bpbpNewPaid;
+      totals.bpbpTotalnewPaidViaEgov! += bpbpNewPaidViaEgov;
+      totals.bpbpTotalrenewPending! += bpbpRenewPending;
+      totals.bpbpTotalrenewPaid! += bpbpRenewPaid;
+      totals.bpbpTotalrenewPaidViaEgov! += bpbpRenewPaidViaEgov;
+      totals.bpbpTotalmalePending! += bpbpMalePending;
+      totals.bpbpTotalmalePaid! += bpbpMalePaid;
+      totals.bpbpTotalfemalePending! += bpbpFemalePending;
+      totals.bpbpTotalfemalePaid! += bpbpFemalePaid;
+
+      // BRGY specific totals
+      totals.brgyTotalnewPending! += brgyNewPending;
+      totals.brgyTotalnewPaid! += brgyNewPaid;
+      totals.brgyTotalnewPaidViaEgov! += brgyNewPaidViaEgov;
+      totals.brgyTotalrenewPending! += brgyRenewPending;
+      totals.brgyTotalrenewPaid! += brgyRenewPaid;
+      totals.brgyTotalrenewPaidViaEgov! += brgyRenewPaidViaEgov;
+      totals.brgyTotalmalePending! += brgyMalePending;
+      totals.brgyTotalmalePaid! += brgyMalePaid;
+      totals.brgyTotalfemalePending! += brgyFemalePending;
+      totals.brgyTotalfemalePaid! += brgyFemalePaid;
     });
   });
 
@@ -284,10 +518,18 @@ function Admin() {
   const dispatch = useDispatch();
 
   const data = useSelector(selectData);
+  const wp = useSelector(selectWp);
+  const brgy = useSelector(selectBrgy);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const controllerRef = useRef<AbortController | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Controllers for status data fetching
+  const bpControllerRef = useRef<AbortController | null>(null);
+  const wpControllerRef = useRef<AbortController | null>(null);
+  const brgyControllerRef = useRef<AbortController | null>(null);
+  const bpcoControllerRef = useRef<AbortController | null>(null);
 
   // Helper function to reset first run flag (useful for testing)
   const resetFirstRun = () => {
@@ -326,6 +568,464 @@ function Admin() {
       });
   }
 
+  // Region mapping for status data
+  const regionMap: Record<string, string> = {
+    R1: "region1",
+    R2: "region2", 
+    R3: "region3",
+    R4A: "region4a",
+    R4B: "region4b",
+    R5: "region5",
+    R6: "region6",
+    R7: "region7",
+    R8: "region8",
+    R9: "region9",
+    R10: "region10",
+    R11: "region11",
+    R12: "region12",
+    R13: "region13",
+    CAR: "CAR",
+    "BARMM I": "BARMM1",
+    "BARMM II": "BARMM2",
+  };
+
+  function mapRegion(region: string): string {
+    if (!region) return ''; // Handle undefined/null/empty regions
+    return regionMap[region] || region.toLowerCase().replace(/\s+/g, '');
+  }
+
+  function getWP() {
+    // Cancel previous request if exists
+    if (wpControllerRef.current) {
+      wpControllerRef.current.abort();
+    }
+    
+    // Create new controller
+    wpControllerRef.current = new AbortController();
+
+    // Fetch both 2024 and 2025 data
+    return Promise.all([
+      axios2.get('18kaPQlN0_kA9i7YAD-DftbdVPZX35Qf33sVMkw_TcWc/values/WP UR Input', {
+        headers: {
+          Authorization: `Token ${import.meta.env.VITE_TOKEN}`,
+        },
+        signal: wpControllerRef.current.signal
+      }),
+      axios2.get('1Po3nyGoTmJ2OLRuYF1GBdfasLfaccRrumaoqIwoF6C0/values/WP UR Input', {
+        headers: {
+          Authorization: `Token ${import.meta.env.VITE_TOKEN}`,
+        },
+        signal: wpControllerRef.current.signal
+      })
+    ]).then((responses) => {
+      const combinedGroupedByMonth: Record<string, Record<string, any>> = {};
+
+      // Process both datasets
+      responses.forEach((response) => {
+        const data = response.data.values;
+        const records = data.slice(3);
+
+        // Map column indexes for easier maintenance
+        const idx = {
+          period: 1,
+          lgu: 4,
+          name: 13,
+          province: 14,
+          dictRo: 18,
+          status: 10,
+        };
+
+        // Group by period and dictRo, and sum statuses
+        records.forEach((row: any) => {
+          const period = row[idx.period];
+          const lgu = row[idx.lgu];
+          const region = mapRegion(row[idx.dictRo]);
+          const name = row[idx.name];
+          const province = row[idx.province];
+          const status = (row[idx.status] || '').toLowerCase();
+
+          if (!period || !lgu || !region) return; // Skip invalid entries
+
+          if (!combinedGroupedByMonth[period]) combinedGroupedByMonth[period] = {};
+          if (!combinedGroupedByMonth[period][lgu]) {
+            combinedGroupedByMonth[period][lgu] = {
+              lgu,
+              period,
+              region,
+              name,
+              province,
+              operational: 0,
+              developmental: 0,
+              withdraw: 0,
+            };
+          }
+
+          // Aggregate data from both years for the same period and LGU
+          if (status.includes('operational')) combinedGroupedByMonth[period][lgu].operational += 1;
+          else if (status.includes('developmental')) combinedGroupedByMonth[period][lgu].developmental += 1;
+          else if (status.includes('withdraw')) combinedGroupedByMonth[period][lgu].withdraw += 1;
+        });
+      });
+
+      // Format result with only essential data to reduce storage size
+      const WP = Object.entries(combinedGroupedByMonth)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([date, lgus]) => ({
+          date,
+          data: Object.values(lgus).map((item: any) => ({
+            lgu: item.lgu,
+            region: item.region,
+            province: item.province,
+            operational: item.operational,
+            developmental: item.developmental,
+            withdraw: item.withdraw,
+          })),
+        }));
+
+      const result = { WP };
+
+      dispatch(setWp({
+        ...wp,
+        WP: result.WP,
+      }));
+      
+    }).catch((error) => {
+      if (error.name !== 'AbortError') { // Don't log aborted requests
+        console.error("Error fetching WP data:", error);
+      }
+    });
+  }
+
+  function getBRGY() {
+    // Cancel previous request if exists
+    if (brgyControllerRef.current) {
+      brgyControllerRef.current.abort();
+    }
+    
+    // Create new controller
+    brgyControllerRef.current = new AbortController();
+
+    // Fetch both 2024 and 2025 data
+    return Promise.all([
+      axios2.get('18kaPQlN0_kA9i7YAD-DftbdVPZX35Qf33sVMkw_TcWc/values/BC UR Input', {
+        headers: {
+          Authorization: `Token ${import.meta.env.VITE_TOKEN}`,
+        },
+        signal: brgyControllerRef.current.signal
+      }),
+      axios2.get('1Po3nyGoTmJ2OLRuYF1GBdfasLfaccRrumaoqIwoF6C0/values/BC UR Input', {
+        headers: {
+          Authorization: `Token ${import.meta.env.VITE_TOKEN}`,
+        },
+        signal: brgyControllerRef.current.signal
+      })
+    ]).then((responses) => {
+      const combinedGroupedByMonth: Record<string, Record<string, any>> = {};
+
+      // Process both datasets
+      responses.forEach((response) => {
+        const data = response.data.values;
+        const records = data.slice(3);
+
+        // Map column indexes for easier maintenance
+        const idx = {
+          period: 1,
+          lgu: 4,
+          name: 13,
+          province: 14,
+          dictRo: 18, // Use dictRo as region
+          status: 10, // e.g. "Operational", "Developmental", "Training", "Withdraw"
+        };
+
+        // Group by period and dictRo, and sum statuses
+        records.forEach((row: any) => {
+          const period = row[idx.period];
+          const lgu = row[idx.lgu];
+          const region = mapRegion(row[idx.dictRo]);
+          const name = row[idx.name];
+          const province = row[idx.province];
+          const status = (row[idx.status] || '').toLowerCase();
+
+          if (!period || !lgu || !region) return; // Skip invalid entries
+
+          if (!combinedGroupedByMonth[period]) combinedGroupedByMonth[period] = {};
+          if (!combinedGroupedByMonth[period][lgu]) {
+            combinedGroupedByMonth[period][lgu] = {
+              lgu,
+              period,
+              region,
+              name,
+              province,
+              operational: 0,
+              developmental: 0,
+              withdraw: 0,
+            };
+          }
+
+          // Aggregate data from both years for the same period and LGU
+          if (status.includes('operational')) combinedGroupedByMonth[period][lgu].operational += 1;
+          else if (status.includes('developmental')) combinedGroupedByMonth[period][lgu].developmental += 1;
+          else if (status.includes('withdraw')) combinedGroupedByMonth[period][lgu].withdraw += 1;
+        });
+      });
+
+      // Format result with only essential data to reduce storage size
+      const BRGY = Object.entries(combinedGroupedByMonth)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([date, lgus]) => ({
+          date,
+          data: Object.values(lgus).map((item: any) => ({
+            lgu: item.lgu,
+            region: item.region,
+            province: item.province,
+            operational: item.operational,
+            developmental: item.developmental,
+            withdraw: item.withdraw,
+          })),
+        }));
+
+      const result = { BRGY };
+
+      dispatch(setBrgy({
+        ...brgy,
+        BRGY: result.BRGY,
+      }));
+      
+    }).catch((error) => {
+      if (error.name !== 'AbortError') { // Don't log aborted requests
+        console.error("Error fetching BRGY data:", error);
+      }
+    });
+  }
+
+  function getBPLS() {
+    // Cancel previous request if exists
+    if (bpControllerRef.current) {
+      bpControllerRef.current.abort();
+    }
+    
+    // Create new controller
+    bpControllerRef.current = new AbortController();
+    
+    // Fetch both 2024 and 2025 data
+    return Promise.all([
+      axios2.get('18kaPQlN0_kA9i7YAD-DftbdVPZX35Qf33sVMkw_TcWc/values/BP1 UR Input', {
+        headers: {
+          Authorization: `Token ${import.meta.env.VITE_TOKEN}`,
+        },
+        signal: bpControllerRef.current.signal
+      }),
+      axios2.get('1Po3nyGoTmJ2OLRuYF1GBdfasLfaccRrumaoqIwoF6C0/values/BP1 UR Input', {
+        headers: {
+          Authorization: `Token ${import.meta.env.VITE_TOKEN}`,
+        },
+        signal: bpControllerRef.current.signal
+      })
+    ]).then((responses) => {
+      const combinedGroupedByMonth: Record<string, Record<string, any>> = {};
+
+      // Process both datasets
+      responses.forEach((response) => {
+        const data = response.data.values;
+        const records = data.slice(3);
+
+        // Map column indexes for easier maintenance
+        const idx = {
+          period: 1,
+          lgu: 4,
+          name: 13,
+          province: 14,
+          dictRo: 19, // Use dictRo as region
+          status: 10, // e.g. "Operational", "Developmental", "Training", "Withdraw"
+        };
+
+        // Group by period and dictRo, and sum statuses
+        records.forEach((row: any) => {
+          const period = row[idx.period];
+          const lgu = row[idx.lgu];
+          const region = mapRegion(row[idx.dictRo]);
+          const name = row[idx.name];
+          const province = row[idx.province];
+          const status = (row[idx.status] || '').toLowerCase();
+
+          if (!period || !lgu || !region) return; // Skip invalid entries
+
+          if (!combinedGroupedByMonth[period]) combinedGroupedByMonth[period] = {};
+          if (!combinedGroupedByMonth[period][lgu]) {
+            combinedGroupedByMonth[period][lgu] = {
+              lgu,
+              period,
+              region,
+              name,
+              province,
+              operational: 0,
+              developmental: 0,
+              withdraw: 0,
+            };
+          }
+
+          // Aggregate data from both years for the same period and LGU
+          if (status.includes('operational')) combinedGroupedByMonth[period][lgu].operational += 1;
+          else if (status.includes('developmental')) combinedGroupedByMonth[period][lgu].developmental += 1;
+          else if (status.includes('withdraw')) combinedGroupedByMonth[period][lgu].withdraw += 1;
+        });
+      });
+
+      // Format result with only essential data to reduce storage size
+      const BP = Object.entries(combinedGroupedByMonth)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([date, lgus]) => ({
+          date,
+          data: Object.values(lgus).map((item: any) => ({
+            lgu: item.lgu,
+            region: item.region,
+            province: item.province,
+            operational: item.operational,
+            developmental: item.developmental,
+            withdraw: item.withdraw,
+          })),
+        }));
+
+      const result = { BP };
+
+      dispatch(setStatus({
+        BP: result.BP,
+      }));
+      
+    }).catch((error) => {
+      if (error.name !== 'AbortError') { // Don't log aborted requests
+        console.error("Error fetching BP data:", error);
+      }
+    });
+  }
+
+  function getBPCO(){
+    // Cancel previous request if exists
+    if (bpcoControllerRef.current) {
+      bpcoControllerRef.current.abort();
+    }
+    
+    // Create new controller
+    bpcoControllerRef.current = new AbortController();
+
+    // Fetch both 2024 and 2025 data
+    return Promise.all([
+      axios2.get('18kaPQlN0_kA9i7YAD-DftbdVPZX35Qf33sVMkw_TcWc/values/BPCO UR Input', {
+        headers: {
+          Authorization: `Token ${import.meta.env.VITE_TOKEN}`,
+        },
+        signal: bpcoControllerRef.current.signal
+      }),
+      axios2.get('1Po3nyGoTmJ2OLRuYF1GBdfasLfaccRrumaoqIwoF6C0/values/BPCO UR Input', {
+        headers: {
+          Authorization: `Token ${import.meta.env.VITE_TOKEN}`,
+        },
+        signal: bpcoControllerRef.current.signal
+      })
+    ]).then((responses) => {
+      const combinedGroupedByMonth: Record<string, Record<string, any>> = {};
+
+      // Process both datasets
+      responses.forEach((response) => {
+        const data = response.data.values;
+        const records = data.slice(3);
+
+        // Map column indexes for easier maintenance
+        const idx = {
+          period: 1,
+          lgu: 4,
+          name: 13,
+          province: 14,
+          dictRo: 18, // Use dictRo as region
+          status: 10, // e.g. "Operational", "Developmental", "Training", "Withdraw"
+        };
+
+        // Group by period and dictRo, and sum statuses
+        records.forEach((row: any) => {
+          const period = row[idx.period];
+          const lgu = row[idx.lgu];
+          const region = mapRegion(row[idx.dictRo]);
+          const name = row[idx.name];
+          const province = row[idx.province];
+          const status = (row[idx.status] || '').toLowerCase();
+
+          if (!period || !lgu || !region) return; // Skip invalid entries
+
+          if (!combinedGroupedByMonth[period]) combinedGroupedByMonth[period] = {};
+          if (!combinedGroupedByMonth[period][lgu]) {
+            combinedGroupedByMonth[period][lgu] = {
+              lgu,
+              period,
+              region,
+              name,
+              province,
+              operational: 0,
+              developmental: 0,
+              withdraw: 0,
+            };
+          }
+
+          // Aggregate data from both years for the same period and LGU
+          if (status.includes('operational')) combinedGroupedByMonth[period][lgu].operational += 1;
+          else if (status.includes('developmental')) combinedGroupedByMonth[period][lgu].developmental += 1;
+          else if (status.includes('withdraw')) combinedGroupedByMonth[period][lgu].withdraw += 1;
+        });
+      });
+
+      // Format result with only essential data to reduce storage size
+      const BPCO = Object.entries(combinedGroupedByMonth)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([date, lgus]) => ({
+          date,
+          data: Object.values(lgus).map((item: any) => ({
+            lgu: item.lgu,
+            region: item.region,
+            province: item.province,
+            operational: item.operational,
+            developmental: item.developmental,
+            withdraw: item.withdraw,
+          })),
+        }));
+
+      const result = { BPCO };
+
+      dispatch(setStatus({
+        BPCO: result.BPCO,
+      }));
+      
+    }).catch((error) => {
+      if (error.name !== 'AbortError') { // Don't log aborted requests
+        console.error("Error fetching BPCO data:", error);
+      }
+    });
+  }
+
+  const loadModulesSequentially = async () => {
+    // Set loading to true at the start
+    dispatch(setLoad2(true));
+    
+    // Small delay to prevent overwhelming the system
+    const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+    
+    try {
+      await getBPLS();
+      await delay(500); // 500ms delay after BPLS
+      
+      await getWP();
+      await delay(500); // 500ms delay after WP
+      
+      await getBRGY();
+      await delay(500); // 500ms delay after BRGY
+      
+      await getBPCO();
+    } catch (error) {
+      console.error("Error in sequential loading:", error);
+    } finally {
+      // Always set loading to false at the end
+      dispatch(setLoad2(false));
+    }
+  };
+
   const BATCH_SIZE = 1; // Process 1 region at a time (reverted back to original working setting)
 
   function GetTransaction() {
@@ -352,6 +1052,9 @@ function Admin() {
     // Initialize results for each module
     let allBPResults: any[] = [];
     let allWPResults: any[] = [];
+    let allBPCOResults: any[] = [];
+    let allBPBPResults: any[] = [];
+    let allBRGYResults: any[] = [];
     let totalLguCount = 0;
     let processedRegions = 0;
 
@@ -388,6 +1091,48 @@ function Admin() {
           );
         }
 
+        if (data.modules?.includes("Certificate of Occupancy")) {
+          requests.push(
+            axios.post(
+              `${import.meta.env.VITE_URL}/api/bpco/transaction-count-co`,
+              {
+                locationName: batch,
+                startDate: data.startDate,
+                endDate: data.endDate,
+              },
+              { signal: controller.signal }
+            ).then(response => ({ type: 'bpco', data: response.data }))
+          );
+        }
+
+        if (data.modules?.includes("Building Permit")) {
+          requests.push(
+            axios.post(
+              `${import.meta.env.VITE_URL}/api/bpco/transaction-count-bp`,
+              {
+                locationName: batch,
+                startDate: data.startDate,
+                endDate: data.endDate,
+              },
+              { signal: controller.signal }
+            ).then(response => ({ type: 'bpbp', data: response.data }))
+          );
+        }
+
+        if (data.modules?.includes("Barangay Clearance")) {
+          requests.push(
+            axios.post(
+              `${import.meta.env.VITE_URL}/api/bc/transaction-count/`,
+              {
+                locationName: batch,
+                startDate: data.startDate,
+                endDate: data.endDate,
+              },
+              { signal: controller.signal }
+            ).then(response => ({ type: 'brgy', data: response.data }))
+          );
+        }
+
         // Execute all requests in parallel
         const responses = await Promise.all(requests);
 
@@ -397,6 +1142,37 @@ function Admin() {
             allBPResults = allBPResults.concat(response.data.results || []);
           } else if (response.type === 'wp') {
             allWPResults = allWPResults.concat(response.data.results || []);
+          } else if (response.type === 'bpco') {
+            // Map coPaid → newPaid, coPending → newPending for BPCO
+            const mappedResults = (response.data.results || []).map((result: any) => ({
+              ...result,
+              monthlyResults: result.monthlyResults?.map((month: any) => ({
+                ...month,
+                newPaid: month.coPaid || 0,
+                newPending: month.coPending || 0,
+                // Keep original fields for completeness
+                coPaid: month.coPaid || 0,
+                coPending: month.coPending || 0
+              })) || []
+            }));
+            allBPCOResults = allBPCOResults.concat(mappedResults);
+          } else if (response.type === 'bpbp') {
+            // Map buildingPaid → newPaid, buildingPending → newPending for BPBP
+            const mappedResults = (response.data.results || []).map((result: any) => ({
+              ...result,
+              monthlyResults: result.monthlyResults?.map((month: any) => ({
+                ...month,
+                newPaid: month.newPaid || 0, // Use newPaid directly instead of buildingPaid
+                newPending: month.buildingPending || 0,
+                // Keep original fields for completeness
+                buildingPaid: month.buildingPaid || 0,
+                buildingPending: month.buildingPending || 0
+              })) || []
+            }));
+            allBPBPResults = allBPBPResults.concat(mappedResults);
+          } else if (response.type === 'brgy') {
+            // Process Barangay Clearance data - use as-is since it should already have the correct structure
+            allBRGYResults = allBRGYResults.concat(response.data.results || []);
           }
           
           if (response.data.lguCount && response.data.lguCount > totalLguCount) {
@@ -407,8 +1183,8 @@ function Admin() {
         // Update processed regions count
         processedRegions += batch.length;
 
-        // Merge results from both modules by LGU
-        const mergedResults = mergeModuleResults(allBPResults, allWPResults);
+        // Merge results from all modules by LGU
+        const mergedResults = mergeModuleResults(allBPResults, allWPResults, allBPCOResults, allBPBPResults, allBRGYResults);
 
         // Update state after each batch completion
         const updatedData = {
@@ -419,7 +1195,9 @@ function Admin() {
             endDate: data.endDate,
           },
           bpResults: allBPResults,
-          wpResults: allWPResults
+          wpResults: allWPResults,
+          bpcoResults: allBPCOResults,
+          bpbpResults: allBPBPResults
         };
 
         const totals = calculateTotals(updatedData);
@@ -442,7 +1220,10 @@ function Admin() {
           totalResults: mergedResults.length,
           isPartialData: mergedResults.length > maxResultsToStore,
           bpResults: allBPResults.length > maxResultsToStore ? allBPResults.slice(0, maxResultsToStore) : allBPResults, // Keep FIRST items
-          wpResults: allWPResults.length > maxResultsToStore ? allWPResults.slice(0, maxResultsToStore) : allWPResults  // Keep FIRST items
+          wpResults: allWPResults.length > maxResultsToStore ? allWPResults.slice(0, maxResultsToStore) : allWPResults, // Keep FIRST items
+          bpcoResults: allBPCOResults.length > maxResultsToStore ? allBPCOResults.slice(0, maxResultsToStore) : allBPCOResults, // Keep FIRST items
+          bpbpResults: allBPBPResults.length > maxResultsToStore ? allBPBPResults.slice(0, maxResultsToStore) : allBPBPResults, // Keep FIRST items
+          brgyResults: allBRGYResults.length > maxResultsToStore ? allBRGYResults.slice(0, maxResultsToStore) : allBRGYResults  // Keep FIRST items
         };
         
         try {
@@ -455,7 +1236,10 @@ function Admin() {
               ...dataToStore,
               results: resultsToStore.slice(0, 250), // Keep FIRST 250 items
               bpResults: allBPResults.slice(0, 250), // Keep FIRST 250 items
-              wpResults: allWPResults.slice(0, 250)  // Keep FIRST 250 items
+              wpResults: allWPResults.slice(0, 250), // Keep FIRST 250 items
+              bpcoResults: allBPCOResults.slice(0, 250), // Keep FIRST 250 items
+              bpbpResults: allBPBPResults.slice(0, 250), // Keep FIRST 250 items
+              brgyResults: allBRGYResults.slice(0, 250)  // Keep FIRST 250 items
             };
             dispatch(setTransaction(smallerData));
           });
@@ -513,6 +1297,26 @@ function Admin() {
           wpTotalmalePaid: 0,
           wpTotalfemalePending: 0,
           wpTotalfemalePaid: 0,
+          bpcoTotalnewPending: 0,
+          bpcoTotalnewPaid: 0,
+          bpcoTotalnewPaidViaEgov: 0,
+          bpcoTotalrenewPending: 0,
+          bpcoTotalrenewPaid: 0,
+          bpcoTotalrenewPaidViaEgov: 0,
+          bpcoTotalmalePending: 0,
+          bpcoTotalmalePaid: 0,
+          bpcoTotalfemalePending: 0,
+          bpcoTotalfemalePaid: 0,
+          bpbpTotalnewPending: 0,
+          bpbpTotalnewPaid: 0,
+          bpbpTotalnewPaidViaEgov: 0,
+          bpbpTotalrenewPending: 0,
+          bpbpTotalrenewPaid: 0,
+          bpbpTotalrenewPaidViaEgov: 0,
+          bpbpTotalmalePending: 0,
+          bpbpTotalmalePaid: 0,
+          bpbpTotalfemalePending: 0,
+          bpbpTotalfemalePaid: 0,
         }));
         dispatch(setTransaction({
           results: [],
@@ -524,7 +1328,9 @@ function Admin() {
           totalResults: 0,
           isPartialData: false,
           bpResults: [],
-          wpResults: []
+          wpResults: [],
+          bpcoResults: [],
+          bpbpResults: []
         }));
 
         
@@ -630,6 +1436,12 @@ function Admin() {
      
     }
   }, []);
+
+  useEffect(() => {
+    // Sequential loading with delay to optimize resource usage
+    loadModulesSequentially();
+  }, []);
+  
  const locations: string[] = Array.isArray(data.real) ? data.real : [data.real];
 const totalRegions = locations.length;
   return (

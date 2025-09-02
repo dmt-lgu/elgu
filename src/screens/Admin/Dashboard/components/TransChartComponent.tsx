@@ -53,6 +53,9 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
   data = [],
   period
 }) => {
+
+
+  console.log(data);
   const [chartType, setChartType] = useState<'bar' | 'line' | 'pie'>('bar');
   const [hidden, setHidden] = useState<boolean[]>([false, false, false, false]);
   const [txnType, setTxnType] = useState<'overall' | 'new' | 'renew'>('overall');
@@ -133,31 +136,111 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
             paidLinkBiz: (item.wpNewPaidLinkBiz ?? 0) + (item.wpRenewPaidLinkBiz ?? 0),
           };
         }
-      } else {
-        // All modules - combine BP and WP data
+      } else if (moduleFilter === 'Certificate of Occupancy') {
         if (txnType === 'new') {
           baseData = {
             name: item.name,
-            paid: (item.bpNewPaid ?? 0) + (item.wpNewPaid ?? 0),
-            pending: (item.bpNewPending ?? 0) + (item.wpNewPending ?? 0),
-            paideGov: (item.bpNewPaidViaEgov ?? 0) + (item.wpNewPaidViaEgov ?? 0),
-            paidLinkBiz: (item.bpNewPaidLinkBiz ?? 0) + (item.wpNewPaidLinkBiz ?? 0),
+            paid: item.bpcoNewPaid ?? 0,
+            pending: item.bpcoNewPending ?? 0,
+            paideGov: item.bpcoNewPaidViaEgov ?? 0,
+            paidLinkBiz: item.bpcoNewPaidLinkBiz ?? 0,
           };
         } else if (txnType === 'renew') {
           baseData = {
             name: item.name,
-            paid: (item.bpRenewPaid ?? 0) + (item.wpRenewPaid ?? 0),
-            pending: (item.bpRenewPending ?? 0) + (item.wpRenewPending ?? 0),
-            paideGov: (item.bpRenewPaidViaEgov ?? 0) + (item.wpRenewPaidViaEgov ?? 0),
-            paidLinkBiz: (item.bpRenewPaidLinkBiz ?? 0) + (item.wpRenewPaidLinkBiz ?? 0),
+            paid: item.bpcoRenewPaid ?? 0,
+            pending: item.bpcoRenewPending ?? 0,
+            paideGov: item.bpcoRenewPaidViaEgov ?? 0,
+            paidLinkBiz: item.bpcoRenewPaidLinkBiz ?? 0,
           };
         } else {
           baseData = {
             name: item.name,
-            paid: (item.bpNewPaid ?? 0) + (item.bpRenewPaid ?? 0) + (item.wpNewPaid ?? 0) + (item.wpRenewPaid ?? 0),
-            pending: (item.bpNewPending ?? 0) + (item.bpRenewPending ?? 0) + (item.wpNewPending ?? 0) + (item.wpRenewPending ?? 0),
-            paideGov: (item.bpNewPaidViaEgov ?? 0) + (item.bpRenewPaidViaEgov ?? 0) + (item.wpNewPaidViaEgov ?? 0) + (item.wpRenewPaidViaEgov ?? 0),
-            paidLinkBiz: (item.bpNewPaidLinkBiz ?? 0) + (item.bpRenewPaidLinkBiz ?? 0) + (item.wpNewPaidLinkBiz ?? 0) + (item.wpRenewPaidLinkBiz ?? 0),
+            paid: (item.bpcoNewPaid ?? 0) + (item.bpcoRenewPaid ?? 0),
+            pending: (item.bpcoNewPending ?? 0) + (item.bpcoRenewPending ?? 0),
+            paideGov: (item.bpcoNewPaidViaEgov ?? 0) + (item.bpcoRenewPaidViaEgov ?? 0),
+            paidLinkBiz: (item.bpcoNewPaidLinkBiz ?? 0) + (item.bpcoRenewPaidLinkBiz ?? 0),
+          };
+        }
+      } else if (moduleFilter === 'Building Permit') {
+        if (txnType === 'new') {
+          baseData = {
+            name: item.name,
+            paid: item.bpbpNewPaid ?? 0,
+            pending: item.bpbpNewPending ?? 0,
+            paideGov: item.bpbpNewPaidViaEgov ?? 0,
+            paidLinkBiz: item.bpbpNewPaidLinkBiz ?? 0,
+          };
+        } else if (txnType === 'renew') {
+          baseData = {
+            name: item.name,
+            paid: item.bpbpRenewPaid ?? 0,
+            pending: item.bpbpRenewPending ?? 0,
+            paideGov: item.bpbpRenewPaidViaEgov ?? 0,
+            paidLinkBiz: item.bpbpRenewPaidLinkBiz ?? 0,
+          };
+        } else {
+          baseData = {
+            name: item.name,
+            paid: (item.bpbpNewPaid ?? 0) + (item.bpbpRenewPaid ?? 0),
+            pending: (item.bpbpNewPending ?? 0) + (item.bpbpRenewPending ?? 0),
+            paideGov: (item.bpbpNewPaidViaEgov ?? 0) + (item.bpbpRenewPaidViaEgov ?? 0),
+            paidLinkBiz: (item.bpbpNewPaidLinkBiz ?? 0) + (item.bpbpRenewPaidLinkBiz ?? 0),
+          };
+        }
+      } else if (moduleFilter === 'Barangay Clearance') {
+        // BRGY data only has newPaid (mapped from totalCount), no other fields
+        if (txnType === 'new') {
+          baseData = {
+            name: item.name,
+            paid: item.brgyNewPaid ?? 0,  // This is mapped from totalCount
+            pending: item.brgyNewPending ?? 0,  // Always 0 for BRGY
+            paideGov: item.brgyNewPaidViaEgov ?? 0,  // Always 0 for BRGY
+            paidLinkBiz: item.brgyNewPaidLinkBiz ?? 0,  // Always 0 for BRGY
+          };
+        } else if (txnType === 'renew') {
+          baseData = {
+            name: item.name,
+            paid: item.brgyRenewPaid ?? 0,  // Always 0 for BRGY
+            pending: item.brgyRenewPending ?? 0,  // Always 0 for BRGY
+            paideGov: item.brgyRenewPaidViaEgov ?? 0,  // Always 0 for BRGY
+            paidLinkBiz: item.brgyRenewPaidLinkBiz ?? 0,  // Always 0 for BRGY
+          };
+        } else {
+          // Overall - only newPaid has data for BRGY
+          baseData = {
+            name: item.name,
+            paid: item.brgyNewPaid ?? 0,  // This is the totalCount
+            pending: 0,  // BRGY doesn't have pending data
+            paideGov: 0,  // BRGY doesn't have eGov data
+            paidLinkBiz: 0,  // BRGY doesn't have linkBiz data
+          };
+        }
+      } else {
+        // All modules - combine BP, WP, BPCO, BPBP and BRGY data
+        if (txnType === 'new') {
+          baseData = {
+            name: item.name,
+            paid: (item.bpNewPaid ?? 0) + (item.wpNewPaid ?? 0) + (item.bpcoNewPaid ?? 0) + (item.bpbpNewPaid ?? 0) + (item.brgyNewPaid ?? 0),
+            pending: (item.bpNewPending ?? 0) + (item.wpNewPending ?? 0) + (item.bpcoNewPending ?? 0) + (item.bpbpNewPending ?? 0) + (item.brgyNewPending ?? 0),
+            paideGov: (item.bpNewPaidViaEgov ?? 0) + (item.wpNewPaidViaEgov ?? 0) + (item.bpcoNewPaidViaEgov ?? 0) + (item.bpbpNewPaidViaEgov ?? 0) + (item.brgyNewPaidViaEgov ?? 0),
+            paidLinkBiz: (item.bpNewPaidLinkBiz ?? 0) + (item.wpNewPaidLinkBiz ?? 0) + (item.bpcoNewPaidLinkBiz ?? 0) + (item.bpbpNewPaidLinkBiz ?? 0) + (item.brgyNewPaidLinkBiz ?? 0),
+          };
+        } else if (txnType === 'renew') {
+          baseData = {
+            name: item.name,
+            paid: (item.bpRenewPaid ?? 0) + (item.wpRenewPaid ?? 0) + (item.bpcoRenewPaid ?? 0) + (item.bpbpRenewPaid ?? 0) + (item.brgyRenewPaid ?? 0),
+            pending: (item.bpRenewPending ?? 0) + (item.wpRenewPending ?? 0) + (item.bpcoRenewPending ?? 0) + (item.bpbpRenewPending ?? 0) + (item.brgyRenewPending ?? 0),
+            paideGov: (item.bpRenewPaidViaEgov ?? 0) + (item.wpRenewPaidViaEgov ?? 0) + (item.bpcoRenewPaidViaEgov ?? 0) + (item.bpbpRenewPaidViaEgov ?? 0) + (item.brgyRenewPaidViaEgov ?? 0),
+            paidLinkBiz: (item.bpRenewPaidLinkBiz ?? 0) + (item.wpRenewPaidLinkBiz ?? 0) + (item.bpcoRenewPaidLinkBiz ?? 0) + (item.bpbpRenewPaidLinkBiz ?? 0) + (item.brgyRenewPaidLinkBiz ?? 0),
+          };
+        } else {
+          baseData = {
+            name: item.name,
+            paid: (item.bpNewPaid ?? 0) + (item.bpRenewPaid ?? 0) + (item.wpNewPaid ?? 0) + (item.wpRenewPaid ?? 0) + (item.bpcoNewPaid ?? 0) + (item.bpcoRenewPaid ?? 0) + (item.bpbpNewPaid ?? 0) + (item.bpbpRenewPaid ?? 0) + (item.brgyNewPaid ?? 0) + (item.brgyRenewPaid ?? 0),
+            pending: (item.bpNewPending ?? 0) + (item.bpRenewPending ?? 0) + (item.wpNewPending ?? 0) + (item.wpRenewPending ?? 0) + (item.bpcoNewPending ?? 0) + (item.bpcoRenewPending ?? 0) + (item.bpbpNewPending ?? 0) + (item.bpbpRenewPending ?? 0) + (item.brgyNewPending ?? 0) + (item.brgyRenewPending ?? 0),
+            paideGov: (item.bpNewPaidViaEgov ?? 0) + (item.bpRenewPaidViaEgov ?? 0) + (item.wpNewPaidViaEgov ?? 0) + (item.wpRenewPaidViaEgov ?? 0) + (item.bpcoNewPaidViaEgov ?? 0) + (item.bpcoRenewPaidViaEgov ?? 0) + (item.bpbpNewPaidViaEgov ?? 0) + (item.bpbpRenewPaidViaEgov ?? 0) + (item.brgyNewPaidViaEgov ?? 0) + (item.brgyRenewPaidViaEgov ?? 0),
+            paidLinkBiz: (item.bpNewPaidLinkBiz ?? 0) + (item.bpRenewPaidLinkBiz ?? 0) + (item.wpNewPaidLinkBiz ?? 0) + (item.wpRenewPaidLinkBiz ?? 0) + (item.bpcoNewPaidLinkBiz ?? 0) + (item.bpcoRenewPaidLinkBiz ?? 0) + (item.bpbpNewPaidLinkBiz ?? 0) + (item.bpbpRenewPaidLinkBiz ?? 0) + (item.brgyNewPaidLinkBiz ?? 0) + (item.brgyRenewPaidLinkBiz ?? 0),
           };
         }
       }
@@ -207,7 +290,7 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
         hidden: hidden[0],
       },
       {
-        label: 'Pending',
+        label: 'Ongoing',
         data: processedData.map(item => item.pending),
         backgroundColor: '#FFD700',
         borderColor: '#FFD700',
@@ -389,6 +472,12 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
               )}
               {dataState.modules?.includes("Working Permit") && (
                 <option value="Working Permit">Working Permit</option>
+              )}
+              {dataState.modules?.includes("Certificate of Occupancy") && (
+                <option value="Certificate of Occupancy">Certificate of Occupancy</option>
+              )}
+              {dataState.modules?.includes("Building Permit") && (
+                <option value="Building Permit">Building Permit</option>
               )}
             </select>
           </div>

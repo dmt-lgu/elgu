@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useRef, useCallback} from 'react';
+import { useMemo, useEffect } from 'react';
 import FilterSection from './components/FilterSection';
 import ModuleFilter from './components/ModuleFilter';
 import StatisticCard from './components/StatisticCard';
@@ -7,20 +7,17 @@ import StatisticCard from './components/StatisticCard';
 import TransactionChart from './components/TransChartComponent';
 import { selectCard } from '@/redux/cardSlice';
 import { selectTransaction } from '@/redux/transactionSlice';
-import { useSelector, useDispatch } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { selectData } from '@/redux/dataSlice';
 
-import axios from './../../../plugin/axios2';
-
-
 import TransactionChart2 from './components/TransChartComponent2';
-import { selectStatus, setStatus } from '@/redux/statusSlice';
+import { selectStatus } from '@/redux/statusSlice';
 
 import { parseISO, isAfter, isBefore, isEqual } from 'date-fns';
 import StatusChartComponent from './components/StatusChartComponent';
-import { setWp, selectWp } from '@/redux/wpSlice';
-import { setBrgy, selectBrgy } from '@/redux/brgySlice';
-import { selectLoad2, setLoad2 } from '@/redux/loadSlice2';
+import { selectWp } from '@/redux/wpSlice';
+import { selectBrgy } from '@/redux/brgySlice';
+import { selectLoad2 } from '@/redux/loadSlice2';
 import StatisticCard2 from './components/StatisticCard2';
 
 
@@ -33,60 +30,9 @@ const DashboardPage = () => {
   const data = useSelector(selectData);
   const transactionData = useSelector(selectTransaction);
   const loading = useSelector(selectLoad2);
-  const dispatch = useDispatch();
 
   // Loading states for each module
 
-
-  // Cancel request controllers
-  const bpControllerRef = useRef<AbortController | null>(null);
-  const wpControllerRef = useRef<AbortController | null>(null);
-  const brgyControllerRef = useRef<AbortController | null>(null);
-  const bpcoControllerRef = useRef<AbortController | null>(null);
-  
-  // Debounce timer and queue
-  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const fetchQueueRef = useRef<string[]>([]);
-  const isProcessingRef = useRef(false);
-
-  // Cancel all pending requests
-  const cancelAllRequests = useCallback(() => {
-    if (bpControllerRef.current) {
-      bpControllerRef.current.abort();
-      bpControllerRef.current = null;
-    }
-    if (wpControllerRef.current) {
-      wpControllerRef.current.abort();
-      wpControllerRef.current = null;
-    }
-    if (brgyControllerRef.current) {
-      brgyControllerRef.current.abort();
-      brgyControllerRef.current = null;
-    }
-    if (bpcoControllerRef.current) {
-      bpcoControllerRef.current.abort();
-      bpcoControllerRef.current = null;
-    }
-    
-    // Clear loading state
-    dispatch(setLoad2(false));
-    
-    // Clear queue
-    fetchQueueRef.current = [];
-    isProcessingRef.current = false;
-  }, [dispatch]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      cancelAllRequests();
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
-    };
-  }, [cancelAllRequests]);
-
-  
 
   // Enhanced filter and group logic
   const filterAndGroupResults = (results: any[], municipalities: any[], provinces: any[], regions: any[] = []) => {
@@ -648,6 +594,13 @@ const bpcoChartData: any = useMemo(() => {
   data.municipalities,
 ]);
 
+// Placeholder for Building Permit status chart data - will need proper data source
+const bpbpChartData: any = useMemo(() => {
+  // For now, return empty data structure
+  // This should be updated when the proper Building Permit status data source is available
+  return { current: [], breakdown: [] };
+}, []);
+
   // --- Calculate totals from all chart data sources ---
   const totalOperational = useMemo(() => {
     let total = 0;
@@ -668,10 +621,11 @@ const bpcoChartData: any = useMemo(() => {
     }
     
     // Add BPCO data if module is enabled
-    if (data.modules?.includes("Building Permit & Certificate of Occupancy")) {
+    if (data.modules?.includes("Certificate of Occupancy") || data.modules?.includes("Building Permit")) {
       total += bpcoChartData?.current.reduce((sum:any, item:any) => sum + (item.operational ?? 0), 0);
     }
     
+   
     return total;
   }, [bpChartData, wpChartData, brgyChartData, bpcoChartData, data.modules]);
 
@@ -690,13 +644,17 @@ const bpcoChartData: any = useMemo(() => {
     
     // Add BRGY data if module is enabled
     if (data.modules?.includes("Barangay Clearance")) {
+   
       total += brgyChartData?.current.reduce((sum:any, item:any) => sum + (item.developmental ?? 0), 0);
     }
     
     // Add BPCO data if module is enabled
-    if (data.modules?.includes("Building Permit & Certificate of Occupancy")) {
+    if (data.modules?.includes("Certificate of Occupancy") || data.modules?.includes("Building Permit") ) {
+      
+
       total += bpcoChartData?.current.reduce((sum:any, item:any) => sum + (item.developmental ?? 0), 0);
     }
+    
     
     return total;
   }, [bpChartData, wpChartData, brgyChartData, bpcoChartData, data.modules]);
@@ -719,10 +677,11 @@ const bpcoChartData: any = useMemo(() => {
       total += brgyChartData?.current.reduce((sum:any, item:any) => sum + (item.withdraw ?? 0), 0);
     }
     
-    // Add BPCO data if module is enabled
-    if (data.modules?.includes("Building Permit & Certificate of Occupancy")) {
+    if (data.modules?.includes("Certificate of Occupancy") || data.modules?.includes("Building Permit") ) {
       total += bpcoChartData?.current.reduce((sum:any, item:any) => sum + (item.withdraw ?? 0), 0);
     }
+
+    
     
     return total;
   }, [bpChartData, wpChartData, brgyChartData, bpcoChartData, data.modules]);
@@ -742,14 +701,11 @@ const bpcoChartData: any = useMemo(() => {
       let paidMale = 0, paidFemale = 0, pendingMale = 0, pendingFemale = 0;
       let bpMalePaid = 0, bpFemalePaid = 0, bpMalePending = 0, bpFemalePending = 0;
       let wpMalePaid = 0, wpFemalePaid = 0, wpMalePending = 0, wpFemalePending = 0;
+      let bpcoMalePaid = 0, bpcoFemalePaid = 0, bpcoMalePending = 0, bpcoFemalePending = 0;
+      let bpbpMalePaid = 0, bpbpFemalePaid = 0, bpbpMalePending = 0, bpbpFemalePending = 0;
+      let brgyMalePaid = 0, brgyFemalePaid = 0, brgyMalePending = 0, brgyFemalePending = 0;
       
       lgu.monthlyResults.forEach((m: any) => {
-        // Combined totals
-        paidMale += (m.bpMalePaid ?? 0) + (m.wpMalePaid ?? 0);
-        paidFemale += (m.bpFemalePaid ?? 0) + (m.wpFemalePaid ?? 0);
-        pendingMale += (m.bpMalePending ?? 0) + (m.wpMalePending ?? 0);
-        pendingFemale += (m.bpFemalePending ?? 0) + (m.wpFemalePending ?? 0);
-        
         // Module-specific totals
         bpMalePaid += m.bpMalePaid ?? 0;
         bpFemalePaid += m.bpFemalePaid ?? 0;
@@ -760,6 +716,56 @@ const bpcoChartData: any = useMemo(() => {
         wpFemalePaid += m.wpFemalePaid ?? 0;
         wpMalePending += m.wpMalePending ?? 0;
         wpFemalePending += m.wpFemalePending ?? 0;
+
+        bpcoMalePaid += m.bpcoMalePaid ?? 0;
+        bpcoFemalePaid += m.bpcoFemalePaid ?? 0;
+        bpcoMalePending += m.bpcoMalePending ?? 0;
+        bpcoFemalePending += m.bpcoFemalePending ?? 0;
+
+        bpbpMalePaid += m.bpbpMalePaid ?? 0;
+        bpbpFemalePaid += m.bpbpFemalePaid ?? 0;
+        bpbpMalePending += m.bpbpMalePending ?? 0;
+        bpbpFemalePending += m.bpbpFemalePending ?? 0;
+
+        // BRGY data only has totalCount, no gender breakdown
+        brgyMalePaid += 0; // BRGY doesn't have gender data
+        brgyFemalePaid += 0; // BRGY doesn't have gender data
+        brgyMalePending += 0; // BRGY doesn't have gender data
+        brgyFemalePending += 0; // BRGY doesn't have gender data
+
+        // Combined totals - only include selected modules
+        if (data.modules?.includes("Business Permit")) {
+          paidMale += m.bpMalePaid ?? 0;
+          paidFemale += m.bpFemalePaid ?? 0;
+          pendingMale += m.bpMalePending ?? 0;
+          pendingFemale += m.bpFemalePending ?? 0;
+        }
+        if (data.modules?.includes("Working Permit")) {
+          paidMale += m.wpMalePaid ?? 0;
+          paidFemale += m.wpFemalePaid ?? 0;
+          pendingMale += m.wpMalePending ?? 0;
+          pendingFemale += m.wpFemalePending ?? 0;
+        }
+        if (data.modules?.includes("Certificate of Occupancy")) {
+          paidMale += m.bpcoMalePaid ?? 0;
+          paidFemale += m.bpcoFemalePaid ?? 0;
+          pendingMale += m.bpcoMalePending ?? 0;
+          pendingFemale += m.bpcoFemalePending ?? 0;
+        }
+        if (data.modules?.includes("Building Permit")) {
+          paidMale += m.bpbpMalePaid ?? 0;
+          paidFemale += m.bpbpFemalePaid ?? 0;
+          pendingMale += m.bpbpMalePending ?? 0;
+          pendingFemale += m.bpbpFemalePending ?? 0;
+        }
+        if (data.modules?.includes("Barangay Clearance")) {
+          // BRGY data doesn't have gender breakdown, so we don't add to paidMale/paidFemale
+          // The totalCount from BRGY will be handled separately in the card calculations
+          paidMale += 0; // BRGY doesn't have gender data
+          paidFemale += 0; // BRGY doesn't have gender data
+          pendingMale += 0; // BRGY doesn't have pending data
+          pendingFemale += 0; // BRGY doesn't have pending data
+        }
       });
       return {
         name: lgu.lgu,
@@ -776,9 +782,21 @@ const bpcoChartData: any = useMemo(() => {
         wpFemalePaid,
         wpMalePending,
         wpFemalePending,
+        bpcoMalePaid,
+        bpcoFemalePaid,
+        bpcoMalePending,
+        bpcoFemalePending,
+        bpbpMalePaid,
+        bpbpFemalePaid,
+        bpbpMalePending,
+        bpbpFemalePending,
+        brgyMalePaid,
+        brgyFemalePaid,
+        brgyMalePending,
+        brgyFemalePending,
       };
     });
-  }, [data, transactionData]);
+  }, [data, transactionData, data.modules]);
 
 const chartData3 = useMemo(() => {
   if (!transactionData || !transactionData.results) return [];
@@ -797,18 +815,14 @@ const chartData3 = useMemo(() => {
     let bpRenewPaid = 0, bpRenewPending = 0, bpRenewPaidViaEgov = 0, bpRenewPaidLinkBiz = 0;
     let wpNewPaid = 0, wpNewPending = 0, wpNewPaidViaEgov = 0, wpNewPaidLinkBiz = 0;
     let wpRenewPaid = 0, wpRenewPending = 0, wpRenewPaidViaEgov = 0, wpRenewPaidLinkBiz = 0;
+    let bpcoNewPaid = 0, bpcoNewPending = 0, bpcoNewPaidViaEgov = 0, bpcoNewPaidLinkBiz = 0;
+    let bpcoRenewPaid = 0, bpcoRenewPending = 0, bpcoRenewPaidViaEgov = 0, bpcoRenewPaidLinkBiz = 0;
+    let bpbpNewPaid = 0, bpbpNewPending = 0, bpbpNewPaidViaEgov = 0, bpbpNewPaidLinkBiz = 0;
+    let bpbpRenewPaid = 0, bpbpRenewPending = 0, bpbpRenewPaidViaEgov = 0, bpbpRenewPaidLinkBiz = 0;
+    let brgyNewPaid = 0, brgyNewPending = 0, brgyNewPaidViaEgov = 0, brgyNewPaidLinkBiz = 0;
+    let brgyRenewPaid = 0, brgyRenewPending = 0, brgyRenewPaidViaEgov = 0, brgyRenewPaidLinkBiz = 0;
     
     lgu.monthlyResults.forEach((m: any) => {
-      // Combined totals
-      newPaid += (m.bpNewPaid ?? 0) + (m.wpNewPaid ?? 0);
-      newPending += (m.bpNewPending ?? 0) + (m.wpNewPending ?? 0);
-      newPaidViaEgov += (m.bpNewPaidViaEgov ?? 0) + (m.wpNewPaidViaEgov ?? 0);
-      newPaidLinkBiz += (m.bpNewPaidLinkBiz ?? 0) + (m.wpNewPaidLinkBiz ?? 0);
-      renewPaid += (m.bpRenewPaid ?? 0) + (m.wpRenewPaid ?? 0);
-      renewPending += (m.bpRenewPending ?? 0) + (m.wpRenewPending ?? 0);
-      renewPaidViaEgov += (m.bpRenewPaidViaEgov ?? 0) + (m.wpRenewPaidViaEgov ?? 0);
-      renewPaidLinkBiz += (m.bpRenewPaidLinkBiz ?? 0) + (m.wpRenewPaidLinkBiz ?? 0);
-
       // Module-specific totals
       bpNewPaid += m.bpNewPaid ?? 0;
       bpNewPending += m.bpNewPending ?? 0;
@@ -827,6 +841,86 @@ const chartData3 = useMemo(() => {
       wpRenewPending += m.wpRenewPending ?? 0;
       wpRenewPaidViaEgov += m.wpRenewPaidViaEgov ?? 0;
       wpRenewPaidLinkBiz += m.wpRenewPaidLinkBiz ?? 0;
+
+      bpcoNewPaid += m.bpcoNewPaid ?? 0;
+      bpcoNewPending += m.bpcoNewPending ?? 0;
+      bpcoNewPaidViaEgov += m.bpcoNewPaidViaEgov ?? 0;
+      bpcoNewPaidLinkBiz += m.bpcoNewPaidLinkBiz ?? 0;
+      bpcoRenewPaid += m.bpcoRenewPaid ?? 0;
+      bpcoRenewPending += m.bpcoRenewPending ?? 0;
+      bpcoRenewPaidViaEgov += m.bpcoRenewPaidViaEgov ?? 0;
+      bpcoRenewPaidLinkBiz += m.bpcoRenewPaidLinkBiz ?? 0;
+
+      bpbpNewPaid += m.bpbpNewPaid ?? 0;
+      bpbpNewPending += m.bpbpNewPending ?? 0;
+      bpbpNewPaidViaEgov += m.bpbpNewPaidViaEgov ?? 0;
+      bpbpNewPaidLinkBiz += m.bpbpNewPaidLinkBiz ?? 0;
+      bpbpRenewPaid += m.bpbpRenewPaid ?? 0;
+      bpbpRenewPending += m.bpbpRenewPending ?? 0;
+      bpbpRenewPaidViaEgov += m.bpbpRenewPaidViaEgov ?? 0;
+      bpbpRenewPaidLinkBiz += m.bpbpRenewPaidLinkBiz ?? 0;
+
+      // BRGY data only has totalCount, map to newPaid
+      brgyNewPaid += m.totalCount ?? 0; // Map totalCount to newPaid for BRGY
+      brgyNewPending += 0; // BRGY doesn't have pending data
+      brgyNewPaidViaEgov += 0; // BRGY doesn't have eGov data
+      brgyNewPaidLinkBiz += 0; // BRGY doesn't have linkBiz data
+      brgyRenewPaid += 0; // BRGY doesn't have renew data
+      brgyRenewPending += 0; // BRGY doesn't have renew pending data
+      brgyRenewPaidViaEgov += 0; // BRGY doesn't have renew eGov data
+      brgyRenewPaidLinkBiz += 0; // BRGY doesn't have renew linkBiz data
+
+      // Combined totals - only include selected modules
+      if (data.modules?.includes("Business Permit")) {
+        newPaid += m.bpNewPaid ?? 0;
+        newPending += m.bpNewPending ?? 0;
+        newPaidViaEgov += m.bpNewPaidViaEgov ?? 0;
+        newPaidLinkBiz += m.bpNewPaidLinkBiz ?? 0;
+        renewPaid += m.bpRenewPaid ?? 0;
+        renewPending += m.bpRenewPending ?? 0;
+        renewPaidViaEgov += m.bpRenewPaidViaEgov ?? 0;
+        renewPaidLinkBiz += m.bpRenewPaidLinkBiz ?? 0;
+      }
+      if (data.modules?.includes("Working Permit")) {
+        newPaid += m.wpNewPaid ?? 0;
+        newPending += m.wpNewPending ?? 0;
+        newPaidViaEgov += m.wpNewPaidViaEgov ?? 0;
+        newPaidLinkBiz += m.wpNewPaidLinkBiz ?? 0;
+        renewPaid += m.wpRenewPaid ?? 0;
+        renewPending += m.wpRenewPending ?? 0;
+        renewPaidViaEgov += m.wpRenewPaidViaEgov ?? 0;
+        renewPaidLinkBiz += m.wpRenewPaidLinkBiz ?? 0;
+      }
+      if (data.modules?.includes("Certificate of Occupancy")) {
+        newPaid += m.bpcoNewPaid ?? 0;
+        newPending += m.bpcoNewPending ?? 0;
+        newPaidViaEgov += m.bpcoNewPaidViaEgov ?? 0;
+        newPaidLinkBiz += m.bpcoNewPaidLinkBiz ?? 0;
+        renewPaid += m.bpcoRenewPaid ?? 0;
+        renewPending += m.bpcoRenewPending ?? 0;
+        renewPaidViaEgov += m.bpcoRenewPaidViaEgov ?? 0;
+        renewPaidLinkBiz += m.bpcoRenewPaidLinkBiz ?? 0;
+      }
+      if (data.modules?.includes("Building Permit")) {
+        newPaid += m.bpbpNewPaid ?? 0;
+        newPending += m.bpbpNewPending ?? 0;
+        newPaidViaEgov += m.bpbpNewPaidViaEgov ?? 0;
+        newPaidLinkBiz += m.bpbpNewPaidLinkBiz ?? 0;
+        renewPaid += m.bpbpRenewPaid ?? 0;
+        renewPending += m.bpbpRenewPending ?? 0;
+        renewPaidViaEgov += m.bpbpRenewPaidViaEgov ?? 0;
+        renewPaidLinkBiz += m.bpbpRenewPaidLinkBiz ?? 0;
+      }
+      if (data.modules?.includes("Barangay Clearance")) {
+        newPaid += m.totalCount ?? 0; // Map totalCount to newPaid for BRGY
+        newPending += 0; // BRGY doesn't have pending data
+        newPaidViaEgov += 0; // BRGY doesn't have eGov data
+        newPaidLinkBiz += 0; // BRGY doesn't have linkBiz data
+        renewPaid += 0; // BRGY doesn't have renew data
+        renewPending += 0; // BRGY doesn't have renew pending data
+        renewPaidViaEgov += 0; // BRGY doesn't have renew eGov data
+        renewPaidLinkBiz += 0; // BRGY doesn't have renew linkBiz data
+      }
     });
 
     return {
@@ -856,9 +950,33 @@ const chartData3 = useMemo(() => {
       wpRenewPending,
       wpRenewPaidViaEgov,
       wpRenewPaidLinkBiz,
+      bpcoNewPaid,
+      bpcoNewPending,
+      bpcoNewPaidViaEgov,
+      bpcoNewPaidLinkBiz,
+      bpcoRenewPaid,
+      bpcoRenewPending,
+      bpcoRenewPaidViaEgov,
+      bpcoRenewPaidLinkBiz,
+      bpbpNewPaid,
+      bpbpNewPending,
+      bpbpNewPaidViaEgov,
+      bpbpNewPaidLinkBiz,
+      bpbpRenewPaid,
+      bpbpRenewPending,
+      bpbpRenewPaidViaEgov,
+      bpbpRenewPaidLinkBiz,
+      brgyNewPaid,
+      brgyNewPending,
+      brgyNewPaidViaEgov,
+      brgyNewPaidLinkBiz,
+      brgyRenewPaid,
+      brgyRenewPending,
+      brgyRenewPaidViaEgov,
+      brgyRenewPaidLinkBiz,
     };
   });
-}, [data, transactionData]);
+}, [data, transactionData, data.modules]);
 
 
   // Filter card statistics by data.municipalities or data.province if present
@@ -908,6 +1026,36 @@ const chartData3 = useMemo(() => {
       wpTotalmalePending: 0,
       wpTotalfemalePaid: 0,
       wpTotalfemalePending: 0,
+      bpcoTotalnewPending: 0,
+      bpcoTotalnewPaid: 0,
+      bpcoTotalnewPaidViaEgov: 0,
+      bpcoTotalrenewPending: 0,
+      bpcoTotalrenewPaid: 0,
+      bpcoTotalrenewPaidViaEgov: 0,
+      bpcoTotalmalePaid: 0,
+      bpcoTotalmalePending: 0,
+      bpcoTotalfemalePaid: 0,
+      bpcoTotalfemalePending: 0,
+      bpbpTotalnewPending: 0,
+      bpbpTotalnewPaid: 0,
+      bpbpTotalnewPaidViaEgov: 0,
+      bpbpTotalrenewPending: 0,
+      bpbpTotalrenewPaid: 0,
+      bpbpTotalrenewPaidViaEgov: 0,
+      bpbpTotalmalePaid: 0,
+      bpbpTotalmalePending: 0,
+      bpbpTotalfemalePaid: 0,
+      bpbpTotalfemalePending: 0,
+      brgyTotalnewPending: 0,
+      brgyTotalnewPaid: 0,
+      brgyTotalnewPaidViaEgov: 0,
+      brgyTotalrenewPending: 0,
+      brgyTotalrenewPaid: 0,
+      brgyTotalrenewPaidViaEgov: 0,
+      brgyTotalmalePaid: 0,
+      brgyTotalmalePending: 0,
+      brgyTotalfemalePaid: 0,
+      brgyTotalfemalePending: 0,
     };
 
     filteredResults.forEach((lgu: any) => {
@@ -935,17 +1083,100 @@ const chartData3 = useMemo(() => {
         const wpFemalePending = m.wpFemalePending ?? 0;
         const wpFemalePaid = m.wpFemalePaid ?? 0;
 
-        // Combined totals
-        totals.totalnewPending += bpNewPending + wpNewPending;
-        totals.totalnewPaid += bpNewPaid + wpNewPaid;
-        totals.totalnewPaidViaEgov += bpNewPaidViaEgov + wpNewPaidViaEgov;
-        totals.totalrenewPending += bpRenewPending + wpRenewPending;
-        totals.totalrenewPaid += bpRenewPaid + wpRenewPaid;
-        totals.totalrenewPaidViaEgov += bpRenewPaidViaEgov + wpRenewPaidViaEgov;
-        totals.totalmalePaid += bpMalePaid + wpMalePaid;
-        totals.totalmalePending += bpMalePending + wpMalePending;
-        totals.totalfemalePaid += bpFemalePaid + wpFemalePaid;
-        totals.totalfemalePending += bpFemalePending + wpFemalePending;
+        const bpcoNewPending = m.bpcoNewPending ?? 0;
+        const bpcoNewPaid = m.bpcoNewPaid ?? 0;
+        const bpcoNewPaidViaEgov = m.bpcoNewPaidViaEgov ?? 0;
+        const bpcoRenewPending = m.bpcoRenewPending ?? 0;
+        const bpcoRenewPaid = m.bpcoRenewPaid ?? 0;
+        const bpcoRenewPaidViaEgov = m.bpcoRenewPaidViaEgov ?? 0;
+        const bpcoMalePending = m.bpcoMalePending ?? 0;
+        const bpcoMalePaid = m.bpcoMalePaid ?? 0;
+        const bpcoFemalePending = m.bpcoFemalePending ?? 0;
+        const bpcoFemalePaid = m.bpcoFemalePaid ?? 0;
+
+        const bpbpNewPending = m.bpbpNewPending ?? 0;
+        const bpbpNewPaid = m.bpbpNewPaid ?? 0;
+        const bpbpNewPaidViaEgov = m.bpbpNewPaidViaEgov ?? 0;
+        const bpbpRenewPending = m.bpbpRenewPending ?? 0;
+        const bpbpRenewPaid = m.bpbpRenewPaid ?? 0;
+        const bpbpRenewPaidViaEgov = m.bpbpRenewPaidViaEgov ?? 0;
+        const bpbpMalePending = m.bpbpMalePending ?? 0;
+        const bpbpMalePaid = m.bpbpMalePaid ?? 0;
+        const bpbpFemalePending = m.bpbpFemalePending ?? 0;
+        const bpbpFemalePaid = m.bpbpFemalePaid ?? 0;
+
+        const brgyNewPending = 0; // BRGY data doesn't have pending field
+        const brgyNewPaid = m.totalCount ?? 0; // Map totalCount to newPaid for BRGY
+        const brgyNewPaidViaEgov = 0; // BRGY data doesn't have eGov field
+        const brgyRenewPending = 0; // BRGY data doesn't have renew pending field
+        const brgyRenewPaid = 0; // BRGY data doesn't have renew paid field
+        const brgyRenewPaidViaEgov = 0; // BRGY data doesn't have renew eGov field
+        const brgyMalePending = 0; // BRGY data doesn't have gender breakdown
+        const brgyMalePaid = 0; // BRGY data doesn't have gender breakdown
+        const brgyFemalePending = 0; // BRGY data doesn't have gender breakdown
+        const brgyFemalePaid = 0; // BRGY data doesn't have gender breakdown
+
+        // Combined totals - only include selected modules
+        if (data.modules?.includes("Business Permit")) {
+          totals.totalnewPending += bpNewPending;
+          totals.totalnewPaid += bpNewPaid;
+          totals.totalnewPaidViaEgov += bpNewPaidViaEgov;
+          totals.totalrenewPending += bpRenewPending;
+          totals.totalrenewPaid += bpRenewPaid;
+          totals.totalrenewPaidViaEgov += bpRenewPaidViaEgov;
+          totals.totalmalePaid += bpMalePaid;
+          totals.totalmalePending += bpMalePending;
+          totals.totalfemalePaid += bpFemalePaid;
+          totals.totalfemalePending += bpFemalePending;
+        }
+        if (data.modules?.includes("Working Permit")) {
+          totals.totalnewPending += wpNewPending;
+          totals.totalnewPaid += wpNewPaid;
+          totals.totalnewPaidViaEgov += wpNewPaidViaEgov;
+          totals.totalrenewPending += wpRenewPending;
+          totals.totalrenewPaid += wpRenewPaid;
+          totals.totalrenewPaidViaEgov += wpRenewPaidViaEgov;
+          totals.totalmalePaid += wpMalePaid;
+          totals.totalmalePending += wpMalePending;
+          totals.totalfemalePaid += wpFemalePaid;
+          totals.totalfemalePending += wpFemalePending;
+        }
+        if (data.modules?.includes("Certificate of Occupancy")) {
+          totals.totalnewPending += bpcoNewPending;
+          totals.totalnewPaid += bpcoNewPaid;
+          totals.totalnewPaidViaEgov += bpcoNewPaidViaEgov;
+          totals.totalrenewPending += bpcoRenewPending;
+          totals.totalrenewPaid += bpcoRenewPaid;
+          totals.totalrenewPaidViaEgov += bpcoRenewPaidViaEgov;
+          totals.totalmalePaid += bpcoMalePaid;
+          totals.totalmalePending += bpcoMalePending;
+          totals.totalfemalePaid += bpcoFemalePaid;
+          totals.totalfemalePending += bpcoFemalePending;
+        }
+        if (data.modules?.includes("Building Permit")) {
+          totals.totalnewPending += bpbpNewPending;
+          totals.totalnewPaid += bpbpNewPaid;
+          totals.totalnewPaidViaEgov += bpbpNewPaidViaEgov;
+          totals.totalrenewPending += bpbpRenewPending;
+          totals.totalrenewPaid += bpbpRenewPaid;
+          totals.totalrenewPaidViaEgov += bpbpRenewPaidViaEgov;
+          totals.totalmalePaid += bpbpMalePaid;
+          totals.totalmalePending += bpbpMalePending;
+          totals.totalfemalePaid += bpbpFemalePaid;
+          totals.totalfemalePending += bpbpFemalePending;
+        }
+        if (data.modules?.includes("Barangay Clearance")) {
+          totals.totalnewPending += brgyNewPending;
+          totals.totalnewPaid += brgyNewPaid;
+          totals.totalnewPaidViaEgov += brgyNewPaidViaEgov;
+          totals.totalrenewPending += brgyRenewPending;
+          totals.totalrenewPaid += brgyRenewPaid;
+          totals.totalrenewPaidViaEgov += brgyRenewPaidViaEgov;
+          totals.totalmalePaid += brgyMalePaid;
+          totals.totalmalePending += brgyMalePending;
+          totals.totalfemalePaid += brgyFemalePaid;
+          totals.totalfemalePending += brgyFemalePending;
+        }
 
         // Module-specific totals
         moduleSpecificTotals.bpTotalnewPending += bpNewPending;
@@ -969,460 +1200,46 @@ const chartData3 = useMemo(() => {
         moduleSpecificTotals.wpTotalmalePending += wpMalePending;
         moduleSpecificTotals.wpTotalfemalePaid += wpFemalePaid;
         moduleSpecificTotals.wpTotalfemalePending += wpFemalePending;
+
+        moduleSpecificTotals.bpcoTotalnewPending += bpcoNewPending;
+        moduleSpecificTotals.bpcoTotalnewPaid += bpcoNewPaid;
+        moduleSpecificTotals.bpcoTotalnewPaidViaEgov += bpcoNewPaidViaEgov;
+        moduleSpecificTotals.bpcoTotalrenewPending += bpcoRenewPending;
+        moduleSpecificTotals.bpcoTotalrenewPaid += bpcoRenewPaid;
+        moduleSpecificTotals.bpcoTotalrenewPaidViaEgov += bpcoRenewPaidViaEgov;
+        moduleSpecificTotals.bpcoTotalmalePaid += bpcoMalePaid;
+        moduleSpecificTotals.bpcoTotalmalePending += bpcoMalePending;
+        moduleSpecificTotals.bpcoTotalfemalePaid += bpcoFemalePaid;
+        moduleSpecificTotals.bpcoTotalfemalePending += bpcoFemalePending;
+
+        moduleSpecificTotals.bpbpTotalnewPending += bpbpNewPending;
+        moduleSpecificTotals.bpbpTotalnewPaid += bpbpNewPaid;
+        moduleSpecificTotals.bpbpTotalnewPaidViaEgov += bpbpNewPaidViaEgov;
+        moduleSpecificTotals.bpbpTotalrenewPending += bpbpRenewPending;
+        moduleSpecificTotals.bpbpTotalrenewPaid += bpbpRenewPaid;
+        moduleSpecificTotals.bpbpTotalrenewPaidViaEgov += bpbpRenewPaidViaEgov;
+        moduleSpecificTotals.bpbpTotalmalePaid += bpbpMalePaid;
+        moduleSpecificTotals.bpbpTotalmalePending += bpbpMalePending;
+        moduleSpecificTotals.bpbpTotalfemalePaid += bpbpFemalePaid;
+        moduleSpecificTotals.bpbpTotalfemalePending += bpbpFemalePending;
+
+        moduleSpecificTotals.brgyTotalnewPending += brgyNewPending;
+        moduleSpecificTotals.brgyTotalnewPaid += brgyNewPaid;
+        moduleSpecificTotals.brgyTotalnewPaidViaEgov += brgyNewPaidViaEgov;
+        moduleSpecificTotals.brgyTotalrenewPending += brgyRenewPending;
+        moduleSpecificTotals.brgyTotalrenewPaid += brgyRenewPaid;
+        moduleSpecificTotals.brgyTotalrenewPaidViaEgov += brgyRenewPaidViaEgov;
+        moduleSpecificTotals.brgyTotalmalePaid += brgyMalePaid;
+        moduleSpecificTotals.brgyTotalmalePending += brgyMalePending;
+        moduleSpecificTotals.brgyTotalfemalePaid += brgyFemalePaid;
+        moduleSpecificTotals.brgyTotalfemalePending += brgyFemalePending;
       });
     });
 
     return { ...card, ...totals, ...moduleSpecificTotals };
-  }, [card, transactionData, data.municipalities, data.province, data.real]);
+  }, [card, transactionData, data.municipalities, data.province, data.real, data.modules]);
 
 
-
-
-
-const regionMap: Record<string, string> = {
-  R1: "region1",
-  R2: "region2",
-  R3: "region3",
-  R4A: "region4a",
-  R4B: "region4b",
-  R5: "region5",
-  R6: "region6",
-  R7: "region7",
-  R8: "region8",
-  R9: "region9",
-  R10: "region10",
-  R11: "region11",
-  R12: "region12",
-  R13: "region13",
-  CAR: "CAR",
-  "BARMM I": "BARMM1",
-  "BARMM II": "BARMM2",
-};
-
-function mapRegion(region: string): string {
-  if (!region) return ''; // Handle undefined/null/empty regions
-  return regionMap[region] || region.toLowerCase().replace(/\s+/g, '');
-}
-
-
-function getWP() {
-    // Cancel previous request if exists
-    if (wpControllerRef.current) {
-      wpControllerRef.current.abort();
-    }
-    
-    // Create new controller
-    wpControllerRef.current = new AbortController();
-
-    // Fetch both 2024 and 2025 data
-    return Promise.all([
-      axios.get('18kaPQlN0_kA9i7YAD-DftbdVPZX35Qf33sVMkw_TcWc/values/WP UR Input', {
-        headers: {
-          Authorization: `Token ${import.meta.env.VITE_TOKEN}`,
-        },
-        signal: wpControllerRef.current.signal
-      }),
-      axios.get('1Po3nyGoTmJ2OLRuYF1GBdfasLfaccRrumaoqIwoF6C0/values/WP UR Input', {
-        headers: {
-          Authorization: `Token ${import.meta.env.VITE_TOKEN}`,
-        },
-        signal: wpControllerRef.current.signal
-      })
-    ]).then((responses) => {
-      const combinedGroupedByMonth: Record<string, Record<string, any>> = {};
-
-      // Process both datasets
-      responses.forEach((response) => {
-        const data = response.data.values;
-        const records = data.slice(3);
-
-        // Map column indexes for easier maintenance
-        const idx = {
-          period: 1,
-          lgu:4,
-          name:13,
-          province:14,
-          dictRo: 18, // Use dictRo as region
-          status: 10, // e.g. "Operational", "Developmental", "Training", "Withdraw"
-        };
-
-        // Group by period and dictRo, and sum statuses
-        records.forEach((row: any) => {
-          const period = row[idx.period];
-          const lgu = row[idx.lgu];
-          const region = mapRegion(row[idx.dictRo]);
-          const name = row[idx.name];
-          const province = row[idx.province];
-          const status = (row[idx.status] || '').toLowerCase();
-
-          if (!period || !lgu || !region) return; // Skip invalid entries
-
-          if (!combinedGroupedByMonth[period]) combinedGroupedByMonth[period] = {};
-          if (!combinedGroupedByMonth[period][lgu]) {
-            combinedGroupedByMonth[period][lgu] = {
-              lgu,
-              period,
-              region,
-              name,
-              province,
-              operational: 0,
-              developmental: 0,
-              withdraw: 0,
-            };
-          }
-
-          // Aggregate data from both years for the same period and LGU
-          if (status.includes('operational')) combinedGroupedByMonth[period][lgu].operational += 1;
-          else if (status.includes('developmental')) combinedGroupedByMonth[period][lgu].developmental += 1;
-          else if (status.includes('withdraw')) combinedGroupedByMonth[period][lgu].withdraw += 1;
-        });
-      });
-
-      // Format result with only essential data to reduce storage size
-      const WP = Object.entries(combinedGroupedByMonth)
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([date, lgus]) => ({
-          date,
-          data: Object.values(lgus).map((item: any) => ({
-            lgu: item.lgu,
-            region: item.region,
-            province: item.province,
-            operational: item.operational,
-            developmental: item.developmental,
-            withdraw: item.withdraw,
-          })),
-        }));
-
-      const result = { WP };
-
-     
-
-      dispatch(setWp({
-        ...wp,
-        WP: result.WP,
-      }));
-      
-    }).catch((error) => {
-      if (error.name !== 'AbortError') { // Don't log aborted requests
-        console.error("Error fetching WP data:", error);
-      }
-    });
-  }
-
-
-function getBRGY() {
-    // Cancel previous request if exists
-    if (brgyControllerRef.current) {
-      brgyControllerRef.current.abort();
-    }
-    
-    // Create new controller
-    brgyControllerRef.current = new AbortController();
-
-    // Fetch both 2024 and 2025 data
-    return Promise.all([
-      axios.get('18kaPQlN0_kA9i7YAD-DftbdVPZX35Qf33sVMkw_TcWc/values/BC UR Input', {
-        headers: {
-          Authorization: `Token ${import.meta.env.VITE_TOKEN}`,
-        },
-        signal: brgyControllerRef.current.signal
-      }),
-      axios.get('1Po3nyGoTmJ2OLRuYF1GBdfasLfaccRrumaoqIwoF6C0/values/BC UR Input', {
-        headers: {
-          Authorization: `Token ${import.meta.env.VITE_TOKEN}`,
-        },
-        signal: brgyControllerRef.current.signal
-      })
-    ]).then((responses) => {
-      const combinedGroupedByMonth: Record<string, Record<string, any>> = {};
-
-      // Process both datasets
-      responses.forEach((response) => {
-        const data = response.data.values;
-        const records = data.slice(3);
-
-        // Map column indexes for easier maintenance
-        const idx = {
-          period: 1,
-          lgu:4,
-          name:13,
-          province:14,
-          dictRo: 18, // Use dictRo as region
-          status: 10, // e.g. "Operational", "Developmental", "Training", "Withdraw"
-        };
-
-        // Group by period and dictRo, and sum statuses
-        records.forEach((row: any) => {
-          const period = row[idx.period];
-          const lgu = row[idx.lgu];
-          const region = mapRegion(row[idx.dictRo]);
-          const name = row[idx.name];
-          const province = row[idx.province];
-          const status = (row[idx.status] || '').toLowerCase();
-
-          if (!period || !lgu || !region) return; // Skip invalid entries
-
-          if (!combinedGroupedByMonth[period]) combinedGroupedByMonth[period] = {};
-          if (!combinedGroupedByMonth[period][lgu]) {
-            combinedGroupedByMonth[period][lgu] = {
-              lgu,
-              period,
-              region,
-              name,
-              province,
-              operational: 0,
-              developmental: 0,
-              withdraw: 0,
-            };
-          }
-
-          // Aggregate data from both years for the same period and LGU
-          if (status.includes('operational')) combinedGroupedByMonth[period][lgu].operational += 1;
-          else if (status.includes('developmental')) combinedGroupedByMonth[period][lgu].developmental += 1;
-          else if (status.includes('withdraw')) combinedGroupedByMonth[period][lgu].withdraw += 1;
-        });
-      });
-
-      // Format result with only essential data to reduce storage size
-      const BRGY = Object.entries(combinedGroupedByMonth)
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([date, lgus]) => ({
-          date,
-          data: Object.values(lgus).map((item: any) => ({
-            lgu: item.lgu,
-            region: item.region,
-            province: item.province,
-            operational: item.operational,
-            developmental: item.developmental,
-            withdraw: item.withdraw,
-          })),
-        }));
-
-      const result = { BRGY };
-
-      
-
-      dispatch(setBrgy({
-        ...brgy,
-        BRGY: result.BRGY,
-      }));
-      
-    }).catch((error) => {
-      if (error.name !== 'AbortError') { // Don't log aborted requests
-        console.error("Error fetching BRGY data:", error);
-      }
-    });
-  }
-
-
-function getBPLS() {
-    // Cancel previous request if exists
-    if (bpControllerRef.current) {
-      bpControllerRef.current.abort();
-    }
-    
-    // Create new controller
-    bpControllerRef.current = new AbortController();
-
-    
-    // Fetch both 2024 and 2025 data
-    return Promise.all([
-      axios.get('18kaPQlN0_kA9i7YAD-DftbdVPZX35Qf33sVMkw_TcWc/values/BP1 UR Input', {
-        headers: {
-          Authorization: `Token ${import.meta.env.VITE_TOKEN}`,
-        },
-        signal: bpControllerRef.current.signal
-      }),
-      axios.get('1Po3nyGoTmJ2OLRuYF1GBdfasLfaccRrumaoqIwoF6C0/values/BP1 UR Input', {
-        headers: {
-          Authorization: `Token ${import.meta.env.VITE_TOKEN}`,
-        },
-        signal: bpControllerRef.current.signal
-      })
-    ]).then((responses) => {
-      const combinedGroupedByMonth: Record<string, Record<string, any>> = {};
-
-      // Process both datasets
-      responses.forEach((response) => {
-        const data = response.data.values;
-        const records = data.slice(3);
-
-        // Map column indexes for easier maintenance
-        const idx = {
-          period: 1,
-          lgu:4,
-          name:13,
-          province:14,
-          dictRo: 19, // Use dictRo as region
-          status: 10, // e.g. "Operational", "Developmental", "Training", "Withdraw"
-        };
-
-        // Group by period and dictRo, and sum statuses
-        records.forEach((row: any) => {
-          const period = row[idx.period];
-          const lgu = row[idx.lgu];
-          const region = mapRegion(row[idx.dictRo]);
-          const name = row[idx.name];
-          const province = row[idx.province];
-          const status = (row[idx.status] || '').toLowerCase();
-
-          if (!period || !lgu || !region) return; // Skip invalid entries
-
-          if (!combinedGroupedByMonth[period]) combinedGroupedByMonth[period] = {};
-          if (!combinedGroupedByMonth[period][lgu]) {
-            combinedGroupedByMonth[period][lgu] = {
-              lgu,
-              period,
-              region,
-              name,
-              province,
-              operational: 0,
-              developmental: 0,
-              withdraw: 0,
-            };
-          }
-
-          // Aggregate data from both years for the same period and LGU
-          if (status.includes('operational')) combinedGroupedByMonth[period][lgu].operational += 1;
-          else if (status.includes('developmental')) combinedGroupedByMonth[period][lgu].developmental += 1;
-          else if (status.includes('withdraw')) combinedGroupedByMonth[period][lgu].withdraw += 1;
-        });
-      });
-
-      // Format result with only essential data to reduce storage size
-      const BP = Object.entries(combinedGroupedByMonth)
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([date, lgus]) => ({
-          date,
-          data: Object.values(lgus).map((item: any) => ({
-            lgu: item.lgu,
-            region: item.region,
-            province: item.province,
-            operational: item.operational,
-            developmental: item.developmental,
-            withdraw: item.withdraw,
-          })),
-        }));
-
-      const result = { BP };
-
-     
-
-      dispatch(setStatus({
-        BP: result.BP,
-      }));
-      
-    }).catch((error) => {
-      if (error.name !== 'AbortError') { // Don't log aborted requests
-        console.error("Error fetching BP data:", error);
-      }
-    });
-  }
-
-
-function getBPCO(){
-  // Cancel previous request if exists
-  if (bpcoControllerRef.current) {
-    bpcoControllerRef.current.abort();
-  }
-  
-  // Create new controller
-  bpcoControllerRef.current = new AbortController();
-
-  // Fetch both 2024 and 2025 data
-  return Promise.all([
-    axios.get('18kaPQlN0_kA9i7YAD-DftbdVPZX35Qf33sVMkw_TcWc/values/BPCO UR Input', {
-      headers: {
-        Authorization: `Token ${import.meta.env.VITE_TOKEN}`,
-      },
-      signal: bpcoControllerRef.current.signal
-    }),
-    axios.get('1Po3nyGoTmJ2OLRuYF1GBdfasLfaccRrumaoqIwoF6C0/values/BPCO UR Input', {
-      headers: {
-        Authorization: `Token ${import.meta.env.VITE_TOKEN}`,
-      },
-      signal: bpcoControllerRef.current.signal
-    })
-  ]).then((responses) => {
-    const combinedGroupedByMonth: Record<string, Record<string, any>> = {};
-
-    // Process both datasets
-    responses.forEach((response) => {
-      const data = response.data.values;
-      const records = data.slice(3);
-
-      // Map column indexes for easier maintenance
-      const idx = {
-        period: 1,
-        lgu:4,
-        name:13,
-        province:14,
-        dictRo: 18, // Use dictRo as region
-        status: 10, // e.g. "Operational", "Developmental", "Training", "Withdraw"
-      };
-
-      // Group by period and dictRo, and sum statuses
-      records.forEach((row: any) => {
-        const period = row[idx.period];
-        const lgu = row[idx.lgu];
-        const region = mapRegion(row[idx.dictRo]);
-        const name = row[idx.name];
-        const province = row[idx.province];
-        const status = (row[idx.status] || '').toLowerCase();
-
-        if (!period || !lgu || !region) return; // Skip invalid entries
-
-        if (!combinedGroupedByMonth[period]) combinedGroupedByMonth[period] = {};
-        if (!combinedGroupedByMonth[period][lgu]) {
-          combinedGroupedByMonth[period][lgu] = {
-            lgu,
-            period,
-            region,
-            name,
-            province,
-            operational: 0,
-            developmental: 0,
-            withdraw: 0,
-          };
-        }
-
-        // Aggregate data from both years for the same period and LGU
-        if (status.includes('operational')) combinedGroupedByMonth[period][lgu].operational += 1;
-        else if (status.includes('developmental')) combinedGroupedByMonth[period][lgu].developmental += 1;
-        else if (status.includes('withdraw')) combinedGroupedByMonth[period][lgu].withdraw += 1;
-      });
-    });
-
-    // Format result with only essential data to reduce storage size
-    const BPCO = Object.entries(combinedGroupedByMonth)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, lgus]) => ({
-        date,
-        data: Object.values(lgus).map((item: any) => ({
-          lgu: item.lgu,
-          region: item.region,
-          province: item.province,
-          operational: item.operational,
-          developmental: item.developmental,
-          withdraw: item.withdraw,
-        })),
-      }));
-
-    const result = { BPCO };
-
- 
-
-    dispatch(setStatus({
-      BPCO: result.BPCO,
-    }));
-    
-   
-  }).catch((error) => {
-    if (error.name !== 'AbortError') { // Don't log aborted requests
-      console.error("Error fetching BPCO data:", error);
-    }
-  });
-}
 
 
 
@@ -1449,41 +1266,13 @@ function getBPCO(){
     //   // console.log("Barangay Clearance module is enabled");
     //   getBRGY();
     // }
-    // if (data.modules?.includes("Building Permit & Certificate of Occupancy")) {
+    // if (data.modules?.includes("Building Permit","Certificate of Occupancy")) {
     //   // console.log("Building Permit & Certificate of Occupancy module is enabled");
     //   getBPCO();
     // }
     
-
 useEffect(() => {
-    // Sequential loading with delay to optimize resource usage
-    const loadModulesSequentially = async () => {
-      // Set loading to true at the start
-      dispatch(setLoad2(true));
-      
-      // Small delay to prevent overwhelming the system
-      const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-      
-      try {
-        await getBPLS();
-        await delay(500); // 500ms delay after BPLS
-        
-        await getWP();
-        await delay(500); // 500ms delay after WP
-        
-        await getBRGY();
-        await delay(500); // 500ms delay after BRGY
-        
-        await getBPCO();
-      } catch (error) {
-        console.error("Error in sequential loading:", error);
-      } finally {
-        // Always set loading to false at the end
-        dispatch(setLoad2(false));
-      }
-    };
-
-    loadModulesSequentially();
+    // Sequential loading moved to Admin.tsx
   }, []);
 
 
@@ -1568,6 +1357,24 @@ const scrollToStatusChart = () => {
             (filteredCard?.wpTotalrenewPending ?? 0) +
             (filteredCard?.wpTotalrenewPaid ?? 0)
           }
+          bpcoValue={
+            (filteredCard?.bpcoTotalnewPending ?? 0) +
+            (filteredCard?.bpcoTotalnewPaid ?? 0) +
+            (filteredCard?.bpcoTotalrenewPending ?? 0) +
+            (filteredCard?.bpcoTotalrenewPaid ?? 0)
+          }
+          bpbpValue={
+            (filteredCard?.bpbpTotalnewPending ?? 0) +
+            (filteredCard?.bpbpTotalnewPaid ?? 0) +
+            (filteredCard?.bpbpTotalrenewPending ?? 0) +
+            (filteredCard?.bpbpTotalrenewPaid ?? 0)
+          }
+          brgyValue={
+            (filteredCard?.brgyTotalnewPending ?? 0) +
+            (filteredCard?.brgyTotalnewPaid ?? 0) +
+            (filteredCard?.brgyTotalrenewPending ?? 0) +
+            (filteredCard?.brgyTotalrenewPaid ?? 0)
+          }
           showInfo={`total no. of transaction on ${formatList(data?.modules)} as of ${data.startDate} - ${data.endDate}`}
           />
           <StatisticCard 
@@ -1575,6 +1382,9 @@ const scrollToStatusChart = () => {
             value={(filteredCard?.totalmalePaid ?? 0) + (filteredCard?.totalmalePending ?? 0)}
             bpValue={(filteredCard?.bpTotalmalePaid ?? 0) + (filteredCard?.bpTotalmalePending ?? 0)}
             wpValue={(filteredCard?.wpTotalmalePaid ?? 0) + (filteredCard?.wpTotalmalePending ?? 0)}
+            bpcoValue={(filteredCard?.bpcoTotalmalePaid ?? 0) + (filteredCard?.bpcoTotalmalePending ?? 0)}
+            bpbpValue={(filteredCard?.bpbpTotalmalePaid ?? 0) + (filteredCard?.bpbpTotalmalePending ?? 0)}
+            brgyValue={(filteredCard?.brgyTotalmalePaid ?? 0) + (filteredCard?.brgyTotalmalePending ?? 0)}
             showInfo={`total no. of male applicants on ${formatList(data?.modules)} as of ${data.startDate} - ${data.endDate}`}
           />
           <StatisticCard 
@@ -1582,6 +1392,9 @@ const scrollToStatusChart = () => {
             value={(filteredCard?.totalfemalePaid ?? 0) + (filteredCard?.totalfemalePending ?? 0)}
             bpValue={(filteredCard?.bpTotalfemalePaid ?? 0) + (filteredCard?.bpTotalfemalePending ?? 0)}
             wpValue={(filteredCard?.wpTotalfemalePaid ?? 0) + (filteredCard?.wpTotalfemalePending ?? 0)}
+            bpcoValue={(filteredCard?.bpcoTotalfemalePaid ?? 0) + (filteredCard?.bpcoTotalfemalePending ?? 0)}
+            bpbpValue={(filteredCard?.bpbpTotalfemalePaid ?? 0) + (filteredCard?.bpbpTotalfemalePending ?? 0)}
+            brgyValue={(filteredCard?.brgyTotalfemalePaid ?? 0) + (filteredCard?.brgyTotalfemalePending ?? 0)}
             showInfo={`total no. of female applicants on ${formatList(data?.modules)} as of ${data.startDate} - ${data.endDate}`}
           />
           <StatisticCard 
@@ -1589,6 +1402,9 @@ const scrollToStatusChart = () => {
             value={(filteredCard?.totalrenewPaidViaEgov ?? 0) + (filteredCard?.totalnewPaidViaEgov ?? 0)}
             bpValue={(filteredCard?.bpTotalrenewPaidViaEgov ?? 0) + (filteredCard?.bpTotalnewPaidViaEgov ?? 0)}
             wpValue={(filteredCard?.wpTotalrenewPaidViaEgov ?? 0) + (filteredCard?.wpTotalnewPaidViaEgov ?? 0)}
+            bpcoValue={(filteredCard?.bpcoTotalrenewPaidViaEgov ?? 0) + (filteredCard?.bpcoTotalnewPaidViaEgov ?? 0)}
+            bpbpValue={(filteredCard?.bpbpTotalrenewPaidViaEgov ?? 0) + (filteredCard?.bpbpTotalnewPaidViaEgov ?? 0)}
+            brgyValue={(filteredCard?.brgyTotalrenewPaidViaEgov ?? 0) + (filteredCard?.brgyTotalnewPaidViaEgov ?? 0)}
             showInfo={`total no. of eGovPay transactions on ${formatList(data?.modules)} as of ${data.startDate} - ${data.endDate}`}
           />
           <StatisticCard 
@@ -1608,6 +1424,21 @@ const scrollToStatusChart = () => {
               - (((filteredCard?.wpTotalmalePaid ?? 0) + (filteredCard?.wpTotalmalePending ?? 0)) + ((filteredCard?.wpTotalfemalePaid ?? 0) + (filteredCard?.wpTotalfemalePending ?? 0))) < 0 ? 0 : ((filteredCard?.wpTotalnewPending ?? 0) + (filteredCard?.wpTotalnewPaid ?? 0) + (filteredCard?.wpTotalrenewPending ?? 0) + (filteredCard?.wpTotalrenewPaid ?? 0))
               - (((filteredCard?.wpTotalmalePaid ?? 0) + (filteredCard?.wpTotalmalePending ?? 0)) + ((filteredCard?.wpTotalfemalePaid ?? 0) + (filteredCard?.wpTotalfemalePending ?? 0)))
             }
+            bpcoValue={
+              ((filteredCard?.bpcoTotalnewPending ?? 0) + (filteredCard?.bpcoTotalnewPaid ?? 0) + (filteredCard?.bpcoTotalrenewPending ?? 0) + (filteredCard?.bpcoTotalrenewPaid ?? 0))
+              - (((filteredCard?.bpcoTotalmalePaid ?? 0) + (filteredCard?.bpcoTotalmalePending ?? 0)) + ((filteredCard?.bpcoTotalfemalePaid ?? 0) + (filteredCard?.bpcoTotalfemalePending ?? 0))) < 0 ? 0 : ((filteredCard?.bpcoTotalnewPending ?? 0) + (filteredCard?.bpcoTotalnewPaid ?? 0) + (filteredCard?.bpcoTotalrenewPending ?? 0) + (filteredCard?.bpcoTotalrenewPaid ?? 0))
+              - (((filteredCard?.bpcoTotalmalePaid ?? 0) + (filteredCard?.bpcoTotalmalePending ?? 0)) + ((filteredCard?.bpcoTotalfemalePaid ?? 0) + (filteredCard?.bpcoTotalfemalePending ?? 0)))
+            }
+            bpbpValue={
+              ((filteredCard?.bpbpTotalnewPending ?? 0) + (filteredCard?.bpbpTotalnewPaid ?? 0) + (filteredCard?.bpbpTotalrenewPending ?? 0) + (filteredCard?.bpbpTotalrenewPaid ?? 0))
+              - (((filteredCard?.bpbpTotalmalePaid ?? 0) + (filteredCard?.bpbpTotalmalePending ?? 0)) + ((filteredCard?.bpbpTotalfemalePaid ?? 0) + (filteredCard?.bpbpTotalfemalePending ?? 0))) < 0 ? 0 : ((filteredCard?.bpbpTotalnewPending ?? 0) + (filteredCard?.bpbpTotalnewPaid ?? 0) + (filteredCard?.bpbpTotalrenewPending ?? 0) + (filteredCard?.bpbpTotalrenewPaid ?? 0))
+              - (((filteredCard?.bpbpTotalmalePaid ?? 0) + (filteredCard?.bpbpTotalmalePending ?? 0)) + ((filteredCard?.bpbpTotalfemalePaid ?? 0) + (filteredCard?.bpbpTotalfemalePending ?? 0)))
+            }
+            brgyValue={
+              ((filteredCard?.brgyTotalnewPending ?? 0) + (filteredCard?.brgyTotalnewPaid ?? 0) + (filteredCard?.brgyTotalrenewPending ?? 0) + (filteredCard?.brgyTotalrenewPaid ?? 0))
+              - (((filteredCard?.brgyTotalmalePaid ?? 0) + (filteredCard?.brgyTotalmalePending ?? 0)) + ((filteredCard?.brgyTotalfemalePaid ?? 0) + (filteredCard?.brgyTotalfemalePending ?? 0))) < 0 ? 0 : ((filteredCard?.brgyTotalnewPending ?? 0) + (filteredCard?.brgyTotalnewPaid ?? 0) + (filteredCard?.brgyTotalrenewPending ?? 0) + (filteredCard?.brgyTotalrenewPaid ?? 0))
+              - (((filteredCard?.brgyTotalmalePaid ?? 0) + (filteredCard?.brgyTotalmalePending ?? 0)) + ((filteredCard?.brgyTotalfemalePaid ?? 0) + (filteredCard?.brgyTotalfemalePending ?? 0)))
+            }
             showInfo={`calculated non-binary applicants on ${formatList(data?.modules)} as of ${data.startDate} - ${data.endDate}`}
           />
         </div>
@@ -1626,7 +1457,7 @@ const scrollToStatusChart = () => {
       {(data.modules?.includes("Business Permit") || 
         data.modules?.includes("Working Permit") || 
         data.modules?.includes("Barangay Clearance") ||
-        data.modules?.includes("Building Permit & Certificate of Occupancy")) && (
+        data.modules?.includes("Building Permit") || data.modules?.includes("Certificate of Occupancy")) && (
         <StatusChartComponent 
           data={[]} // Not used anymore
           raw={null} // Not used anymore
@@ -1634,10 +1465,12 @@ const scrollToStatusChart = () => {
           wpData={wpChartData?.current || []}
           brgyData={brgyChartData?.current || []}
           bpcoData={bpcoChartData?.current || []}
+          bpbpData={bpbpChartData?.current || []}
           bpRaw={bpChartData?.breakdown || []}
           wpRaw={wpChartData?.breakdown || []}
           brgyRaw={brgyChartData?.breakdown || []}
           bpcoRaw={bpcoChartData?.breakdown || []}
+          bpbpRaw={bpbpChartData?.breakdown || []}
           modules={data.modules || []}
           title="Operational vs. Developmental vs. Withdrawal (All Modules)"
           period={`${data.startDate} - ${data.endDate}`}

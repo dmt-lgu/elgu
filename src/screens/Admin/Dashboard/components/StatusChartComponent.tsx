@@ -42,10 +42,12 @@ interface BarChartProps {
   wpData?: any[];
   brgyData?: any[];
   bpcoData?: any[];
+  bpbpData?: any[];
   bpRaw?: any[];
   wpRaw?: any[];
   brgyRaw?: any[];
   bpcoRaw?: any[];
+  bpbpRaw?: any[];
   modules?: string[];
   loading?: boolean;
 }
@@ -84,10 +86,12 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
   wpData = [],
   brgyData = [],
   bpcoData = [],
+  bpbpData = [],
   bpRaw = [],
   wpRaw = [],
   brgyRaw = [],
   bpcoRaw = [],
+  bpbpRaw = [],
   modules = [],
   loading
 }) => {
@@ -162,9 +166,23 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
       });
     }
 
-    // Add Building Permit & Certificate of Occupancy data
-    if (modules.includes("Building Permit & Certificate of Occupancy")) {
+    // Add Certificate of Occupancy data
+    if (modules.includes("Certificate of Occupancy")) {
       bpcoData.forEach(item => {
+        const key = item.name;
+        if (!combined.has(key)) {
+          combined.set(key, { operational: 0, developmental: 0, withdraw: 0 });
+        }
+        const entry = combined.get(key)!;
+        entry.operational += Number(item.operational) || 0;
+        entry.developmental += Number(item.developmental) || 0;
+        entry.withdraw += Number(item.withdraw) || 0;
+      });
+    }
+
+    // Add Building Permit data
+    if (modules.includes("Building Permit")) {
+      bpbpData.forEach(item => {
         const key = item.name;
         if (!combined.has(key)) {
           combined.set(key, { operational: 0, developmental: 0, withdraw: 0 });
@@ -180,7 +198,7 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
       name,
       ...values,
     }));
-  }, [bpData, wpData, brgyData, bpcoData, modules]);
+  }, [bpData, wpData, brgyData, bpcoData, bpbpData, modules]);
 
   // Get selected modules data for breakdown (combine multiple selections)
   const getSelectedModulesData = () => {
@@ -208,9 +226,13 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
           moduleData = brgyData;
           moduleRaw = brgyRaw;
           break;
-        case 'Building Permit & Certificate of Occupancy':
+        case 'Certificate of Occupancy':
           moduleData = bpcoData;
           moduleRaw = bpcoRaw;
+          break;
+        case 'Building Permit':
+          moduleData = bpbpData;
+          moduleRaw = bpbpRaw;
           break;
       }
 
@@ -562,9 +584,7 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
                 const values = selectedOptions ? selectedOptions.map((option: any) => option.value) : [];
                 setSelectedModules(values);
               }}
-              options={modules.filter(module => 
-                ['Business Permit', 'Working Permit', 'Barangay Clearance', 'Building Permit & Certificate of Occupancy'].includes(module)
-              ).map(module => ({ value: module, label: module }))}
+              options={['Business Permit', 'Working Permit', 'Barangay Clearance', 'Building Permit & Certificate of Occupancy'].map(module => ({ value: module, label: module }))}
               placeholder="Choose modules to analyze..."
               className="text-sm"
               classNamePrefix="react-select"

@@ -67,6 +67,16 @@ const ModuleFilter: React.FC<ModuleFilterProps> = ({
               {data.modules?.includes("Working Permit") && (
                 <option value="Working Permit">Working Permit</option>
               )}
+              {data.modules?.includes("Building Permit") && (
+                <option value="Building Permit">Building Permit</option>
+              )}
+               {data.modules?.includes("Certificate of Occupancy") && (
+                <option value="Certificate of Occupancy">Certificate of Occupancy</option>
+              )}
+              {data.modules?.includes("Barangay Clearance") && (
+                <option value="Barangay Clearance">Barangay Clearance</option>
+              )}
+
             </select>
             <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
               <ChevronDown className="w-4 h-4 text-gray-400" />

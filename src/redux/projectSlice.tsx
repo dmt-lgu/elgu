@@ -7,7 +7,8 @@ interface RegionState {
 const initialState: RegionState = {
   value: [
     "Business Permit",
-    "Building Permit & Certificate of Occupancy",
+    "Building Permit",
+    "Certificate of Occupancy",
     "Working Permit",
     "Barangay Clearance",
   ], // Initial empty list of regions

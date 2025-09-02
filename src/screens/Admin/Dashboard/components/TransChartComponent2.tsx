@@ -92,14 +92,39 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
           pendingMale: item.wpMalePending || 0,
           pendingFemale: item.wpFemalePending || 0,
         };
-      } else {
-        // All modules - combine BP and WP data
+      } else if (moduleFilter === 'Certificate of Occupancy') {
         return {
           name: item.name,
-          paidMale: (item.bpMalePaid || 0) + (item.wpMalePaid || 0),
-          paidFemale: (item.bpFemalePaid || 0) + (item.wpFemalePaid || 0),
-          pendingMale: (item.bpMalePending || 0) + (item.wpMalePending || 0),
-          pendingFemale: (item.bpFemalePending || 0) + (item.wpFemalePending || 0),
+          paidMale: item.bpcoMalePaid || 0,
+          paidFemale: item.bpcoFemalePaid || 0,
+          pendingMale: item.bpcoMalePending || 0,
+          pendingFemale: item.bpcoFemalePending || 0,
+        };
+      } else if (moduleFilter === 'Building Permit') {
+        return {
+          name: item.name,
+          paidMale: item.bpbpMalePaid || 0,
+          paidFemale: item.bpbpFemalePaid || 0,
+          pendingMale: item.bpbpMalePending || 0,
+          pendingFemale: item.bpbpFemalePending || 0,
+        };
+      } else if (moduleFilter === 'Barangay Clearance') {
+        // BRGY data doesn't have gender breakdown, so all values are 0
+        return {
+          name: item.name,
+          paidMale: item.brgyMalePaid || 0,  // Always 0 for BRGY
+          paidFemale: item.brgyFemalePaid || 0,  // Always 0 for BRGY
+          pendingMale: item.brgyMalePending || 0,  // Always 0 for BRGY
+          pendingFemale: item.brgyFemalePending || 0,  // Always 0 for BRGY
+        };
+      } else {
+        // All modules - combine BP, WP, BPCO, BPBP and BRGY data
+        return {
+          name: item.name,
+          paidMale: (item.bpMalePaid || 0) + (item.wpMalePaid || 0) + (item.bpcoMalePaid || 0) + (item.bpbpMalePaid || 0) + (item.brgyMalePaid || 0),
+          paidFemale: (item.bpFemalePaid || 0) + (item.wpFemalePaid || 0) + (item.bpcoFemalePaid || 0) + (item.bpbpFemalePaid || 0) + (item.brgyFemalePaid || 0),
+          pendingMale: (item.bpMalePending || 0) + (item.wpMalePending || 0) + (item.bpcoMalePending || 0) + (item.bpbpMalePending || 0) + (item.brgyMalePending || 0),
+          pendingFemale: (item.bpFemalePending || 0) + (item.wpFemalePending || 0) + (item.bpcoFemalePending || 0) + (item.bpbpFemalePending || 0) + (item.brgyFemalePending || 0),
         };
       }
     });
@@ -147,7 +172,7 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
         hidden: hidden[1],
       },
       {
-        label: 'Pending Male',
+        label: 'Ongoing Male',
         data: processedData.map(item => item.pendingMale),
         backgroundColor: '#DC2626',
         borderColor: '#DC2626',
@@ -155,7 +180,7 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
         hidden: hidden[2],
       },
       {
-        label: 'Pending Female',
+        label: 'Ongoing  Female',
         data: processedData.map(item => item.pendingFemale),
         backgroundColor: '#38BDF8',
         borderColor: '#38BDF8',
@@ -303,6 +328,12 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
                 )}
                 {dataState.modules?.includes("Working Permit") && (
                   <option value="Working Permit">Working Permit</option>
+                )}
+                {dataState.modules?.includes("Certificate of Occupancy") && (
+                  <option value="Certificate of Occupancy">Certificate of Occupancy</option>
+                )}
+                {dataState.modules?.includes("Building Permit") && (
+                  <option value="Building Permit">Building Permit</option>
                 )}
               </select>
             </div>
