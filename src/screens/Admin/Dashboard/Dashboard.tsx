@@ -15,6 +15,7 @@ import { selectStatus } from '@/redux/statusSlice';
 
 import { parseISO, isAfter, isBefore, isEqual } from 'date-fns';
 import StatusChartComponent from './components/StatusChartComponent';
+import ComparisonChartComponent from './components/ComparisonChartComponent';
 import { selectWp } from '@/redux/wpSlice';
 import { selectBrgy } from '@/redux/brgySlice';
 import { selectLoad2 } from '@/redux/loadSlice2';
@@ -1483,6 +1484,32 @@ const scrollToStatusChart = () => {
           modules={data.modules || []}
           title="Operational vs. Developmental vs. Withdrawal (All Modules)"
           period={`${data.startDate} - ${data.endDate}`}
+          loading={loading}
+        />
+      )}
+      </div>
+
+      {/* Date Range Comparison Chart */}
+      <div className="mb-6">
+      {(data.modules?.includes("Business Permit") || 
+        data.modules?.includes("Working Permit") || 
+        data.modules?.includes("Barangay Clearance") ||
+        data.modules?.includes("Building Permit") || data.modules?.includes("Certificate of Occupancy")) && (
+        <ComparisonChartComponent 
+          bpData={bpChartData?.current || []}
+          wpData={wpChartData?.current || []}
+          brgyData={brgyChartData?.current || []}
+          bpcoData={bpcoChartData?.current || []}
+          bpbpData={bpbpChartData?.current || []}
+          bpRaw={bpChartData?.breakdown || []}
+          wpRaw={wpChartData?.breakdown || []}
+          brgyRaw={brgyChartData?.breakdown || []}
+          bpcoRaw={bpcoChartData?.breakdown || []}
+          bpbpRaw={bpbpChartData?.breakdown || []}
+          modules={data.modules || []}
+          title="Date Range Comparison Analysis"
+          startDate={data.startDate}
+          endDate={data.endDate}
           loading={loading}
         />
       )}
