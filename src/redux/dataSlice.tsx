@@ -11,8 +11,8 @@ const initialState: DataState = {
   "selectedStatusModuleFilter": "All", // New field for status module filtering
   "selectedChartFilter_renew": "All", // Chart-specific filter for renew chart
   "selectedChartFilter_gender": "All", // Chart-specific filter for gender chart
-  "selectedCardModuleFilter": "All", // New field for card module filtering
-  "selectedChartModuleFilter": "All", // New field for chart module filtering
+  "selectedCardModuleFilter": [], // Changed to array for multi-selection
+  "selectedChartModuleFilter": [], // Changed to array for multi-selection
   "locationName": ["I","II","III","IV-A","V","CAR","IV-B","VI","VII","VIII","IX","X","XI","XII","XIII","BARMM I","BARMM II"],
   "municipalities": [],
   "province": [],

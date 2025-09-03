@@ -1284,6 +1284,15 @@ function formatList(arr:any) {
   return arr.slice(0, -1).join(", ") + ", and " + arr[arr.length - 1];
 }
 
+// Function to get selected card modules for display
+function getSelectedCardModules(data: any) {
+  const selectedModules = Array.isArray(data.selectedCardModuleFilter) ? data.selectedCardModuleFilter : [];
+  if (selectedModules.length === 0) {
+    return data?.modules || []; // All modules
+  }
+  return selectedModules;
+}
+
 // Function to scroll to status chart section
 const scrollToStatusChart = () => {
   const element = document.getElementById('status-chart-section');
@@ -1375,7 +1384,7 @@ const scrollToStatusChart = () => {
             (filteredCard?.brgyTotalrenewPending ?? 0) +
             (filteredCard?.brgyTotalrenewPaid ?? 0)
           }
-          showInfo={`total no. of transaction on ${formatList(data?.modules)} as of ${data.startDate} - ${data.endDate}`}
+          showInfo={`total no. of transaction on ${formatList(getSelectedCardModules(data))} as of ${data.startDate} - ${data.endDate}`}
           />
           <StatisticCard 
             title="No. of Male"
@@ -1385,7 +1394,7 @@ const scrollToStatusChart = () => {
             bpcoValue={(filteredCard?.bpcoTotalmalePaid ?? 0) + (filteredCard?.bpcoTotalmalePending ?? 0)}
             bpbpValue={(filteredCard?.bpbpTotalmalePaid ?? 0) + (filteredCard?.bpbpTotalmalePending ?? 0)}
             brgyValue={(filteredCard?.brgyTotalmalePaid ?? 0) + (filteredCard?.brgyTotalmalePending ?? 0)}
-            showInfo={`total no. of male applicants on ${formatList(data?.modules)} as of ${data.startDate} - ${data.endDate}`}
+            showInfo={`total no. of male applicants on ${formatList(getSelectedCardModules(data))} as of ${data.startDate} - ${data.endDate}`}
           />
           <StatisticCard 
             title="No. of Female"
@@ -1395,7 +1404,7 @@ const scrollToStatusChart = () => {
             bpcoValue={(filteredCard?.bpcoTotalfemalePaid ?? 0) + (filteredCard?.bpcoTotalfemalePending ?? 0)}
             bpbpValue={(filteredCard?.bpbpTotalfemalePaid ?? 0) + (filteredCard?.bpbpTotalfemalePending ?? 0)}
             brgyValue={(filteredCard?.brgyTotalfemalePaid ?? 0) + (filteredCard?.brgyTotalfemalePending ?? 0)}
-            showInfo={`total no. of female applicants on ${formatList(data?.modules)} as of ${data.startDate} - ${data.endDate}`}
+            showInfo={`total no. of female applicants on ${formatList(getSelectedCardModules(data))} as of ${data.startDate} - ${data.endDate}`}
           />
           <StatisticCard 
             title="No. of eGovPay"
@@ -1405,7 +1414,7 @@ const scrollToStatusChart = () => {
             bpcoValue={(filteredCard?.bpcoTotalrenewPaidViaEgov ?? 0) + (filteredCard?.bpcoTotalnewPaidViaEgov ?? 0)}
             bpbpValue={(filteredCard?.bpbpTotalrenewPaidViaEgov ?? 0) + (filteredCard?.bpbpTotalnewPaidViaEgov ?? 0)}
             brgyValue={(filteredCard?.brgyTotalrenewPaidViaEgov ?? 0) + (filteredCard?.brgyTotalnewPaidViaEgov ?? 0)}
-            showInfo={`total no. of eGovPay transactions on ${formatList(data?.modules)} as of ${data.startDate} - ${data.endDate}`}
+            showInfo={`total no. of eGovPay transactions on ${formatList(getSelectedCardModules(data))} as of ${data.startDate} - ${data.endDate}`}
           />
           <StatisticCard 
             title="Non-Binary"
@@ -1439,7 +1448,7 @@ const scrollToStatusChart = () => {
               - (((filteredCard?.brgyTotalmalePaid ?? 0) + (filteredCard?.brgyTotalmalePending ?? 0)) + ((filteredCard?.brgyTotalfemalePaid ?? 0) + (filteredCard?.brgyTotalfemalePending ?? 0))) < 0 ? 0 : ((filteredCard?.brgyTotalnewPending ?? 0) + (filteredCard?.brgyTotalnewPaid ?? 0) + (filteredCard?.brgyTotalrenewPending ?? 0) + (filteredCard?.brgyTotalrenewPaid ?? 0))
               - (((filteredCard?.brgyTotalmalePaid ?? 0) + (filteredCard?.brgyTotalmalePending ?? 0)) + ((filteredCard?.brgyTotalfemalePaid ?? 0) + (filteredCard?.brgyTotalfemalePending ?? 0)))
             }
-            showInfo={`calculated non-binary applicants on ${formatList(data?.modules)} as of ${data.startDate} - ${data.endDate}`}
+            showInfo={`calculated non-binary applicants on ${formatList(getSelectedCardModules(data))} as of ${data.startDate} - ${data.endDate}`}
           />
         </div>
       </div>
@@ -1494,12 +1503,12 @@ const scrollToStatusChart = () => {
         <div className="space-y-6">
           <TransactionChart
             data={chartData3}
-            title="NUMBER OF TRANSACTION PER REGION FOR RENEW APPLICATION"
+            title="TRANSACTION ANALYTICS BY REGION"
             period={`${data.startDate} - ${data.endDate}`}
           />
           <TransactionChart2
             data={chartData}
-            title="NUMBER OF TRANSACTION PER REGION AND GENDER"
+            title="TRANSACTION ANALYTICS BY GENDER"
             period={`${data.startDate} - ${data.endDate}`}
           />
         </div>

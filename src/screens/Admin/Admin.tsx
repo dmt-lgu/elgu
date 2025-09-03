@@ -1162,8 +1162,16 @@ function Admin() {
               ...result,
               monthlyResults: result.monthlyResults?.map((month: any) => ({
                 ...month,
-                newPaid: month.newPaid || 0, // Use newPaid directly instead of buildingPaid
+                newPaid: month.buildingPaid || 0, // Map buildingPaid to newPaid for BPBP
                 newPending: month.buildingPending || 0,
+                renewPaid: month.renewPaid || 0,
+                renewPending: month.renewPending || 0,
+                newPaidViaEgov: month.newPaidViaEgov || 0,
+                renewPaidViaEgov: month.renewPaidViaEgov || 0,
+                malePaid: month.malePaid || 0,
+                malePending: month.malePending || 0,
+                femalePaid: month.femalePaid || 0,
+                femalePending: month.femalePending || 0,
                 // Keep original fields for completeness
                 buildingPaid: month.buildingPaid || 0,
                 buildingPending: month.buildingPending || 0
