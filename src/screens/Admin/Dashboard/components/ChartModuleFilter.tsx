@@ -19,11 +19,12 @@ const ChartModuleFilter: React.FC<ChartModuleFilterProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Only show transaction-related modules (Business Permit and Working Permit)
+  // Only show transaction-related modules
   const transactionModuleOptions = [
     "All",
-    "Business Permit",
-    "Working Permit"
+    ...(data.modules?.filter((module: string) => 
+      ["Business Permit", "Working Permit", "Certificate of Occupancy", "Building Permit"].includes(module)
+    ) || [])
   ];
 
   // Use filterId to get the specific filter value

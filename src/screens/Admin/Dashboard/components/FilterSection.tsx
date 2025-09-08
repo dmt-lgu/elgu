@@ -408,7 +408,7 @@ const FilterSection: React.FC = () => {
  
 
   return (
-    <div className="relative bg-white border border-gray-200 rounded-md shadow-sm p-6 mb-6 z-50">
+    <div className="relative bg-white border border-gray-200 rounded-md shadow-sm p-6 mb-6 z-20">
       
       {/* Title Section */}
       <div className="mb-6 pb-4 border-b border-gray-200">
@@ -461,7 +461,7 @@ const FilterSection: React.FC = () => {
                     Clear All
                   </button>
                 </div>
-                <div className="max-h-[200px] overflow-y-auto">
+                <div className="max-h-[400px] overflow-y-auto">
                   {modules.map((module, index) => (
                     <label
                       key={`module-${index}`}

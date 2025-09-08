@@ -13,9 +13,9 @@ import {
   Legend,
 } from 'chart.js';
 import ChartDataLabels from 'chartjs-plugin-datalabels';
-import { useSelector, useDispatch } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { selectLoad } from '@/redux/loadSlice';
-import { selectData, setData } from '@/redux/dataSlice';
+import { selectData } from '@/redux/dataSlice';
 
 // Register Chart.js components
 ChartJS.register(
@@ -62,46 +62,104 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
   const chartRef = useRef<any>(null);
   
   const dataState = useSelector(selectData);
-  const dispatch = useDispatch();
 
-  const handleModuleFilterChange = (selectedModule: string) => {
-    dispatch(setData({
-      ...dataState,
-      selectedChartModuleFilter: selectedModule
-    }));
+  // Helper function to format selected modules for display
+  const getSelectedModulesDisplay = () => {
+    const moduleFilters = Array.isArray(dataState.selectedChartModuleFilter) ? dataState.selectedChartModuleFilter : [];
+    if (moduleFilters.length === 0) return 'All Modules';
+    if (moduleFilters.length === 1) return moduleFilters[0];
+    if (moduleFilters.length === 2) return `${moduleFilters[0]} & ${moduleFilters[1]}`;
+    return `${moduleFilters.length} Selected Modules`;
   };
 
   // Process data based on module filter
   const processedData = useMemo(() => {
-    const moduleFilter = dataState.selectedChartModuleFilter || 'All';
+    const moduleFilters = Array.isArray(dataState.selectedChartModuleFilter) ? dataState.selectedChartModuleFilter : [];
+    const isAllModules = moduleFilters.length === 0;
     
     return data.map(item => {
-      if (moduleFilter === 'Business Permit') {
-        return {
-          name: item.name,
-          paidMale: item.bpMalePaid || 0,
-          paidFemale: item.bpFemalePaid || 0,
-          pendingMale: item.bpMalePending || 0,
-          pendingFemale: item.bpFemalePending || 0,
-        };
-      } else if (moduleFilter === 'Working Permit') {
-        return {
-          name: item.name,
-          paidMale: item.wpMalePaid || 0,
-          paidFemale: item.wpFemalePaid || 0,
-          pendingMale: item.wpMalePending || 0,
-          pendingFemale: item.wpFemalePending || 0,
-        };
+      let baseData = {
+        name: item.name,
+        paidMale: 0,
+        paidFemale: 0,
+        pendingMale: 0,
+        pendingFemale: 0,
+      };
+
+      // Helper function to get module data
+      const getModuleData = (moduleType: string) => {
+        let moduleData = { paidMale: 0, paidFemale: 0, pendingMale: 0, pendingFemale: 0 };
+        
+        switch (moduleType) {
+          case 'Business Permit':
+            moduleData = {
+              paidMale: item.bpMalePaid || 0,
+              paidFemale: item.bpFemalePaid || 0,
+              pendingMale: item.bpMalePending || 0,
+              pendingFemale: item.bpFemalePending || 0,
+            };
+            break;
+          case 'Working Permit':
+            moduleData = {
+              paidMale: item.wpMalePaid || 0,
+              paidFemale: item.wpFemalePaid || 0,
+              pendingMale: item.wpMalePending || 0,
+              pendingFemale: item.wpFemalePending || 0,
+            };
+            break;
+          case 'Certificate of Occupancy':
+            moduleData = {
+              paidMale: item.bpcoMalePaid || 0,
+              paidFemale: item.bpcoFemalePaid || 0,
+              pendingMale: item.bpcoMalePending || 0,
+              pendingFemale: item.bpcoFemalePending || 0,
+            };
+            break;
+          case 'Building Permit':
+            moduleData = {
+              paidMale: item.bpbpMalePaid || 0,
+              paidFemale: item.bpbpFemalePaid || 0,
+              pendingMale: item.bpbpMalePending || 0,
+              pendingFemale: item.bpbpFemalePending || 0,
+            };
+            break;
+          case 'Barangay Clearance':
+            // BRGY data doesn't have gender breakdown, so all values are 0
+            moduleData = {
+              paidMale: 0,
+              paidFemale: 0,
+              pendingMale: 0,
+              pendingFemale: 0,
+            };
+            break;
+        }
+        
+        return moduleData;
+      };
+
+      // Calculate data based on selected modules
+      if (isAllModules) {
+        // All modules - combine all module data
+        const modules = ['Business Permit', 'Working Permit', 'Certificate of Occupancy', 'Building Permit', 'Barangay Clearance'];
+        modules.forEach((moduleType: string) => {
+          const moduleData = getModuleData(moduleType);
+          baseData.paidMale += moduleData.paidMale;
+          baseData.paidFemale += moduleData.paidFemale;
+          baseData.pendingMale += moduleData.pendingMale;
+          baseData.pendingFemale += moduleData.pendingFemale;
+        });
       } else {
-        // All modules - combine BP and WP data
-        return {
-          name: item.name,
-          paidMale: (item.bpMalePaid || 0) + (item.wpMalePaid || 0),
-          paidFemale: (item.bpFemalePaid || 0) + (item.wpFemalePaid || 0),
-          pendingMale: (item.bpMalePending || 0) + (item.wpMalePending || 0),
-          pendingFemale: (item.bpFemalePending || 0) + (item.wpFemalePending || 0),
-        };
+        // Selected modules only
+        moduleFilters.forEach((moduleType: string) => {
+          const moduleData = getModuleData(moduleType);
+          baseData.paidMale += moduleData.paidMale;
+          baseData.paidFemale += moduleData.paidFemale;
+          baseData.pendingMale += moduleData.pendingMale;
+          baseData.pendingFemale += moduleData.pendingFemale;
+        });
       }
+
+      return baseData;
     });
   }, [data, dataState.selectedChartModuleFilter]);
 
@@ -147,7 +205,7 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
         hidden: hidden[1],
       },
       {
-        label: 'Pending Male',
+        label: 'Ongoing Male',
         data: processedData.map(item => item.pendingMale),
         backgroundColor: '#DC2626',
         borderColor: '#DC2626',
@@ -155,7 +213,7 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
         hidden: hidden[2],
       },
       {
-        label: 'Pending Female',
+        label: 'Ongoing  Female',
         data: processedData.map(item => item.pendingFemale),
         backgroundColor: '#38BDF8',
         borderColor: '#38BDF8',
@@ -289,23 +347,7 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
       )}
         <div className="flex gap-2  justify-between">
           <div className="flex flex-col gap-2">
-            <p className="font-semibold">{title}</p>
-            <div className="flex gap-2 items-center">
-              <label className="text-xs font-semibold">Module Filter:</label>
-              <select
-                className="border rounded cursor-pointer px-2 py-1 text-xs"
-                value={dataState.selectedChartModuleFilter || 'All'}
-                onChange={(e) => handleModuleFilterChange(e.target.value)}
-              >
-                <option value="All">All Modules</option>
-                {dataState.modules?.includes("Business Permit") && (
-                  <option value="Business Permit">Business Permit</option>
-                )}
-                {dataState.modules?.includes("Working Permit") && (
-                  <option value="Working Permit">Working Permit</option>
-                )}
-              </select>
-            </div>
+            <p className="font-semibold">{title} ({getSelectedModulesDisplay()})</p>
           </div>
           <div className=' gap-2 flex items-center'>
            {chartTypes.map(type => (

@@ -10,6 +10,9 @@ interface StatisticCardProps {
   value: string | number;
   bpValue?: string | number;
   wpValue?: string | number;
+  bpcoValue?: string | number;
+  bpbpValue?: string | number;
+  brgyValue?: string | number;
   showInfo?: string; // Tooltip text
   className?: string;
 }
@@ -19,21 +22,39 @@ const StatisticCard: React.FC<StatisticCardProps> = ({
   value, 
   bpValue, 
   wpValue, 
+  bpcoValue,
+  bpbpValue,
+  brgyValue,
   showInfo 
 }) => {
   const loading = useSelector(selectLoad);
   const data = useSelector(selectData);
 
   const getDisplayValue = () => {
-    const filter = data.selectedCardModuleFilter;
-    if (filter === 'Business Permit' && bpValue !== undefined) {
-      return bpValue;
-    } else if (filter === 'Working Permit' && wpValue !== undefined) {
-      return wpValue;
-    } else {
-      // All modules or fallback - always return the combined value
-      return value;
+    const filters = Array.isArray(data.selectedCardModuleFilter) ? data.selectedCardModuleFilter : [];
+    
+    // If no filters selected (All modules)
+    if (filters.length === 0) {
+      return value; // Show combined total of all modules
     }
+    
+    // Calculate sum of selected modules only
+    let selectedTotal = 0;
+    filters.forEach((filter: string) => {
+      if (filter === 'Business Permit' && bpValue !== undefined) {
+        selectedTotal += Number(bpValue);
+      } else if (filter === 'Working Permit' && wpValue !== undefined) {
+        selectedTotal += Number(wpValue);
+      } else if (filter === 'Certificate of Occupancy' && bpcoValue !== undefined) {
+        selectedTotal += Number(bpcoValue);
+      } else if (filter === 'Building Permit' && bpbpValue !== undefined) {
+        selectedTotal += Number(bpbpValue);
+      } else if (filter === 'Barangay Clearance' && brgyValue !== undefined) {
+        selectedTotal += Number(brgyValue);
+      }
+    });
+    
+    return selectedTotal;
   };
 
   const getCardTheme = () => {
@@ -130,7 +151,7 @@ const StatisticCard: React.FC<StatisticCardProps> = ({
                 <div className="flex items-center space-x-1 mt-0.5">
                   <div className={`w-1.5 h-1.5 rounded-full ${theme.iconColor.replace('bg-', 'bg-')}`}></div>
                   <span className="text-xs text-gray-500">
-                    {data.selectedCardModuleFilter}
+                    {data.selectedCardModuleFilter.join(', ')}
                   </span>
                 </div>
               )}

@@ -13,9 +13,9 @@ import {
   Legend,
 } from 'chart.js';
 import ChartDataLabels from 'chartjs-plugin-datalabels';
-import { useSelector, useDispatch } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { selectLoad } from '@/redux/loadSlice';
-import { selectData, setData } from '@/redux/dataSlice';
+import { selectData } from '@/redux/dataSlice';
 
 // Register Chart.js components
 ChartJS.register(
@@ -53,23 +53,28 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
   data = [],
   period
 }) => {
+
+
+  console.log(data);
   const [chartType, setChartType] = useState<'bar' | 'line' | 'pie'>('bar');
   const [hidden, setHidden] = useState<boolean[]>([false, false, false, false]);
   const [txnType, setTxnType] = useState<'overall' | 'new' | 'renew'>('overall');
   
   const dataState = useSelector(selectData);
-  const dispatch = useDispatch();
 
-  const handleModuleFilterChange = (selectedModule: string) => {
-    dispatch(setData({
-      ...dataState,
-      selectedChartModuleFilter: selectedModule
-    }));
+  // Helper function to format selected modules for display
+  const getSelectedModulesDisplay = () => {
+    const moduleFilters = Array.isArray(dataState.selectedChartModuleFilter) ? dataState.selectedChartModuleFilter : [];
+    if (moduleFilters.length === 0) return 'All Modules';
+    if (moduleFilters.length === 1) return moduleFilters[0];
+    if (moduleFilters.length === 2) return `${moduleFilters[0]} & ${moduleFilters[1]}`;
+    return `${moduleFilters.length} Selected Modules`;
   };
 
   // Massage data based on txnType and module filter
   const processedData = useMemo(() => {
-    const moduleFilter = dataState.selectedChartModuleFilter || 'All';
+    const moduleFilters = Array.isArray(dataState.selectedChartModuleFilter) ? dataState.selectedChartModuleFilter : [];
+    const isAllModules = moduleFilters.length === 0;
     
     return data.map(item => {
       let baseData = {
@@ -80,86 +85,162 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
         paidLinkBiz: 0,
       };
 
-      // Get data based on module filter
-      if (moduleFilter === 'Business Permit') {
-        if (txnType === 'new') {
-          baseData = {
-            name: item.name,
-            paid: item.bpNewPaid ?? 0,
-            pending: item.bpNewPending ?? 0,
-            paideGov: item.bpNewPaidViaEgov ?? 0,
-            paidLinkBiz: item.bpNewPaidLinkBiz ?? 0,
-          };
-        } else if (txnType === 'renew') {
-          baseData = {
-            name: item.name,
-            paid: item.bpRenewPaid ?? 0,
-            pending: item.bpRenewPending ?? 0,
-            paideGov: item.bpRenewPaidViaEgov ?? 0,
-            paidLinkBiz: item.bpRenewPaidLinkBiz ?? 0,
-          };
-        } else {
-          baseData = {
-            name: item.name,
-            paid: (item.bpNewPaid ?? 0) + (item.bpRenewPaid ?? 0),
-            pending: (item.bpNewPending ?? 0) + (item.bpRenewPending ?? 0),
-            paideGov: (item.bpNewPaidViaEgov ?? 0) + (item.bpRenewPaidViaEgov ?? 0),
-            paidLinkBiz: (item.bpNewPaidLinkBiz ?? 0) + (item.bpRenewPaidLinkBiz ?? 0),
-          };
+      // Helper function to get module data
+      const getModuleData = (moduleType: string) => {
+        let moduleData = { paid: 0, pending: 0, paideGov: 0, paidLinkBiz: 0 };
+        
+        switch (moduleType) {
+          case 'Business Permit':
+            if (txnType === 'new') {
+              moduleData = {
+                paid: item.bpNewPaid ?? 0,
+                pending: item.bpNewPending ?? 0,
+                paideGov: item.bpNewPaidViaEgov ?? 0,
+                paidLinkBiz: item.bpNewPaidLinkBiz ?? 0,
+              };
+            } else if (txnType === 'renew') {
+              moduleData = {
+                paid: item.bpRenewPaid ?? 0,
+                pending: item.bpRenewPending ?? 0,
+                paideGov: item.bpRenewPaidViaEgov ?? 0,
+                paidLinkBiz: item.bpRenewPaidLinkBiz ?? 0,
+              };
+            } else {
+              moduleData = {
+                paid: (item.bpNewPaid ?? 0) + (item.bpRenewPaid ?? 0),
+                pending: (item.bpNewPending ?? 0) + (item.bpRenewPending ?? 0),
+                paideGov: (item.bpNewPaidViaEgov ?? 0) + (item.bpRenewPaidViaEgov ?? 0),
+                paidLinkBiz: (item.bpNewPaidLinkBiz ?? 0) + (item.bpRenewPaidLinkBiz ?? 0),
+              };
+            }
+            break;
+            
+          case 'Working Permit':
+            if (txnType === 'new') {
+              moduleData = {
+                paid: item.wpNewPaid ?? 0,
+                pending: item.wpNewPending ?? 0,
+                paideGov: item.wpNewPaidViaEgov ?? 0,
+                paidLinkBiz: item.wpNewPaidLinkBiz ?? 0,
+              };
+            } else if (txnType === 'renew') {
+              moduleData = {
+                paid: item.wpRenewPaid ?? 0,
+                pending: item.wpRenewPending ?? 0,
+                paideGov: item.wpRenewPaidViaEgov ?? 0,
+                paidLinkBiz: item.wpRenewPaidLinkBiz ?? 0,
+              };
+            } else {
+              moduleData = {
+                paid: (item.wpNewPaid ?? 0) + (item.wpRenewPaid ?? 0),
+                pending: (item.wpNewPending ?? 0) + (item.wpRenewPending ?? 0),
+                paideGov: (item.wpNewPaidViaEgov ?? 0) + (item.wpRenewPaidViaEgov ?? 0),
+                paidLinkBiz: (item.wpNewPaidLinkBiz ?? 0) + (item.wpRenewPaidLinkBiz ?? 0),
+              };
+            }
+            break;
+            
+          case 'Certificate of Occupancy':
+            if (txnType === 'new') {
+              moduleData = {
+                paid: item.bpcoNewPaid ?? 0,
+                pending: item.bpcoNewPending ?? 0,
+                paideGov: item.bpcoNewPaidViaEgov ?? 0,
+                paidLinkBiz: item.bpcoNewPaidLinkBiz ?? 0,
+              };
+            } else if (txnType === 'renew') {
+              moduleData = {
+                paid: item.bpcoRenewPaid ?? 0,
+                pending: item.bpcoRenewPending ?? 0,
+                paideGov: item.bpcoRenewPaidViaEgov ?? 0,
+                paidLinkBiz: item.bpcoRenewPaidLinkBiz ?? 0,
+              };
+            } else {
+              moduleData = {
+                paid: (item.bpcoNewPaid ?? 0) + (item.bpcoRenewPaid ?? 0),
+                pending: (item.bpcoNewPending ?? 0) + (item.bpcoRenewPending ?? 0),
+                paideGov: (item.bpcoNewPaidViaEgov ?? 0) + (item.bpcoRenewPaidViaEgov ?? 0),
+                paidLinkBiz: (item.bpcoNewPaidLinkBiz ?? 0) + (item.bpcoRenewPaidLinkBiz ?? 0),
+              };
+            }
+            break;
+            
+          case 'Building Permit':
+            if (txnType === 'new') {
+              moduleData = {
+                paid: item.bpbpNewPaid ?? 0,
+                pending: item.bpbpNewPending ?? 0,
+                paideGov: item.bpbpNewPaidViaEgov ?? 0,
+                paidLinkBiz: item.bpbpNewPaidLinkBiz ?? 0,
+              };
+            } else if (txnType === 'renew') {
+              moduleData = {
+                paid: item.bpbpRenewPaid ?? 0,
+                pending: item.bpbpRenewPending ?? 0,
+                paideGov: item.bpbpRenewPaidViaEgov ?? 0,
+                paidLinkBiz: item.bpbpRenewPaidLinkBiz ?? 0,
+              };
+            } else {
+              moduleData = {
+                paid: (item.bpbpNewPaid ?? 0) + (item.bpbpRenewPaid ?? 0),
+                pending: (item.bpbpNewPending ?? 0) + (item.bpbpRenewPending ?? 0),
+                paideGov: (item.bpbpNewPaidViaEgov ?? 0) + (item.bpbpRenewPaidViaEgov ?? 0),
+                paidLinkBiz: (item.bpbpNewPaidLinkBiz ?? 0) + (item.bpbpRenewPaidLinkBiz ?? 0),
+              };
+            }
+            break;
+            
+          case 'Barangay Clearance':
+            // BRGY data only has newPaid (mapped from totalCount), no other fields
+            if (txnType === 'new') {
+              moduleData = {
+                paid: item.brgyNewPaid ?? 0,  // This is mapped from totalCount
+                pending: 0,  // Always 0 for BRGY
+                paideGov: 0,  // Always 0 for BRGY
+                paidLinkBiz: 0,  // Always 0 for BRGY
+              };
+            } else if (txnType === 'renew') {
+              moduleData = {
+                paid: 0,  // Always 0 for BRGY
+                pending: 0,  // Always 0 for BRGY
+                paideGov: 0,  // Always 0 for BRGY
+                paidLinkBiz: 0,  // Always 0 for BRGY
+              };
+            } else {
+              // Overall - only newPaid has data for BRGY
+              moduleData = {
+                paid: item.brgyNewPaid ?? 0,  // This is the totalCount
+                pending: 0,  // BRGY doesn't have pending data
+                paideGov: 0,  // BRGY doesn't have eGov data
+                paidLinkBiz: 0,  // BRGY doesn't have linkBiz data
+              };
+            }
+            break;
         }
-      } else if (moduleFilter === 'Working Permit') {
-        if (txnType === 'new') {
-          baseData = {
-            name: item.name,
-            paid: item.wpNewPaid ?? 0,
-            pending: item.wpNewPending ?? 0,
-            paideGov: item.wpNewPaidViaEgov ?? 0,
-            paidLinkBiz: item.wpNewPaidLinkBiz ?? 0,
-          };
-        } else if (txnType === 'renew') {
-          baseData = {
-            name: item.name,
-            paid: item.wpRenewPaid ?? 0,
-            pending: item.wpRenewPending ?? 0,
-            paideGov: item.wpRenewPaidViaEgov ?? 0,
-            paidLinkBiz: item.wpRenewPaidLinkBiz ?? 0,
-          };
-        } else {
-          baseData = {
-            name: item.name,
-            paid: (item.wpNewPaid ?? 0) + (item.wpRenewPaid ?? 0),
-            pending: (item.wpNewPending ?? 0) + (item.wpRenewPending ?? 0),
-            paideGov: (item.wpNewPaidViaEgov ?? 0) + (item.wpRenewPaidViaEgov ?? 0),
-            paidLinkBiz: (item.wpNewPaidLinkBiz ?? 0) + (item.wpRenewPaidLinkBiz ?? 0),
-          };
-        }
+        
+        return moduleData;
+      };
+
+      // Calculate data based on selected modules
+      if (isAllModules) {
+        // All modules - combine all module data
+        const modules = ['Business Permit', 'Working Permit', 'Certificate of Occupancy', 'Building Permit', 'Barangay Clearance'];
+        modules.forEach((moduleType: string) => {
+          const moduleData = getModuleData(moduleType);
+          baseData.paid += moduleData.paid;
+          baseData.pending += moduleData.pending;
+          baseData.paideGov += moduleData.paideGov;
+          baseData.paidLinkBiz += moduleData.paidLinkBiz;
+        });
       } else {
-        // All modules - combine BP and WP data
-        if (txnType === 'new') {
-          baseData = {
-            name: item.name,
-            paid: (item.bpNewPaid ?? 0) + (item.wpNewPaid ?? 0),
-            pending: (item.bpNewPending ?? 0) + (item.wpNewPending ?? 0),
-            paideGov: (item.bpNewPaidViaEgov ?? 0) + (item.wpNewPaidViaEgov ?? 0),
-            paidLinkBiz: (item.bpNewPaidLinkBiz ?? 0) + (item.wpNewPaidLinkBiz ?? 0),
-          };
-        } else if (txnType === 'renew') {
-          baseData = {
-            name: item.name,
-            paid: (item.bpRenewPaid ?? 0) + (item.wpRenewPaid ?? 0),
-            pending: (item.bpRenewPending ?? 0) + (item.wpRenewPending ?? 0),
-            paideGov: (item.bpRenewPaidViaEgov ?? 0) + (item.wpRenewPaidViaEgov ?? 0),
-            paidLinkBiz: (item.bpRenewPaidLinkBiz ?? 0) + (item.wpRenewPaidLinkBiz ?? 0),
-          };
-        } else {
-          baseData = {
-            name: item.name,
-            paid: (item.bpNewPaid ?? 0) + (item.bpRenewPaid ?? 0) + (item.wpNewPaid ?? 0) + (item.wpRenewPaid ?? 0),
-            pending: (item.bpNewPending ?? 0) + (item.bpRenewPending ?? 0) + (item.wpNewPending ?? 0) + (item.wpRenewPending ?? 0),
-            paideGov: (item.bpNewPaidViaEgov ?? 0) + (item.bpRenewPaidViaEgov ?? 0) + (item.wpNewPaidViaEgov ?? 0) + (item.wpRenewPaidViaEgov ?? 0),
-            paidLinkBiz: (item.bpNewPaidLinkBiz ?? 0) + (item.bpRenewPaidLinkBiz ?? 0) + (item.wpNewPaidLinkBiz ?? 0) + (item.wpRenewPaidLinkBiz ?? 0),
-          };
-        }
+        // Selected modules only
+        moduleFilters.forEach((moduleType: string) => {
+          const moduleData = getModuleData(moduleType);
+          baseData.paid += moduleData.paid;
+          baseData.pending += moduleData.pending;
+          baseData.paideGov += moduleData.paideGov;
+          baseData.paidLinkBiz += moduleData.paidLinkBiz;
+        });
       }
 
       return baseData;
@@ -169,7 +250,7 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
   const labels = processedData.map(item => item.name);
 
   // Pie chart labels and values
-  const allPieLabels = ['Paid', 'Pending', 'Paid with eGovPay', 'Paid with LinkBiz'];
+  const allPieLabels = ['Paid', 'Ongoing', 'Paid with eGovPay', 'Paid with LinkBiz'];
   const allPieValues = [
     processedData.reduce((sum, item) => sum + (item.paid ?? 0), 0),
     processedData.reduce((sum, item) => sum + (item.pending ?? 0), 0),
@@ -207,7 +288,7 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
         hidden: hidden[0],
       },
       {
-        label: 'Pending',
+        label: 'Ongoing',
         data: processedData.map(item => item.pending),
         backgroundColor: '#FFD700',
         borderColor: '#FFD700',
@@ -372,26 +453,10 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
       <div className="flex gap-2  justify-between">
         <div className="flex flex-col gap-2">
           <p className="font-semibold">
-            {txnType === 'renew' && 'NUMBER OF TRANSACTION PER REGION FOR RENEW APPLICATION'}
-            {txnType === 'new' && 'NUMBER OF TRANSACTION PER REGION FOR NEW APPLICATION'}
-            {txnType === 'overall' && 'NUMBER OF TRANSACTION PER REGION FOR OVERALL APPLICATION'}
+            {txnType === 'renew' && `NUMBER OF TRANSACTION PER REGION FOR RENEW APPLICATION (${getSelectedModulesDisplay()})`}
+            {txnType === 'new' && `NUMBER OF TRANSACTION PER REGION FOR NEW APPLICATION (${getSelectedModulesDisplay()})`}
+            {txnType === 'overall' && `NUMBER OF TRANSACTION PER REGION FOR OVERALL APPLICATION (${getSelectedModulesDisplay()})`}
           </p>
-          <div className="flex gap-2 items-center">
-            <label className="text-xs font-semibold">Module Filter:</label>
-            <select
-              className="border rounded cursor-pointer px-2 py-1 text-xs"
-              value={dataState.selectedChartModuleFilter || 'All'}
-              onChange={(e) => handleModuleFilterChange(e.target.value)}
-            >
-              <option value="All">All Modules</option>
-              {dataState.modules?.includes("Business Permit") && (
-                <option value="Business Permit">Business Permit</option>
-              )}
-              {dataState.modules?.includes("Working Permit") && (
-                <option value="Working Permit">Working Permit</option>
-              )}
-            </select>
-          </div>
         </div>
         <div className=' gap-2 flex items-center'>
           {chartTypes.map(type => (
