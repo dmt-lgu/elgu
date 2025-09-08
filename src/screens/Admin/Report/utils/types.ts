@@ -21,13 +21,14 @@ export interface FilterOptions {
 }
 
 export interface FilterState {
-   selectedRegions: string[];
+  selectedModules: string[];
+  selectedRegions: string[];
   selectedProvinces: string[];
   selectedCities: string[];
-  selectedIslands: string[];
-  selectedModules: string[];
   dateRange: { start: string | null; end: string | null };
   selectedDateType: string;
+  selectedIslands: string[];
+  allRegionsSelected?: boolean;
 }
 
 export interface RegionData {
