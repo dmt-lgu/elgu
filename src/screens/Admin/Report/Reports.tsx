@@ -71,7 +71,7 @@ function formatLocalDate(date: Date | null): string | null {
   return `${yyyy}-${mm}-${dd}`;
 }
 function useReportData({
-  apiUrl, appliedFilter, reduxTableData, reduxAppliedFilter,
+  moduleKey, apiUrl, appliedFilter, reduxTableData, reduxAppliedFilter,
   setReduxTableData, setReduxAppliedFilter, hasSearched, abortSignal,
   skipLoading, isSelectAll,
 }: {
@@ -108,33 +108,83 @@ function useReportData({
       endDate: appliedFilter.dateRange.end ? formatLocalDate(ensureDate(appliedFilter.dateRange.end)) : null,
     };
     Object.keys(payload).forEach(key => ((Array.isArray(payload[key]) && payload[key].length === 0) || payload[key] === null) ? delete payload[key] : {});
-    axios.post(apiUrl, payload, { signal: abortSignal })
-      .then((response) => {
-        // --- START OF FIX ---
-        // Clean the data by removing duplicate LGUs before setting the state.
-        const rawData = response.data;
-        let cleanedData = rawData;
-
-        if (rawData && Array.isArray(rawData.results)) {
-          const seenLgus = new Set();
-          const uniqueResults = rawData.results.filter((lgu:any) => {
-            if (seenLgus.has(lgu.lgu)) {
-              return false; // This is a duplicate, so filter it out.
+    // If multiple regions selected and not select-all, fetch sequentially per-region so progress is step-by-step.
+    const doFetch = async () => {
+      try {
+        if (Array.isArray(appliedFilter.selectedRegions) && appliedFilter.selectedRegions.length > 1 && !isSelectAll) {
+          const regions = appliedFilter.selectedRegions.slice();
+          const aggregated: any[] = [];
+          for (let i = 0; i < regions.length; i++) {
+            const region = regions[i];
+            if (abortSignal?.aborted) break;
+            const regionPayload = { ...payload, locationName: [region] };
+            try {
+              // eslint-disable-next-line no-await-in-loop
+              const res = await axios.post(apiUrl, regionPayload, { signal: abortSignal });
+              const rawData = res?.data;
+              if (rawData && Array.isArray(rawData.results)) {
+                rawData.results.forEach((r: any) => {
+                  if (!aggregated.some(a => a.lgu === r.lgu)) aggregated.push(r);
+                });
+              }
+            } catch (err: any) {
+              if (err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED' || err?.message === 'canceled') {
+                break;
+              }
+              // otherwise continue to next region
             }
-            seenLgus.add(lgu.lgu);
-            return true; // First time seeing this LGU, so keep it.
-          });
-          
-          cleanedData = { ...rawData, results: uniqueResults, lguCount: uniqueResults.length };
+            // call parent-updater via a custom event so Reports can update its progressState (since hook is inside same module)
+            try {
+              const progressEvent = new CustomEvent('report-progress', { detail: { moduleKey: moduleKey, currentRegion: region, currentIndex: i + 1, totalRegions: regions.length } });
+              window.dispatchEvent(progressEvent);
+            } catch (e) {
+              // ignore
+            }
+            // Push intermediate aggregated results to state/redux so tables update progressively
+            try {
+              const interim = { results: aggregated.slice(), lguCount: aggregated.length };
+              setData(interim);
+              setReduxTableData(interim);
+              setReduxAppliedFilter(currentFilter);
+            } catch (e) {
+              // ignore
+            }
+            // Small delay to keep UI responsive
+          }
+          const final = { results: aggregated, lguCount: aggregated.length };
+          setData(final);
+          setReduxTableData(final);
+          setReduxAppliedFilter(currentFilter);
+        } else {
+          const response = await axios.post(apiUrl, payload, { signal: abortSignal });
+          // --- START OF FIX ---
+          const rawData = response.data;
+          let cleanedData = rawData;
+          if (rawData && Array.isArray(rawData.results)) {
+            const seenLgus = new Set();
+            const uniqueResults = rawData.results.filter((lgu:any) => {
+              if (seenLgus.has(lgu.lgu)) {
+                return false;
+              }
+              seenLgus.add(lgu.lgu);
+              return true;
+            });
+            cleanedData = { ...rawData, results: uniqueResults, lguCount: uniqueResults.length };
+          }
+          setData(cleanedData);
+          setReduxTableData(cleanedData);
+          setReduxAppliedFilter(currentFilter);
+          // --- END OF FIX ---
         }
-        
-        setData(cleanedData);
-        setReduxTableData(cleanedData);
-        setReduxAppliedFilter(currentFilter);
-        // --- END OF FIX ---
-      })
-      .catch((err: any) => { if (err?.name !== "CanceledError" && err?.code !== "ERR_CANCELED" && err?.message !== "canceled") { setData(null); setReduxTableData(null); } })
-      .finally(() => { setLoading(false); });
+      } catch (err: any) {
+        if (!(err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED' || err?.message === 'canceled')) {
+          setData(null); setReduxTableData(null);
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+    void doFetch();
   }, [ hasSearched, JSON.stringify(currentFilter), JSON.stringify(reduxAppliedFilter), reduxTableData, apiUrl, skipLoading, isSelectAll, setReduxTableData, setReduxAppliedFilter, abortSignal ]);
   return { loading };
 }
@@ -143,7 +193,7 @@ function useReportData({
 const Reports: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
 
-  const { selectedModules: uiSelectedModules, selectedProvinces, selectedCities } = useSelector((state: RootState) => state.reportFilter);
+  const { selectedModules: uiSelectedModules, selectedProvinces, selectedCities, selectedRegions: uiSelectedRegions, selectedIslands: uiSelectedIslands, dateRange: uiDateRange, selectedDateType: uiSelectedDateType } = useSelector((state: RootState) => state.reportFilter);
   
   const { tableData: bpTableData, appliedFilter: bpPersistedAppliedFilter } = useSelector((state: RootState) => state.businessPermitTable);
   const { tableData: wpTableData, appliedFilter: wpPersistedAppliedFilter } = useSelector((state: RootState) => state.workingPermitTable);
@@ -152,14 +202,24 @@ const Reports: React.FC = () => {
   const { tableData: coTableData, appliedFilter: coPersistedAppliedFilter } = useSelector((state: RootState) => state.certificateOfOccupancy);
 
   const [appliedFilter, setAppliedFilterState] = useState<AppliedFilter>(() => {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
     const defaultFilter: AppliedFilter = {
-      selectedRegions: [], selectedProvinces: [], selectedCities: [],
-      dateRange: { start: null, end: null }, selectedDateType: "",
-      selectedIslands: [], allRegionsSelected: false, selectedModules: [],
+      selectedRegions: (uiSelectedRegions as string[]) || [],
+      selectedProvinces: (selectedProvinces as string[]) || [],
+      selectedCities: (selectedCities as string[]) || [],
+      dateRange: (uiDateRange as DateRange) || { start: monthStart, end: monthEnd },
+      selectedDateType: (uiSelectedDateType as string) || 'Month',
+      selectedIslands: (uiSelectedIslands as string[]) || [],
+      allRegionsSelected: false,
+      selectedModules: (uiSelectedModules as string[]) || [],
     };
     return { ...defaultFilter, ...(bpPersistedAppliedFilter || {}) };
   });
-  
+
+  // Start with searched = true only when there is a persisted applied filter.
+  // Do NOT auto-trigger search when the UI filter (redux) merely has defaults.
   const [hasSearched, setHasSearched] = useState<boolean>(() => !!bpPersistedAppliedFilter);
   const [lastAppliedFilters, setLastAppliedFilters] = useState<any>(() => bpPersistedAppliedFilter);
   const [cancelled, setCancelled] = useState(false);
@@ -171,6 +231,21 @@ const Reports: React.FC = () => {
   const [isProgressiveLoading, setIsProgressiveLoading] = useState(false);
   const [progressiveData, setProgressiveData] = useState<ProgressiveDataState>({ [BP]: null, [WP]: null, [BC]: null, [BLDG]: null, [CO]: null });
   const [progressState, setProgressState] = useState<ProgressState>({});
+
+  // Listen to progress events dispatched by useReportData and update local progress state
+  useEffect(() => {
+    const handler = (e: Event) => {
+      try {
+        const detail = (e as CustomEvent).detail as { moduleKey: string; currentRegion: string; currentIndex: number; totalRegions: number };
+        if (!detail || !detail.moduleKey) return;
+        setProgressState(prev => ({ ...prev, [detail.moduleKey]: { currentRegion: detail.currentRegion, currentIndex: detail.currentIndex, totalRegions: detail.totalRegions } }));
+      } catch (err) {
+        // ignore
+      }
+    };
+    window.addEventListener('report-progress', handler as EventListener);
+    return () => window.removeEventListener('report-progress', handler as EventListener);
+  }, []);
   
   const [generatedAt, setGeneratedAt] = useState(new Date());
 
@@ -258,9 +333,19 @@ const Reports: React.FC = () => {
   
   const handleSearch = (filters: any) => {
     setCancelled(false);
-    const normalizedDateRangeVal = { start: filters.dateRange?.start ? (typeof filters.dateRange.start === "string" ? filters.dateRange.start : filters.dateRange.start.toISOString().slice(0, 10)) : null, end: filters.dateRange?.end ? (typeof filters.dateRange.end === "string" ? filters.dateRange.end : filters.dateRange.end.toISOString().slice(0, 10)) : null };
-    const normalizedFilters = { ...filters, dateRange: normalizedDateRangeVal, selectedModules: (filters.selectedModules || []).slice().sort() };
+  const normalizedDateRangeVal = { start: filters.dateRange?.start ? (typeof filters.dateRange.start === "string" ? filters.dateRange.start : filters.dateRange.start.toISOString().slice(0, 10)) : null, end: filters.dateRange?.end ? (typeof filters.dateRange.end === "string" ? filters.dateRange.end : filters.dateRange.end.toISOString().slice(0, 10)) : null };
+  const normalizedFilters = { ...filters, dateRange: normalizedDateRangeVal, selectedModules: (filters.selectedModules || []).slice().sort(), selectedDateType: filters.selectedDateType || 'Month' };
     if (filters.skipApi || areFiltersEqual(normalizedFilters, lastAppliedFilters)) return;
+    // Initialize progress entries so ProgressIndicator can show during normal (non-select-all) fetches
+    try {
+      const initialProgress: ProgressState = {};
+      (normalizedFilters.selectedModules || []).forEach((moduleKey: string) => {
+        initialProgress[moduleKey] = { currentRegion: 'Initializing...', currentIndex: 0, totalRegions: (normalizedFilters.selectedRegions && normalizedFilters.selectedRegions.length) ? normalizedFilters.selectedRegions.length : 1 };
+      });
+      setProgressState(initialProgress);
+    } catch (e) {
+      // ignore
+    }
     setAppliedFilterState(normalizedFilters);
     setHasSearched(true);
     setLastAppliedFilters(normalizedFilters);
@@ -274,15 +359,45 @@ const Reports: React.FC = () => {
     searchAbortController.current = new AbortController();
   };
 
+  // Auto-run search on first mount if FilterSection has valid defaults
+  useEffect(() => {
+    // Only auto-search when user hasn't searched yet and filter UI has sensible defaults
+    if (hasSearched) return;
+    const hasModules = Array.isArray(uiSelectedModules) && uiSelectedModules.length > 0;
+    const hasLocation = (Array.isArray(uiSelectedRegions) && uiSelectedRegions.length > 0) || (Array.isArray(uiSelectedIslands) && uiSelectedIslands.length > 0);
+    const hasDate = Boolean(uiDateRange && uiDateRange.start && uiDateRange.end);
+    if (hasModules && hasLocation && hasDate) {
+      // Build shape expected by handleSearch
+      const normalized = {
+        selectedModules: (uiSelectedModules || []).slice().sort(),
+        selectedProvinces: selectedProvinces || [],
+        selectedCities: selectedCities || [],
+        selectedRegions: uiSelectedRegions || [],
+        selectedIslands: uiSelectedIslands || [],
+        dateRange: uiDateRange,
+        selectedDateType: uiSelectedDateType || 'Month',
+      };
+      handleSearch(normalized);
+    }
+    // run only once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // No auto-search: users must explicitly click Search in the FilterSection to load table data.
+
   const handleReset = () => {
     setProgressState({});
     const keys: (keyof RootState['reportFilter'])[] = ['selectedRegions', 'selectedProvinces', 'selectedCities', 'selectedIslands', 'selectedModules'];
     keys.forEach(key => dispatch(updateFilterField({ key, value: [] })));
-    dispatch(updateFilterField({ key: 'dateRange', value: { start: null, end: null } }));
-    dispatch(updateFilterField({ key: 'selectedDateType', value: "" }));
+  dispatch(updateFilterField({ key: 'dateRange', value: { start: null, end: null } }));
+  // Restore default date type to 'Month' in the filter UI
+  dispatch(updateFilterField({ key: 'selectedDateType', value: 'Month' }));
     setHasSearched(false);
     setLastAppliedFilters(null);
-    setAppliedFilterState({ selectedRegions: [], selectedProvinces: [], selectedCities: [], dateRange: { start: null, end: null }, selectedDateType: "", selectedIslands: [], selectedModules: [] });
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
+  setAppliedFilterState({ selectedRegions: [], selectedProvinces: [], selectedCities: [], dateRange: { start: monthStart, end: monthEnd }, selectedDateType: 'Month', selectedIslands: [], selectedModules: [] });
     setHasTableData(false);
     dispatch(setTableData(null)); dispatch(setAppliedFilter(null));
     dispatch(setWorkingPermitTableData(null)); dispatch(setWorkingPermitAppliedFilter(null));
@@ -379,6 +494,40 @@ const Reports: React.FC = () => {
     reportRefs[moduleKey as keyof typeof reportRefs]?.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
+  // Compute counts for ProgressIndicator based on the current FilterSection (UI) filters
+  const counts = useMemo(() => {
+    const modulesList = [BP, WP, BC, BLDG, CO];
+    const result: Record<string, number> = {};
+    modulesList.forEach((moduleKey) => {
+      let rawData: any = null;
+      if (isSelectAll) {
+        rawData = progressiveData[moduleKey];
+      } else {
+        if (moduleKey === BP) rawData = bpTableData;
+        if (moduleKey === WP) rawData = wpTableData;
+        if (moduleKey === BC) rawData = bcTableData;
+        if (moduleKey === BLDG) rawData = bldgTableData;
+        if (moduleKey === CO) rawData = coTableData;
+      }
+      const safeApiData = rawData || { results: [] };
+      try {
+        const filtered = filterTableResults({
+          apiData: safeApiData,
+          lguToRegion,
+          dateRange: uiDateRange,
+          selectedRegions: uiSelectedRegions,
+          selectedProvinces,
+          selectedCities,
+          selectedIslands: uiSelectedIslands,
+        });
+        result[moduleKey] = Array.isArray(filtered) ? filtered.length : 0;
+      } catch (e) {
+        result[moduleKey] = 0;
+      }
+    });
+    return result;
+  }, [progressiveData, bpTableData, wpTableData, bcTableData, bldgTableData, coTableData, lguToRegion, uiDateRange, uiSelectedRegions, selectedProvinces, selectedCities, uiSelectedIslands, isSelectAll]);
+
   return (
     <div ref={tableContainerRef} style={{ position: "relative", marginTop: 24, height: "88vh", overflow: "auto" }}>
       <div className='p-6 max-w-[1200px] mx-auto bg-background flex flex-col gap-6'>
@@ -467,7 +616,7 @@ const Reports: React.FC = () => {
           )}
         </div>
         <ScrollToTopButton scrollTargetRef={tableContainerRef} />
-        <ProgressIndicator isLoading={isProgressiveLoading} progress={progressState} onModuleClick={scrollToReport}/>
+  <ProgressIndicator isLoading={loading || isProgressiveLoading} progress={progressState} counts={counts} onModuleClick={scrollToReport}/>
       </div>
     </div>
   );

@@ -15,10 +15,11 @@ interface ProgressIndicatorProps {
   progress: {
     [moduleKey: string]: ProgressDetail | null;
   };
+  counts?: { [moduleKey: string]: number };
   onModuleClick: (moduleKey: string) => void;
 }
 
-const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({ isLoading, progress, onModuleClick }) => {
+const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({ isLoading, progress, counts = {}, onModuleClick }) => {
   const [isMinimized, setIsMinimized] = useState(false);
   const [isVisible, setIsVisible] = useState(isLoading);
 
@@ -39,13 +40,18 @@ const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({ isLoading, progre
     setIsVisible(false);
   };
 
-  if (!isVisible || Object.keys(progress).length === 0) return null;
+  if (!isVisible) return null;
 
-  const progressEntries = Object.entries(progress).filter(([, details]) => details !== null);
+  // Show all modules present in the progress object, even if details are null.
+  const progressEntries = Object.entries(progress);
+  const showFallback = progressEntries.length === 0;
   const isCompleted = !isLoading;
   progressEntries.sort(([keyA], [keyB]) => modules.indexOf(keyA) - modules.indexOf(keyB));
 
-  const renderProgressStatus = (details: ProgressDetail) => {
+  const renderProgressStatus = (details?: ProgressDetail | null) => {
+    if (!details) {
+      return ( <div className="flex items-center gap-1 text-xs text-white"> <span>Preparing</span> <div className="fetching-loader"></div> </div> );
+    }
     if (details.currentIndex === 0) {
       return ( <div className="flex items-center gap-1 text-xs text-white"> <span>Preparing</span> <div className="fetching-loader"></div> </div> );
     }
@@ -83,22 +89,27 @@ const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({ isLoading, progre
         <div className="p-3">
           {!isCompleted && (<p className="text-xs text-white italic text-center mb-3">Click module or region to scroll to table.</p>)}
           <div className="flex flex-col gap-3 text-sm">
-            {progressEntries.map(([moduleKey, details]) => {
+            {showFallback ? (
+              <div className="text-center text-sm text-white/90 italic">Waiting for report generation to start...</div>
+            ) : progressEntries.sort(([a], [b]) => modules.indexOf(a) - modules.indexOf(b)).map(([moduleKey, details]) => {
               const progressPercentage = details ? (details.currentIndex / details.totalRegions) * 100 : 0;
               return (
                 <div key={moduleKey} className="flex flex-col justify-between items-start w-full text-left rounded-lg p-2 bg-slate-800/20">
                   <div className="flex justify-between w-full items-center mb-1.5">
-                    <span
-                      onClick={() => !isCompleted && onModuleClick(moduleKey)}
-                      className={`font-semibold text-slate-200 ${!isCompleted ? 'cursor-pointer hover:text-sky-300 transition-colors' : ''}`}
-                    >
-                      {moduleKey}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span
+                        onClick={() => !isCompleted && onModuleClick(moduleKey)}
+                        className={`font-semibold text-slate-200 ${!isCompleted ? 'cursor-pointer hover:text-sky-300 transition-colors' : ''}`}
+                      >
+                        {moduleKey}
+                      </span>
+                      <span className="text-xs text-slate-300">({counts[moduleKey] ?? 0})</span>
+                    </div>
                     <span 
                       onClick={() => !isCompleted && onModuleClick(moduleKey)}
                       className={`font-mono px-2 py-0.5 rounded-full text-[10px] ${isCompleted ? 'bg-green-500/20 text-green-300' : 'bg-slate-700/70 text-slate-300'} ${!isCompleted ? 'cursor-pointer hover:bg-slate-600 transition-colors' : ''}`}
                     >
-                      {isCompleted ? 'COMPLETE' : details ? renderProgressStatus(details) : '...'}
+                      {isCompleted ? 'COMPLETE' : renderProgressStatus(details)}
                     </span>
                   </div>
                   <div className="w-full bg-slate-700/50 rounded-full h-1.5">
