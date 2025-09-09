@@ -246,7 +246,7 @@ const addHeader = (doc: jsPDF, params: PdfParams, pageNumber: number, pageCount:
   doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.text(`Page ${pageNumber} of ${pageCount}`, pageWidth - margin, doc.internal.pageSize.getHeight() - 20, { align: 'right' });
 };
 
-export const exportReportToPdf = async (params: PdfParams) => {
+export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal) => {
   // Use deduped/normalized data for Certificate of Occupancy to match the table totals/format
   const baseData = params.data.filter(lgu => !lgu.hasError);
   const exportableData =
@@ -264,8 +264,20 @@ export const exportReportToPdf = async (params: PdfParams) => {
   const sortedData = [...exportableData].sort(compareByRegion);
 
   let base64Logo = '';
-  try { base64Logo = await loadImageAsBase64(finalParams.logoUrl); }
-  catch (error) { console.error("Could not load logo for PDF.", error); }
+  const throwIfAborted = () => {
+    if (signal?.aborted) {
+      const e: any = new Error('canceled');
+      e.name = 'CanceledError';
+      throw e;
+    }
+  };
+  try {
+    throwIfAborted();
+    base64Logo = await loadImageAsBase64(finalParams.logoUrl);
+  } catch (error) {
+    if ((error as any)?.name === 'CanceledError') throw error;
+    console.error("Could not load logo for PDF.", error);
+  }
 
   const isComplex = ['Business Permit', 'Working Permit'].includes(moduleLabel);
   const orientation = isComplex ? 'landscape' : 'portrait';
@@ -300,6 +312,7 @@ export const exportReportToPdf = async (params: PdfParams) => {
   const numPages = allRows.length > 0 ? Math.ceil(allRows.length / rowsPerPage) : 1;
 
   for (let i = 0; i < numPages; i++) {
+    throwIfAborted();
     const pageData = allRows.slice(i * rowsPerPage, (i + 1) * rowsPerPage);
     const pageBody: any[] = [];
     let lastRegionOnPage: string | null = null;
@@ -359,7 +372,7 @@ export const exportReportToPdf = async (params: PdfParams) => {
       }
     }
 
-    if (i > 0) doc.addPage();
+  if (i > 0) doc.addPage();
     autoTable(doc, {
       head, body: pageBody,
       // Use the loop index and computed numPages to render "Page X of Y" correctly.
@@ -370,12 +383,17 @@ export const exportReportToPdf = async (params: PdfParams) => {
       alternateRowStyles: { fillColor: '#f8fafc' }
     });
   }
+  if (signal?.aborted) {
+    const e: any = new Error('canceled');
+    e.name = 'CanceledError';
+    throw e;
+  }
   doc.save(`${moduleLabel.toLowerCase().replace(/\s/g, '-')}-report.pdf`);
 };
 
 interface ExcelParams { data: any[]; moduleLabel: string; isDayMode: boolean; }
 
-export const exportReportToExcel = (params: ExcelParams) => {
+export const exportReportToExcel = (params: ExcelParams, signal?: AbortSignal) => {
   // Use deduped/normalized data for Certificate of Occupancy to match the table totals/format
   const baseData = params.data.filter(lgu => !lgu.hasError);
   const exportableData =
@@ -384,6 +402,14 @@ export const exportReportToExcel = (params: ExcelParams) => {
       : baseData;
 
   const { moduleLabel, isDayMode } = params;
+  const throwIfAborted = () => {
+    if (signal?.aborted) {
+      const e: any = new Error('canceled');
+      e.name = 'CanceledError';
+      throw e;
+    }
+  };
+  throwIfAborted();
 
   // Sort by custom region order (after normalizing region keys)
   const sortedData = [...exportableData].sort(compareByRegion);
@@ -491,5 +517,10 @@ export const exportReportToExcel = (params: ExcelParams) => {
 
   const wb = xlsx.utils.book_new();
   xlsx.utils.book_append_sheet(wb, ws, 'Report');
+  if (signal?.aborted) {
+    const e: any = new Error('canceled');
+    e.name = 'CanceledError';
+    throw e;
+  }
   xlsx.writeFile(wb, `${moduleLabel.toLowerCase().replace(/\s/g, '-')}-report.xlsx`);
 };

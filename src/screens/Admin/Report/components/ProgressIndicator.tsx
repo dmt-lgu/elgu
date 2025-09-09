@@ -16,24 +16,27 @@ interface ProgressIndicatorProps {
     [moduleKey: string]: ProgressDetail | null;
   };
   counts?: { [moduleKey: string]: number };
+  moduleLoading?: { [moduleKey: string]: boolean };
   onModuleClick: (moduleKey: string) => void;
 }
 
-const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({ isLoading, progress, counts = {}, onModuleClick }) => {
+const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({ isLoading, progress, counts = {}, moduleLoading = {}, onModuleClick }) => {
   const [isMinimized, setIsMinimized] = useState(false);
-  const [isVisible, setIsVisible] = useState(isLoading);
+  const anyModuleLoading = Object.values(moduleLoading || {}).some(Boolean);
+  const [isVisible, setIsVisible] = useState<boolean>(() => Boolean(isLoading || anyModuleLoading));
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
-    if (isLoading) {
+    const active = Boolean(isLoading || anyModuleLoading);
+    if (active) {
       setIsVisible(true);
-    } else if (isVisible && !isLoading) {
-      // Kung complete na ug makita pa, itago human sa 10 segundos
+    } else if (isVisible && !active) {
+      // If everything finished but still visible, hide after 10 seconds
       timer = setTimeout(() => setIsVisible(false), 10000);
     }
-    // Limpyohan ang timer kung ma-unmount ang component or mag-change ang dependencies
     return () => clearTimeout(timer);
-  }, [isLoading, isVisible]);
+  // include anyModuleLoading so visibility reacts to per-module states
+  }, [isLoading, anyModuleLoading, isVisible]);
   
   // 2. Function para itago ang component kung i-klik ang 'X'
   const handleClose = () => {
@@ -45,7 +48,10 @@ const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({ isLoading, progre
   // Show all modules present in the progress object, even if details are null.
   const progressEntries = Object.entries(progress);
   const showFallback = progressEntries.length === 0;
-  const isCompleted = !isLoading;
+  // Determine completion per-module using moduleLoading when available.
+  const allModuleKeys = progressEntries.map(([k]) => k);
+  const allModulesComplete = allModuleKeys.length === 0 ? !(isLoading || anyModuleLoading) : allModuleKeys.every(k => !moduleLoading[k]);
+  const isCompleted = allModulesComplete && !(isLoading || anyModuleLoading);
   progressEntries.sort(([keyA], [keyB]) => modules.indexOf(keyA) - modules.indexOf(keyB));
 
   const renderProgressStatus = (details?: ProgressDetail | null) => {

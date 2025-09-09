@@ -101,20 +101,33 @@ interface BusinessPermitProps {
   hasSearched?: boolean;
   onTableDataChange?: (hasData: boolean) => void;
   isProgressive?: boolean;
+  searchStartedAt?: Date;
+  moduleLoading?: boolean;
+  searchLoading?: boolean;
 }
 
-const BusinessPermitReport = forwardRef<HTMLDivElement, BusinessPermitProps>(({
+const BusinessPermitReport = forwardRef<HTMLDivElement, BusinessPermitProps>(({ 
   selectedRegions, dateRange, apiData, loading, lguToRegion,
   selectedProvinces, selectedCities, selectedDateType, selectedIslands,
-  hasSearched, onTableDataChange, isProgressive = false,
+  hasSearched, onTableDataChange, isProgressive = false, searchStartedAt, moduleLoading, searchLoading,
 }, ref) => {
-  const [generatedAt, setGeneratedAt] = useState(new Date());
-  const [openRegions, setOpenRegions] = useState(new Set<string>());
+  const [generatedAt, setGeneratedAt] = useState<Date>(() => new Date());
+  const [openRegions, setOpenRegions] = useState<Set<string>>(new Set<string>());
+  const [nowTime, setNowTime] = useState<Date>(() => new Date());
 
+  // When parent provides a searchStartedAt timestamp, use it as the generated time
+  // and start a small interval to update `nowTime` so we can compute an elapsed timer.
   useEffect(() => {
-    const intervalId = setInterval(() => setGeneratedAt(new Date()), 1000);
-    return () => clearInterval(intervalId);
-  }, []);
+    if (!searchStartedAt) return;
+    setGeneratedAt(searchStartedAt);
+    setNowTime(new Date());
+    let id: number | undefined;
+    const shouldRun = Boolean(loading || moduleLoading || searchLoading);
+    if (shouldRun) {
+      id = window.setInterval(() => setNowTime(new Date()), 1000);
+    }
+    return () => { if (id !== undefined) window.clearInterval(id); };
+  }, [searchStartedAt, loading, moduleLoading, searchLoading]);
   
   // 1) Filter using existing business rules
   const filteredResults = useMemo(() => {
@@ -206,6 +219,16 @@ const BusinessPermitReport = forwardRef<HTMLDivElement, BusinessPermitProps>(({
   };
 
   const dateRangeLabel = getDateRangeLabel(dateRange.start, dateRange.end, selectedDateType);
+
+  const elapsedString = useMemo(() => {
+    if (!searchStartedAt || !generatedAt) return null;
+    const diff = Math.max(0, Math.floor((nowTime.getTime() - new Date(generatedAt).getTime()) / 1000));
+    const hh = Math.floor(diff / 3600);
+    const mm = Math.floor((diff % 3600) / 60);
+    const ss = diff % 60;
+    if (hh > 0) return `${hh}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+    return `${mm}:${String(ss).padStart(2, '0')}`;
+  }, [nowTime, generatedAt, searchStartedAt]);
 
   // 4) Grand totals computed from normalizedResults to avoid double counting
   const grandTotals = useMemo(() => {
@@ -397,6 +420,9 @@ const BusinessPermitReport = forwardRef<HTMLDivElement, BusinessPermitProps>(({
           <div className='text-right'>
             <p className="text-[11px] font-semibold text-slate-600">Generated On</p>
             <p className="text-xs font-mono text-slate-500">{format(generatedAt, "MMM dd, yyyy, h:mm:ss a")}</p>
+            {elapsedString && (
+              <p className="text-[11px] text-slate-500 mt-1">Elapsed: <span className="font-mono text-xs">{elapsedString}</span></p>
+            )}
           </div>
         </div>
 

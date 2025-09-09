@@ -1,5 +1,3 @@
-// src/pages/Admin/Report/Reports.tsx
-
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import FilterSection from './components/FilterSection';
 import axios from '../../../plugin/axios';
@@ -227,10 +225,16 @@ const Reports: React.FC = () => {
   const [lguToRegion, setLguToRegion] = useState<Record<string, string>>({});
   const [lguRegionLoading, setLguRegionLoading] = useState(true);
   const searchAbortController = useRef<AbortController | null>(null);
+  const exportAbortController = useRef<AbortController | null>(null);
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const [isProgressiveLoading, setIsProgressiveLoading] = useState(false);
   const [progressiveData, setProgressiveData] = useState<ProgressiveDataState>({ [BP]: null, [WP]: null, [BC]: null, [BLDG]: null, [CO]: null });
   const [progressState, setProgressState] = useState<ProgressState>({});
+  
+  // --- MODIFICATION START ---
+  // New state to explicitly track if a user-initiated request (search or download) is active.
+  const [isRequestActive, setIsRequestActive] = useState(false);
+  // --- MODIFICATION END ---
 
   // Listen to progress events dispatched by useReportData and update local progress state
   useEffect(() => {
@@ -330,11 +334,34 @@ const Reports: React.FC = () => {
 
   const searchedModules = appliedFilter.selectedModules || [];
   const loading = !cancelled && (isProgressiveLoading || (!isSelectAll && ((searchedModules.includes(BP) && bpLoading) || (searchedModules.includes(WP) && wpLoading) || (searchedModules.includes(BC) && bcLoading) || (searchedModules.includes(BLDG) && bldgLoading) || (searchedModules.includes(CO) && coLoading))));
+
+  // --- MODIFICATION START ---
+  // This effect synchronizes our explicit `isRequestActive` state.
+  // It ensures that when all individual loading flags turn false, the overall request is marked as inactive.
+  useEffect(() => {
+    if (!loading) {
+      setIsRequestActive(false);
+    }
+  }, [loading]);
+  // --- MODIFICATION END ---
+  
+  // per-module loading map for ProgressIndicator
+  const moduleLoading: Record<string, boolean> = {
+    [BP]: (progressState[BP] ? (progressState[BP]!.currentIndex < progressState[BP]!.totalRegions) : (isSelectAll ? isProgressiveLoading : !!bpLoading)),
+    [WP]: (progressState[WP] ? (progressState[WP]!.currentIndex < progressState[WP]!.totalRegions) : (isSelectAll ? isProgressiveLoading : !!wpLoading)),
+    [BC]: (progressState[BC] ? (progressState[BC]!.currentIndex < progressState[BC]!.totalRegions) : (isSelectAll ? isProgressiveLoading : !!bcLoading)),
+    [BLDG]: (progressState[BLDG] ? (progressState[BLDG]!.currentIndex < progressState[BLDG]!.totalRegions) : (isSelectAll ? isProgressiveLoading : !!bldgLoading)),
+    [CO]: (progressState[CO] ? (progressState[CO]!.currentIndex < progressState[CO]!.totalRegions) : (isSelectAll ? isProgressiveLoading : !!coLoading)),
+  };
   
   const handleSearch = (filters: any) => {
+    // --- MODIFICATION START ---
+    setIsRequestActive(true); // Explicitly mark a request as active
+    // --- MODIFICATION END ---
     setCancelled(false);
-  const normalizedDateRangeVal = { start: filters.dateRange?.start ? (typeof filters.dateRange.start === "string" ? filters.dateRange.start : filters.dateRange.start.toISOString().slice(0, 10)) : null, end: filters.dateRange?.end ? (typeof filters.dateRange.end === "string" ? filters.dateRange.end : filters.dateRange.end.toISOString().slice(0, 10)) : null };
-  const normalizedFilters = { ...filters, dateRange: normalizedDateRangeVal, selectedModules: (filters.selectedModules || []).slice().sort(), selectedDateType: filters.selectedDateType || 'Month' };
+    setGeneratedAt(new Date());
+    const normalizedDateRangeVal = { start: filters.dateRange?.start ? (typeof filters.dateRange.start === "string" ? filters.dateRange.start : filters.dateRange.start.toISOString().slice(0, 10)) : null, end: filters.dateRange?.end ? (typeof filters.dateRange.end === "string" ? filters.dateRange.end : filters.dateRange.end.toISOString().slice(0, 10)) : null };
+    const normalizedFilters = { ...filters, dateRange: normalizedDateRangeVal, selectedModules: (filters.selectedModules || []).slice().sort(), selectedDateType: filters.selectedDateType || 'Month' };
     if (filters.skipApi || areFiltersEqual(normalizedFilters, lastAppliedFilters)) return;
     // Initialize progress entries so ProgressIndicator can show during normal (non-select-all) fetches
     try {
@@ -359,33 +386,36 @@ const Reports: React.FC = () => {
     searchAbortController.current = new AbortController();
   };
 
-  // Auto-run search on first mount if FilterSection has valid defaults
+  // Auto-run search reactively when the UI filter has modules + location + date range,
+  // but avoid duplicate calls by comparing against lastAppliedFilters.
   useEffect(() => {
-    // Only auto-search when user hasn't searched yet and filter UI has sensible defaults
     if (hasSearched) return;
     const hasModules = Array.isArray(uiSelectedModules) && uiSelectedModules.length > 0;
     const hasLocation = (Array.isArray(uiSelectedRegions) && uiSelectedRegions.length > 0) || (Array.isArray(uiSelectedIslands) && uiSelectedIslands.length > 0);
     const hasDate = Boolean(uiDateRange && uiDateRange.start && uiDateRange.end);
-    if (hasModules && hasLocation && hasDate) {
-      // Build shape expected by handleSearch
-      const normalized = {
-        selectedModules: (uiSelectedModules || []).slice().sort(),
-        selectedProvinces: selectedProvinces || [],
-        selectedCities: selectedCities || [],
-        selectedRegions: uiSelectedRegions || [],
-        selectedIslands: uiSelectedIslands || [],
-        dateRange: uiDateRange,
-        selectedDateType: uiSelectedDateType || 'Month',
-      };
+    if (!hasModules || !hasLocation || !hasDate) return;
+    const normalized = {
+      selectedModules: (uiSelectedModules || []).slice().sort(),
+      selectedProvinces: selectedProvinces || [],
+      selectedCities: selectedCities || [],
+      selectedRegions: uiSelectedRegions || [],
+      selectedIslands: uiSelectedIslands || [],
+      dateRange: uiDateRange,
+      selectedDateType: uiSelectedDateType || 'Month',
+    };
+    // Avoid calling search if filters equal lastAppliedFilters
+    if (!areFiltersEqual(normalized, lastAppliedFilters)) {
       handleSearch(normalized);
     }
-    // run only once on mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // re-run when any UI filter value changes
+  }, [uiSelectedModules, uiSelectedRegions, uiSelectedIslands, uiDateRange, uiSelectedDateType, selectedProvinces, selectedCities, hasSearched, lastAppliedFilters]);
 
   // No auto-search: users must explicitly click Search in the FilterSection to load table data.
 
   const handleReset = () => {
+    // --- MODIFICATION START ---
+    setIsRequestActive(false); // Ensure request is marked as inactive
+    // --- MODIFICATION END ---
     setProgressState({});
     const keys: (keyof RootState['reportFilter'])[] = ['selectedRegions', 'selectedProvinces', 'selectedCities', 'selectedIslands', 'selectedModules'];
     keys.forEach(key => dispatch(updateFilterField({ key, value: [] })));
@@ -407,8 +437,12 @@ const Reports: React.FC = () => {
   };
   
   const handleCancelSearch = () => {
+    // --- MODIFICATION START ---
+    setIsRequestActive(false); // Explicitly mark the request as inactive
+    // --- MODIFICATION END ---
     setProgressState({});
     if (searchAbortController.current) searchAbortController.current.abort();
+    if (exportAbortController.current) exportAbortController.current.abort();
     setHasSearched(false);
     setCancelled(true);
     setIsProgressiveLoading(false);
@@ -420,67 +454,90 @@ const Reports: React.FC = () => {
     filters: RootState['reportFilter'], 
     permitTypes?: ("business" | "working" | "barangay" | "building" | "certificate")[]
 ) => {
+    // --- MODIFICATION START ---
+    setIsRequestActive(true); // Explicitly mark a request as active
+    // --- MODIFICATION END ---
     setGeneratedAt(new Date());
+    // create a fresh abort controller for this export operation
+    if (exportAbortController.current) exportAbortController.current.abort();
+    exportAbortController.current = new AbortController();
+    const exportSignal = exportAbortController.current.signal;
     
-    const normalizedDateRange = normalizeDateRange(filters.dateRange);
-    const dateRangeLabel = getDateRangeLabel(normalizedDateRange.start, normalizedDateRange.end, filters.selectedDateType);
+    try {
+      const normalizedDateRange = normalizeDateRange(filters.dateRange);
+      const dateRangeLabel = getDateRangeLabel(normalizedDateRange.start, normalizedDateRange.end, filters.selectedDateType);
 
-    const modulesToExport = permitTypes ? permitTypes.map(pt => {
-        if (pt === "business") return BP; if (pt === "working") return WP;
-        if (pt === "barangay") return BC; if (pt === "building") return BLDG;
-        if (pt === "certificate") return CO;
-        return "";
-    }).filter(Boolean) : (filters.selectedModules || []);
+      const modulesToExport = permitTypes ? permitTypes.map(pt => {
+          if (pt === "business") return BP; if (pt === "working") return WP;
+          if (pt === "barangay") return BC; if (pt === "building") return BLDG;
+          if (pt === "certificate") return CO;
+          return "";
+      }).filter(Boolean) : (filters.selectedModules || []);
 
-    for (const moduleKey of modulesToExport) {
-        const isSelectAllMode = !!appliedFilter.allRegionsSelected;
-        let rawData;
-        switch (moduleKey) {
-            case BP: rawData = isSelectAllMode ? progressiveData[BP] : bpTableData; break;
-            case WP: rawData = isSelectAllMode ? progressiveData[WP] : wpTableData; break;
-            case BC: rawData = isSelectAllMode ? progressiveData[BC] : bcTableData; break;
-            case BLDG: rawData = isSelectAllMode ? progressiveData[BLDG] : bldgTableData; break;
-            case CO: rawData = isSelectAllMode ? progressiveData[CO] : coTableData; break;
-            default: rawData = null;
-        }
+      for (const moduleKey of modulesToExport) {
+          if (exportSignal.aborted) break;
 
-        if (!rawData || !rawData.results || rawData.results.length === 0) {
-            Swal.fire({ icon: "info", title: "No Data", text: `There is no data to download for the ${moduleKey} report.`, timer: 2000, showConfirmButton: false });
-            continue;
-        }
+          const isSelectAllMode = !!appliedFilter.allRegionsSelected;
+          let rawData;
+          switch (moduleKey) {
+              case BP: rawData = isSelectAllMode ? progressiveData[BP] : bpTableData; break;
+              case WP: rawData = isSelectAllMode ? progressiveData[WP] : wpTableData; break;
+              case BC: rawData = isSelectAllMode ? progressiveData[BC] : bcTableData; break;
+              case BLDG: rawData = isSelectAllMode ? progressiveData[BLDG] : bldgTableData; break;
+              case CO: rawData = isSelectAllMode ? progressiveData[CO] : coTableData; break;
+              default: rawData = null;
+          }
 
-        // --- START OF THE CRITICAL FIX ---
-        // REMOVE the call to the wrong filter function: getModuleFilteredResults
-        // REPLACE it with the call to the CORRECT filter function: filterTableResults
-        // This is the same function your UI tables use.
-        const finalSortedData = filterTableResults({
-            apiData: rawData,
-            lguToRegion,
-            dateRange: filters.dateRange,
-            selectedRegions: filters.selectedRegions,
-            selectedProvinces: filters.selectedProvinces,
-            selectedCities: filters.selectedCities,
-            selectedIslands: filters.selectedIslands,
-            selectedDates: filters.selectedDateType ? [filters.selectedDateType] : []
-        });
-        // --- END OF THE CRITICAL FIX ---
+          if (!rawData || !rawData.results || rawData.results.length === 0) {
+              Swal.fire({ icon: "info", title: "No Data", text: `There is no data to download for the ${moduleKey} report.`, timer: 2000, showConfirmButton: false });
+              continue;
+          }
+          
+          const finalSortedData = filterTableResults({
+              apiData: rawData,
+              lguToRegion,
+              dateRange: filters.dateRange,
+              selectedRegions: filters.selectedRegions,
+              selectedProvinces: filters.selectedProvinces,
+              selectedCities: filters.selectedCities,
+              selectedIslands: filters.selectedIslands,
+              selectedDates: filters.selectedDateType ? [filters.selectedDateType] : []
+          });
 
-        if (type === "pdf") {
-            await exportReportToPdf({
+          try {
+            if (type === "pdf") {
+              await exportReportToPdf({
                 data: finalSortedData,
                 logoUrl: dictImage,
                 moduleLabel: moduleKey,
                 dateRangeLabel,
                 isDayMode: filters.selectedDateType === 'Day',
                 generatedAt: generatedAt,
-            });
-        } else {
-            await exportReportToExcel({
+              }, exportSignal);
+            } else {
+              await exportReportToExcel({
                 data: finalSortedData,
                 moduleLabel: moduleKey,
                 isDayMode: filters.selectedDateType === 'Day'
-            });
-        }
+              }, exportSignal);
+            }
+          } catch (err: any) {
+            if (err?.name === 'CanceledError' || err?.message === 'canceled') {
+              Swal.fire({ icon: 'info', title: 'Export Cancelled', timer: 1000, showConfirmButton: false });
+              // If export was cancelled, stop further modules
+              break;
+            } else {
+              console.error('Export error for', moduleKey, err);
+              Swal.fire({ icon: 'error', title: 'Export Failed', text: `Failed to export ${moduleKey}.`, timer: 2000, showConfirmButton: false });
+            }
+          }
+      }
+    } finally {
+      // --- MODIFICATION START ---
+      // Ensure the request is marked as inactive when the download process ends (success or fail)
+      setIsRequestActive(false);
+      if (exportAbortController.current) { exportAbortController.current = null; }
+      // --- MODIFICATION END ---
     }
   };
 
@@ -536,7 +593,10 @@ const Reports: React.FC = () => {
           onDownload={handleDownload}
           onReset={handleReset}
           hasTableData={hasTableData}
-          loading={!!loading || lguRegionLoading}
+          // --- MODIFICATION START ---
+          // Pass the new, more stable state to the FilterSection
+          loading={isRequestActive || lguRegionLoading}
+          // --- MODIFICATION END ---
           onCancel={handleCancelSearch}
           hasSearched={hasSearched}
         />
@@ -548,10 +608,13 @@ const Reports: React.FC = () => {
               selectedProvinces={selectedProvinces} 
               selectedCities={selectedCities} 
               apiData={isSelectAll ? progressiveData[BP] : bpTableData} 
-              loading={(isSelectAll ? isProgressiveLoading : bpLoading)} 
+              loading={(isSelectAll ? isProgressiveLoading : (moduleLoading[BP] || bpLoading))} 
               isProgressive={isProgressiveLoading} 
               lguToRegion={lguToRegion} 
               hasSearched={hasSearched} 
+              moduleLoading={moduleLoading[BP]}
+              searchStartedAt={generatedAt}
+              searchLoading={(isSelectAll ? isProgressiveLoading : (moduleLoading[BP] || bpLoading))}
               onTableDataChange={setHasTableData}/>
             </div>}
           {uiSelectedModules.includes(WP) && 
@@ -561,10 +624,13 @@ const Reports: React.FC = () => {
               selectedProvinces={selectedProvinces} 
               selectedCities={selectedCities} 
               apiData={isSelectAll ? progressiveData[WP] : wpTableData} 
-              loading={(isSelectAll ? isProgressiveLoading : wpLoading)} 
+              loading={(isSelectAll ? isProgressiveLoading : (moduleLoading[WP] || wpLoading))} 
               isProgressive={isProgressiveLoading} 
               lguToRegion={lguToRegion} 
               hasSearched={hasSearched} 
+              moduleLoading={moduleLoading[WP]}
+              searchStartedAt={generatedAt}
+              searchLoading={(isSelectAll ? isProgressiveLoading : (moduleLoading[WP] || wpLoading))}
               onTableDataChange={setHasTableData}/>
             </div>}
           {uiSelectedModules.includes(BC) && 
@@ -574,10 +640,13 @@ const Reports: React.FC = () => {
               selectedProvinces={selectedProvinces} 
               selectedCities={selectedCities} 
               apiData={isSelectAll ? progressiveData[BC] : bcTableData} 
-              loading={(isSelectAll ? isProgressiveLoading : bcLoading)} 
+              loading={(isSelectAll ? isProgressiveLoading : (moduleLoading[BC] || bcLoading))} 
               isProgressive={isProgressiveLoading} 
               lguToRegion={lguToRegion} 
               hasSearched={hasSearched} 
+              moduleLoading={moduleLoading[BC]}
+              searchStartedAt={generatedAt}
+              searchLoading={(isSelectAll ? isProgressiveLoading : (moduleLoading[BC] || bcLoading))}
               onTableDataChange={setHasTableData}/>
             </div>}
           {uiSelectedModules.includes(BLDG) && 
@@ -587,10 +656,13 @@ const Reports: React.FC = () => {
               selectedProvinces={selectedProvinces} 
               selectedCities={selectedCities} 
               apiData={isSelectAll ? progressiveData[BLDG] : bldgTableData} 
-              loading={(isSelectAll ? isProgressiveLoading : bldgLoading)} 
+              loading={(isSelectAll ? isProgressiveLoading : (moduleLoading[BLDG] || bldgLoading))} 
               isProgressive={isProgressiveLoading} 
               lguToRegion={lguToRegion} 
               hasSearched={hasSearched} 
+              moduleLoading={moduleLoading[BLDG]}
+              searchStartedAt={generatedAt}
+              searchLoading={(isSelectAll ? isProgressiveLoading : (moduleLoading[BLDG] || bldgLoading))}
               onTableDataChange={setHasTableData}/>
             </div>}
           {uiSelectedModules.includes(CO) && 
@@ -599,10 +671,13 @@ const Reports: React.FC = () => {
               {...appliedFilter} selectedProvinces={selectedProvinces} 
               selectedCities={selectedCities} 
               apiData={isSelectAll ? progressiveData[CO] : coTableData} 
-              loading={(isSelectAll ? isProgressiveLoading : coLoading)} 
+              loading={(isSelectAll ? isProgressiveLoading : (moduleLoading[CO] || coLoading))} 
               isProgressive={isProgressiveLoading} 
               lguToRegion={lguToRegion} 
               hasSearched={hasSearched} 
+              moduleLoading={moduleLoading[CO]}
+              searchStartedAt={generatedAt}
+              searchLoading={(isSelectAll ? isProgressiveLoading : (moduleLoading[CO] || coLoading))}
               onTableDataChange={setHasTableData}/>
             </div>}
           {!loading && uiSelectedModules.length === 0 && (
@@ -616,7 +691,7 @@ const Reports: React.FC = () => {
           )}
         </div>
         <ScrollToTopButton scrollTargetRef={tableContainerRef} />
-  <ProgressIndicator isLoading={loading || isProgressiveLoading} progress={progressState} counts={counts} onModuleClick={scrollToReport}/>
+        <ProgressIndicator isLoading={isRequestActive || lguRegionLoading} progress={progressState} counts={counts} moduleLoading={moduleLoading} onModuleClick={scrollToReport}/>
       </div>
     </div>
   );

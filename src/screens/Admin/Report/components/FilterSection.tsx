@@ -130,7 +130,6 @@ const FilterSection: React.FC<FilterSectionProps> = ({
   hasTableData = false,
   loading = false,
   onCancel,
-  hasSearched = false,
   isActive = true,
 }) => {
   const dispatch = useDispatch<AppDispatch>();
@@ -209,9 +208,14 @@ const FilterSection: React.FC<FilterSectionProps> = ({
   const [elapsedSec, setElapsedSec] = useState(0);
   const [lastRequestDuration, setLastRequestDuration] = useState<string | null>(null);
   const timerRef = useRef<number | null>(null);
+  const [isDownloadInProgress, setIsDownloadInProgress] = useState(false);
+  const watchdogRef = useRef<number | null>(null);
+  const [requestActive, setRequestActive] = useState(false);
+  const hideRequestTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
-    const shouldRun = loading && hasSearched && isActive;
+    // Start the timer whenever loading or a download is in progress while the component is active.
+    const shouldRun = (loading || isDownloadInProgress) && isActive;
     if (shouldRun) {
       if (timerRef.current == null) {
         const start = Date.now();
@@ -230,20 +234,49 @@ const FilterSection: React.FC<FilterSectionProps> = ({
         timerRef.current = null;
       }
     };
-  }, [loading, hasSearched, isActive]);
+  }, [loading, isDownloadInProgress, isActive]);
+
+  // Keep a short grace period so the Cancel button doesn't disappear during brief loading gaps
+  useEffect(() => {
+    const anyActive = (loading || isDownloadInProgress) && isActive;
+    if (anyActive) {
+      setRequestActive(true);
+      if (hideRequestTimeoutRef.current != null) {
+        clearTimeout(hideRequestTimeoutRef.current);
+        hideRequestTimeoutRef.current = null;
+      }
+    } else {
+      // start a small grace timeout before hiding
+      if (hideRequestTimeoutRef.current != null) clearTimeout(hideRequestTimeoutRef.current);
+      hideRequestTimeoutRef.current = window.setTimeout(() => {
+        setRequestActive(false);
+        hideRequestTimeoutRef.current = null;
+      }, 3000); // 3s grace
+    }
+    return () => {
+      if (hideRequestTimeoutRef.current != null) {
+        clearTimeout(hideRequestTimeoutRef.current);
+        hideRequestTimeoutRef.current = null;
+      }
+    };
+  }, [loading, isDownloadInProgress, isActive]);
 
   const elapsedLabel = useMemo(() => {
-    const mm = String(Math.floor(elapsedSec / 60)).padStart(2, '0');
-    const ss = String(elapsedSec % 60).padStart(2, '0');
-    return `${mm}:${ss}`;
+  const hh = Math.floor(elapsedSec / 3600);
+  const mm = Math.floor((elapsedSec % 3600) / 60);
+  const ss = elapsedSec % 60;
+  if (hh > 0) return `${hh}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+  return `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
   }, [elapsedSec]);
 
   const prevLoading = usePrevious(loading);
+  const prevDownloadInProgress = usePrevious(isDownloadInProgress);
   useEffect(() => {
-    if (prevLoading && !loading && hasSearched) {
+    // Capture the final request duration whenever either a loading cycle or a download finishes.
+    if ((prevLoading && !loading) || (prevDownloadInProgress && !isDownloadInProgress)) {
       setLastRequestDuration(elapsedLabel);
     }
-  }, [loading, prevLoading, hasSearched, elapsedLabel]);
+  }, [loading, prevLoading, isDownloadInProgress, prevDownloadInProgress, elapsedLabel]);
 
   const handleCancelClick = () => {
     if (timerRef.current != null) {
@@ -251,7 +284,12 @@ const FilterSection: React.FC<FilterSectionProps> = ({
       timerRef.current = null;
     }
     setElapsedSec(0);
-    onCancel?.();
+  setIsDownloadInProgress(false);
+  if (watchdogRef.current != null) {
+    clearTimeout(watchdogRef.current);
+    watchdogRef.current = null;
+  }
+  onCancel?.();
   };
 
   const isSearchDisabled =
@@ -306,8 +344,24 @@ const FilterSection: React.FC<FilterSectionProps> = ({
     const checkboxOptions = allPermitOptions.filter(opt => selectedModules.includes(opt.moduleName));
     if (checkboxOptions.length === 0) return;
     if (checkboxOptions.length === 1) {
-      if (onDownload) onDownload(type, filterState, [checkboxOptions[0].value as any]);
-      return;
+        if (onDownload) {
+          // Ensure we track download progress even for single-option quick path
+          setIsDownloadInProgress(true);
+          watchdogRef.current = window.setTimeout(() => setIsDownloadInProgress(false), 120000);
+          try {
+            const ret: any = onDownload(type, filterState, [checkboxOptions[0].value as any]);
+            if (ret && typeof ret.then === 'function') {
+              await ret;
+            }
+          } finally {
+            if (watchdogRef.current != null) {
+              clearTimeout(watchdogRef.current);
+              watchdogRef.current = null;
+            }
+            setIsDownloadInProgress(false);
+          }
+        }
+        return;
     }
     const checkmarkSVG = `<svg viewBox='0 0 16 16' fill='currentColor'><path d='M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z'/></svg>`;
     const html = `
@@ -369,9 +423,32 @@ const FilterSection: React.FC<FilterSectionProps> = ({
         confirmButton: 'swal-button swal-button-confirm',
         cancelButton: 'swal-button swal-button-cancel',
       },
-    }).then(result => {
+    }).then(async result => {
       if (result.isConfirmed && Array.isArray(result.value)) {
-        if (onDownload) onDownload(type, filterState, result.value as any);
+        if (onDownload) {
+          // mark download in progress immediately so UI shows Cancel button
+          setIsDownloadInProgress(true);
+          watchdogRef.current = window.setTimeout(() => setIsDownloadInProgress(false), 120000);
+          try {
+            const returnVal: any = onDownload(type, filterState, result.value as any);
+            // If parent returned a promise-like, await it and track progress locally.
+            if (returnVal && typeof returnVal.then === 'function') {
+              try {
+                await returnVal;
+              } finally {
+                // nothing here; outer finally will handle clearing
+              }
+            }
+          } catch (err) {
+            throw err;
+          } finally {
+            if (watchdogRef.current != null) {
+              clearTimeout(watchdogRef.current);
+              watchdogRef.current = null;
+            }
+            setIsDownloadInProgress(false);
+          }
+        }
       }
     });
   };
@@ -525,16 +602,16 @@ const FilterSection: React.FC<FilterSectionProps> = ({
         <div className="flex justify-between items-center">
           <h2 className="text-lg font-bold text-[#2162e7]">Filter Reports</h2>
 
-          {/* This will show the LIVE timer DURING the request */}
-          {loading && hasSearched && (
+          {/* This will show the LIVE timer DURING the request or download */}
+          {requestActive && isActive && (
             <div className="flex items-center gap-2 text-sm font-medium text-gray-600">
               <Loader2Icon className="w-4 h-4 animate-spin" />
               <span>Duration: {elapsedLabel}</span>
             </div>
           )}
 
-          {/* This will show the FINAL duration AFTER the request */}
-          {!loading && lastRequestDuration && (
+          {/* This will show the FINAL duration AFTER the request or download */}
+          {!requestActive && lastRequestDuration && (
             <span className="text-sm font-medium text-gray-600">Duration: {lastRequestDuration}</span>
           )}
         </div>
@@ -871,8 +948,8 @@ const FilterSection: React.FC<FilterSectionProps> = ({
         <div className="flex flex-col gap-4 mt-4 justify-end">
           <div className="grid grid-cols-3 gap-2">
             <Button className="bg-red-500 hover:bg-red-600 h-12 text-white font-semibold text-xs" onClick={handleReset} disabled={loading || !isActive}>Reset</Button>
-            {loading && hasSearched && isActive ? (
-              <Button className="bg-red-500 hover:bg-red-600 h-12 text-xs text-white col-span-2" onClick={handleCancelClick} disabled={!loading || !isActive}>
+            {requestActive && isActive ? (
+              <Button className="bg-red-500 hover:bg-red-600 h-12 text-xs text-white col-span-2" onClick={handleCancelClick} disabled={!requestActive || !isActive}>
                 <Loader2Icon className="inline w-4 h-4 animate-spin mr-1" />
                 Cancel Request
               </Button>
