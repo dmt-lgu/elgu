@@ -215,7 +215,8 @@ const FilterSection: React.FC<FilterSectionProps> = ({
 
   useEffect(() => {
     // Start the timer whenever loading or a download is in progress while the component is active.
-    const shouldRun = (loading || isDownloadInProgress) && isActive;
+  // Only treat download-as-active for the timer when a cancel handler exists (exports don't pass onCancel)
+  const shouldRun = (loading || (isDownloadInProgress && typeof onCancel === 'function')) && isActive;
     if (shouldRun) {
       if (timerRef.current == null) {
         const start = Date.now();
@@ -238,7 +239,8 @@ const FilterSection: React.FC<FilterSectionProps> = ({
 
   // Keep a short grace period so the Cancel button doesn't disappear during brief loading gaps
   useEffect(() => {
-    const anyActive = (loading || isDownloadInProgress) && isActive;
+  // Show the request active state only for loading (search) or downloads that can be cancelled (onCancel provided).
+  const anyActive = (loading || (isDownloadInProgress && typeof onCancel === 'function')) && isActive;
     if (anyActive) {
       setRequestActive(true);
       if (hideRequestTimeoutRef.current != null) {

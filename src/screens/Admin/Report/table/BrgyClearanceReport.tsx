@@ -15,6 +15,7 @@ import LoaderTable from '../utils/LoaderTable';
 
 import { filterTableResults, formatMonthYear, formatNumber, groupResultsByRegion, getDateRangeLabel } from '../utils/reportUtils';
 import Loading from '../utils/Loading';
+import { Search } from 'lucide-react';
 
 // Export the filter function so other parts of the app can use it if needed
 export { filterTableResults };
@@ -455,9 +456,7 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
                   <TableCell colSpan={3} className="text-center py-16 bg-white">
                     <div className='flex flex-col items-center justify-center'>
                       <div className="rounded-full bg-slate-100 p-3">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                        </svg>
+                        <Search className="h-8 w-8 text-slate-400" />
                       </div>
                       <p className='font-bold text-sm text-slate-600 mt-4'>{hasSearched ? 'No Results Found' : 'Generate a Report'}</p>
                       <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">

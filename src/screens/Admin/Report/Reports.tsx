@@ -22,6 +22,7 @@ import { setcertificateOfOccupancy, setCertificateOfOccupancyAppliedFilter } fro
 import ProgressIndicator from './components/ProgressIndicator';
 import { filterTableResults, getDateRangeLabel } from './utils/reportUtils';
 import BusinessPermitReport from './table/BusinessPermitReport';
+import { Filter } from 'lucide-react';
 
 // Type definitions and helper functions remain the same
 type DateRange = { start: string | null; end: string | null };
@@ -92,12 +93,17 @@ function useReportData({
     appliedFilter.selectedIslands, appliedFilter.dateRange?.start, appliedFilter.dateRange?.end,
   ]);
   useEffect(() => {
-    if (isSelectAll) { setData(null); setLoading(false); return; }
-    if (!hasSearched || skipLoading || (!appliedFilter.selectedRegions.length && !appliedFilter.selectedIslands.length) || !appliedFilter.dateRange.start || !appliedFilter.dateRange.end) {
-      setData(null); setLoading(false); return;
-    }
+  // If we have persisted table data + a persisted applied filter that matches the
+    // current UI filter, reuse that data so the tables remain after a page refresh.
+    // This allows users to refresh the page and still see the results they previously
+    // fetched without needing to click Search again.
     if (reduxTableData && reduxAppliedFilter && JSON.stringify(currentFilter) === JSON.stringify(reduxAppliedFilter)) {
       setData(reduxTableData); setLoading(false); return;
+    }
+
+    // Otherwise, gate API calls behind an explicit search and required filter fields.
+    if (!hasSearched || skipLoading || (!appliedFilter.selectedRegions.length && !appliedFilter.selectedIslands.length) || !appliedFilter.dateRange.start || !appliedFilter.dateRange.end) {
+      setData(null); setLoading(false); return;
     }
     setLoading(true);
     const payload: any = {
@@ -216,10 +222,13 @@ const Reports: React.FC = () => {
     return { ...defaultFilter, ...(bpPersistedAppliedFilter || {}) };
   });
 
-  // Start with searched = true only when there is a persisted applied filter.
-  // Do NOT auto-trigger search when the UI filter (redux) merely has defaults.
-  const [hasSearched, setHasSearched] = useState<boolean>(() => !!bpPersistedAppliedFilter);
-  const [lastAppliedFilters, setLastAppliedFilters] = useState<any>(() => bpPersistedAppliedFilter);
+  // Do NOT auto-trigger search; require explicit user action.
+  // However, if we already have persisted table data (from redux-persist), consider
+  // the page as having been 'searched' so we reuse the stored results immediately
+  // and avoid showing a loading spinner on refresh.
+  const initialHasSearched = !!(bpTableData || wpTableData || bcTableData || bldgTableData || coTableData);
+  const [hasSearched, setHasSearched] = useState<boolean>(initialHasSearched);
+  const [lastAppliedFilters, setLastAppliedFilters] = useState<any>(null);
   const [cancelled, setCancelled] = useState(false);
   const [hasTableData, setHasTableData] = useState(false);
   const [lguToRegion, setLguToRegion] = useState<Record<string, string>>({});
@@ -231,10 +240,9 @@ const Reports: React.FC = () => {
   const [progressiveData, setProgressiveData] = useState<ProgressiveDataState>({ [BP]: null, [WP]: null, [BC]: null, [BLDG]: null, [CO]: null });
   const [progressState, setProgressState] = useState<ProgressState>({});
   
-  // --- MODIFICATION START ---
-  // New state to explicitly track if a user-initiated request (search or download) is active.
-  const [isRequestActive, setIsRequestActive] = useState(false);
-  // --- MODIFICATION END ---
+  // Track search vs export separately so UI doesn't show cancel/progress during export
+  const [isSearchActive, setIsSearchActive] = useState(false);
+  const [isExportActive, setIsExportActive] = useState(false);
 
   // Listen to progress events dispatched by useReportData and update local progress state
   useEffect(() => {
@@ -334,30 +342,47 @@ const Reports: React.FC = () => {
 
   const searchedModules = appliedFilter.selectedModules || [];
   const loading = !cancelled && (isProgressiveLoading || (!isSelectAll && ((searchedModules.includes(BP) && bpLoading) || (searchedModules.includes(WP) && wpLoading) || (searchedModules.includes(BC) && bcLoading) || (searchedModules.includes(BLDG) && bldgLoading) || (searchedModules.includes(CO) && coLoading))));
+  // More robust signal: any module still loading (including progress-mode modules)
+  // or progressive mode active. Include progressState so progress-based loading
+  // (when modules are fetched per-region) keeps the global loading flag true
+  // — this ensures the cancel button in the FilterSection remains available
+  // while, for example, Business Permit is still completing its per-region work.
+  const anyModuleLoading = !cancelled && (
+    bpLoading || wpLoading || bcLoading || bldgLoading || coLoading || isProgressiveLoading ||
+    Object.values(progressState || {}).some(p => !!p && typeof p.currentIndex === 'number' && typeof p.totalRegions === 'number' && p.currentIndex < p.totalRegions)
+  );
 
-  // --- MODIFICATION START ---
-  // This effect synchronizes our explicit `isRequestActive` state.
-  // It ensures that when all individual loading flags turn false, the overall request is marked as inactive.
+  // Keep search-active state in sync with module loading flags.
   useEffect(() => {
-    if (!loading) {
-      setIsRequestActive(false);
+    if (!anyModuleLoading) {
+      setIsSearchActive(false);
     }
-  }, [loading]);
-  // --- MODIFICATION END ---
+  }, [anyModuleLoading]);
   
   // per-module loading map for ProgressIndicator
+  // Use progress-based loading only for select-all or multi-region selections
+  const useProgressMode = isSelectAll || ((appliedFilter.selectedRegions || []).length > 1);
   const moduleLoading: Record<string, boolean> = {
-    [BP]: (progressState[BP] ? (progressState[BP]!.currentIndex < progressState[BP]!.totalRegions) : (isSelectAll ? isProgressiveLoading : !!bpLoading)),
-    [WP]: (progressState[WP] ? (progressState[WP]!.currentIndex < progressState[WP]!.totalRegions) : (isSelectAll ? isProgressiveLoading : !!wpLoading)),
-    [BC]: (progressState[BC] ? (progressState[BC]!.currentIndex < progressState[BC]!.totalRegions) : (isSelectAll ? isProgressiveLoading : !!bcLoading)),
-    [BLDG]: (progressState[BLDG] ? (progressState[BLDG]!.currentIndex < progressState[BLDG]!.totalRegions) : (isSelectAll ? isProgressiveLoading : !!bldgLoading)),
-    [CO]: (progressState[CO] ? (progressState[CO]!.currentIndex < progressState[CO]!.totalRegions) : (isSelectAll ? isProgressiveLoading : !!coLoading)),
+    [BP]: useProgressMode
+      ? (progressState[BP] ? (progressState[BP]!.currentIndex < progressState[BP]!.totalRegions) : (isSelectAll ? isProgressiveLoading : !!bpLoading))
+      : !!bpLoading,
+    [WP]: useProgressMode
+      ? (progressState[WP] ? (progressState[WP]!.currentIndex < progressState[WP]!.totalRegions) : (isSelectAll ? isProgressiveLoading : !!wpLoading))
+      : !!wpLoading,
+    [BC]: useProgressMode
+      ? (progressState[BC] ? (progressState[BC]!.currentIndex < progressState[BC]!.totalRegions) : (isSelectAll ? isProgressiveLoading : !!bcLoading))
+      : !!bcLoading,
+    [BLDG]: useProgressMode
+      ? (progressState[BLDG] ? (progressState[BLDG]!.currentIndex < progressState[BLDG]!.totalRegions) : (isSelectAll ? isProgressiveLoading : !!bldgLoading))
+      : !!bldgLoading,
+    [CO]: useProgressMode
+      ? (progressState[CO] ? (progressState[CO]!.currentIndex < progressState[CO]!.totalRegions) : (isSelectAll ? isProgressiveLoading : !!coLoading))
+      : !!coLoading,
   };
   
   const handleSearch = (filters: any) => {
-    // --- MODIFICATION START ---
-    setIsRequestActive(true); // Explicitly mark a request as active
-    // --- MODIFICATION END ---
+    // Mark search as active
+    setIsSearchActive(true);
     setCancelled(false);
     setGeneratedAt(new Date());
     const normalizedDateRangeVal = { start: filters.dateRange?.start ? (typeof filters.dateRange.start === "string" ? filters.dateRange.start : filters.dateRange.start.toISOString().slice(0, 10)) : null, end: filters.dateRange?.end ? (typeof filters.dateRange.end === "string" ? filters.dateRange.end : filters.dateRange.end.toISOString().slice(0, 10)) : null };
@@ -365,11 +390,21 @@ const Reports: React.FC = () => {
     if (filters.skipApi || areFiltersEqual(normalizedFilters, lastAppliedFilters)) return;
     // Initialize progress entries so ProgressIndicator can show during normal (non-select-all) fetches
     try {
-      const initialProgress: ProgressState = {};
-      (normalizedFilters.selectedModules || []).forEach((moduleKey: string) => {
-        initialProgress[moduleKey] = { currentRegion: 'Initializing...', currentIndex: 0, totalRegions: (normalizedFilters.selectedRegions && normalizedFilters.selectedRegions.length) ? normalizedFilters.selectedRegions.length : 1 };
-      });
-      setProgressState(initialProgress);
+      const shouldTrackProgress = !!normalizedFilters.allRegionsSelected || ((normalizedFilters.selectedRegions?.length || 0) > 1);
+      if (shouldTrackProgress) {
+        const initialProgress: ProgressState = {};
+        (normalizedFilters.selectedModules || []).forEach((moduleKey: string) => {
+          initialProgress[moduleKey] = {
+            currentRegion: 'Initializing...',
+            currentIndex: 0,
+            totalRegions: normalizedFilters.selectedRegions?.length || 0,
+          };
+        });
+        setProgressState(initialProgress);
+      } else {
+        // Clear any previous progress to avoid stale loading indicators on single-region searches
+        setProgressState({});
+      }
     } catch (e) {
       // ignore
     }
@@ -386,36 +421,38 @@ const Reports: React.FC = () => {
     searchAbortController.current = new AbortController();
   };
 
-  // Auto-run search reactively when the UI filter has modules + location + date range,
-  // but avoid duplicate calls by comparing against lastAppliedFilters.
+  // Auto-run an initial search on mount when the FilterSection already contains
+  // usable default filters (modules selected + date range + location). This
+  // ensures each report table displays data according to the FilterSection
+  // defaults without requiring the user to click Search.
   useEffect(() => {
-    if (hasSearched) return;
-    const hasModules = Array.isArray(uiSelectedModules) && uiSelectedModules.length > 0;
-    const hasLocation = (Array.isArray(uiSelectedRegions) && uiSelectedRegions.length > 0) || (Array.isArray(uiSelectedIslands) && uiSelectedIslands.length > 0);
-    const hasDate = Boolean(uiDateRange && uiDateRange.start && uiDateRange.end);
-    if (!hasModules || !hasLocation || !hasDate) return;
-    const normalized = {
-      selectedModules: (uiSelectedModules || []).slice().sort(),
-      selectedProvinces: selectedProvinces || [],
-      selectedCities: selectedCities || [],
-      selectedRegions: uiSelectedRegions || [],
-      selectedIslands: uiSelectedIslands || [],
-      dateRange: uiDateRange,
-      selectedDateType: uiSelectedDateType || 'Month',
-    };
-    // Avoid calling search if filters equal lastAppliedFilters
-    if (!areFiltersEqual(normalized, lastAppliedFilters)) {
-      handleSearch(normalized);
+    const modules = uiSelectedModules || [];
+    const hasDateRange = uiDateRange && uiDateRange.start && uiDateRange.end;
+    const hasLocations = (uiSelectedRegions && uiSelectedRegions.length > 0) || (uiSelectedIslands && uiSelectedIslands.length > 0);
+    if (!hasSearched && modules.length > 0 && hasDateRange && hasLocations) {
+      const initFilters = {
+        selectedModules: (modules || []).slice().sort(),
+        selectedRegions: uiSelectedRegions || [],
+        selectedProvinces,
+        selectedCities,
+        dateRange: uiDateRange,
+        selectedDateType: uiSelectedDateType,
+        selectedIslands: uiSelectedIslands || [],
+        allRegionsSelected: false,
+      };
+      // intentionally not added to deps to run once on mount
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      handleSearch(initFilters);
     }
-  // re-run when any UI filter value changes
-  }, [uiSelectedModules, uiSelectedRegions, uiSelectedIslands, uiDateRange, uiSelectedDateType, selectedProvinces, selectedCities, hasSearched, lastAppliedFilters]);
+  }, []);
 
   // No auto-search: users must explicitly click Search in the FilterSection to load table data.
+  // Previously we cleared persisted table data here on mount to force users to search manually.
+  // That behavior was removed so per-table data (persisted via redux-persist) remains after a page refresh.
 
   const handleReset = () => {
-    // --- MODIFICATION START ---
-    setIsRequestActive(false); // Ensure request is marked as inactive
-    // --- MODIFICATION END ---
+    // Ensure search state is inactive
+    setIsSearchActive(false);
     setProgressState({});
     const keys: (keyof RootState['reportFilter'])[] = ['selectedRegions', 'selectedProvinces', 'selectedCities', 'selectedIslands', 'selectedModules'];
     keys.forEach(key => dispatch(updateFilterField({ key, value: [] })));
@@ -437,12 +474,10 @@ const Reports: React.FC = () => {
   };
   
   const handleCancelSearch = () => {
-    // --- MODIFICATION START ---
-    setIsRequestActive(false); // Explicitly mark the request as inactive
-    // --- MODIFICATION END ---
+    // Explicitly mark the search request as inactive
+    setIsSearchActive(false);
     setProgressState({});
     if (searchAbortController.current) searchAbortController.current.abort();
-    if (exportAbortController.current) exportAbortController.current.abort();
     setHasSearched(false);
     setCancelled(true);
     setIsProgressiveLoading(false);
@@ -454,9 +489,8 @@ const Reports: React.FC = () => {
     filters: RootState['reportFilter'], 
     permitTypes?: ("business" | "working" | "barangay" | "building" | "certificate")[]
 ) => {
-    // --- MODIFICATION START ---
-    setIsRequestActive(true); // Explicitly mark a request as active
-    // --- MODIFICATION END ---
+    // Mark export as active; do not affect search UI
+    setIsExportActive(true);
     setGeneratedAt(new Date());
     // create a fresh abort controller for this export operation
     if (exportAbortController.current) exportAbortController.current.abort();
@@ -533,11 +567,9 @@ const Reports: React.FC = () => {
           }
       }
     } finally {
-      // --- MODIFICATION START ---
-      // Ensure the request is marked as inactive when the download process ends (success or fail)
-      setIsRequestActive(false);
+      // Export done
+      setIsExportActive(false);
       if (exportAbortController.current) { exportAbortController.current = null; }
-      // --- MODIFICATION END ---
     }
   };
 
@@ -593,18 +625,23 @@ const Reports: React.FC = () => {
           onDownload={handleDownload}
           onReset={handleReset}
           hasTableData={hasTableData}
-          // --- MODIFICATION START ---
-          // Pass the new, more stable state to the FilterSection
-          loading={isRequestActive || lguRegionLoading}
-          // --- MODIFICATION END ---
-          onCancel={handleCancelSearch}
+          // === START OF FIX ===
+          // Prevent showing the main loading state during an export.
+          // This stops the `loading` prop from triggering the cancel button appearance.
+          loading={!isExportActive && (isSearchActive || lguRegionLoading || anyModuleLoading)}
+          // Hide the cancel button during export operations by not providing onCancel when exporting
+          onCancel={isExportActive ? undefined : handleCancelSearch}
+          // === END OF FIX ===
           hasSearched={hasSearched}
         />
         <div className="relative flex flex-col gap-6">
           {uiSelectedModules.includes(BP) && 
             <div ref={reportRefs[BP]}>
               <BusinessPermitReport 
-              {...appliedFilter} 
+              selectedRegions={hasSearched ? appliedFilter.selectedRegions : uiSelectedRegions}
+              dateRange={hasSearched ? appliedFilter.dateRange : uiDateRange}
+              selectedDateType={hasSearched ? appliedFilter.selectedDateType : uiSelectedDateType}
+              selectedIslands={hasSearched ? appliedFilter.selectedIslands : uiSelectedIslands}
               selectedProvinces={selectedProvinces} 
               selectedCities={selectedCities} 
               apiData={isSelectAll ? progressiveData[BP] : bpTableData} 
@@ -620,7 +657,10 @@ const Reports: React.FC = () => {
           {uiSelectedModules.includes(WP) && 
             <div ref={reportRefs[WP]}>
               <WorkingPermitReport 
-              {...appliedFilter} 
+              selectedRegions={hasSearched ? appliedFilter.selectedRegions : uiSelectedRegions}
+              dateRange={hasSearched ? appliedFilter.dateRange : uiDateRange}
+              selectedDateType={hasSearched ? appliedFilter.selectedDateType : uiSelectedDateType}
+              selectedIslands={hasSearched ? appliedFilter.selectedIslands : uiSelectedIslands}
               selectedProvinces={selectedProvinces} 
               selectedCities={selectedCities} 
               apiData={isSelectAll ? progressiveData[WP] : wpTableData} 
@@ -636,7 +676,10 @@ const Reports: React.FC = () => {
           {uiSelectedModules.includes(BC) && 
             <div ref={reportRefs[BC]}>
               <BrgyClearanceReport 
-              {...appliedFilter} 
+              selectedRegions={hasSearched ? appliedFilter.selectedRegions : uiSelectedRegions}
+              dateRange={hasSearched ? appliedFilter.dateRange : uiDateRange}
+              selectedDateType={hasSearched ? appliedFilter.selectedDateType : uiSelectedDateType}
+              selectedIslands={hasSearched ? appliedFilter.selectedIslands : uiSelectedIslands}
               selectedProvinces={selectedProvinces} 
               selectedCities={selectedCities} 
               apiData={isSelectAll ? progressiveData[BC] : bcTableData} 
@@ -652,7 +695,10 @@ const Reports: React.FC = () => {
           {uiSelectedModules.includes(BLDG) && 
             <div ref={reportRefs[BLDG]}>
               <BuildingPermitReport 
-              {...appliedFilter} 
+              selectedRegions={hasSearched ? appliedFilter.selectedRegions : uiSelectedRegions}
+              dateRange={hasSearched ? appliedFilter.dateRange : uiDateRange}
+              selectedDateType={hasSearched ? appliedFilter.selectedDateType : uiSelectedDateType}
+              selectedIslands={hasSearched ? appliedFilter.selectedIslands : uiSelectedIslands}
               selectedProvinces={selectedProvinces} 
               selectedCities={selectedCities} 
               apiData={isSelectAll ? progressiveData[BLDG] : bldgTableData} 
@@ -668,7 +714,11 @@ const Reports: React.FC = () => {
           {uiSelectedModules.includes(CO) && 
             <div ref={reportRefs[CO]}>
               <CertificateOfOccupancyReport 
-              {...appliedFilter} selectedProvinces={selectedProvinces} 
+              selectedRegions={hasSearched ? appliedFilter.selectedRegions : uiSelectedRegions}
+              dateRange={hasSearched ? appliedFilter.dateRange : uiDateRange}
+              selectedDateType={hasSearched ? appliedFilter.selectedDateType : uiSelectedDateType}
+              selectedIslands={hasSearched ? appliedFilter.selectedIslands : uiSelectedIslands}
+              selectedProvinces={selectedProvinces} 
               selectedCities={selectedCities} 
               apiData={isSelectAll ? progressiveData[CO] : coTableData} 
               loading={(isSelectAll ? isProgressiveLoading : (moduleLoading[CO] || coLoading))} 
@@ -683,7 +733,7 @@ const Reports: React.FC = () => {
           {!loading && uiSelectedModules.length === 0 && (
             <div className="text-center bg-card p-8 rounded-lg border text-secondary-foreground border-border shadow-sm">
               <div className="flex flex-col items-center gap-4">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-16 w-16 text-muted-foreground"><path d="M20 7h-9" /><path d="M14 17H4" /><circle cx="17" cy="17" r="3" /><circle cx="7" cy="7" r="3" /></svg>
+                <Filter className="h-16 w-16 text-muted-foreground" />
                 <h3 className="text-2xl font-bold text-foreground">Start by Selecting Filters</h3>
                 <p className="text-md text-muted-foreground max-w-md">Please select a <span className="font-semibold text-primary">Module</span>, <span className="font-semibold text-primary">Region</span>, and <span className="font-semibold text-primary">Date Range</span> to generate a report.</p>
               </div>
@@ -691,7 +741,7 @@ const Reports: React.FC = () => {
           )}
         </div>
         <ScrollToTopButton scrollTargetRef={tableContainerRef} />
-        <ProgressIndicator isLoading={isRequestActive || lguRegionLoading} progress={progressState} counts={counts} moduleLoading={moduleLoading} onModuleClick={scrollToReport}/>
+        <ProgressIndicator isLoading={isSearchActive || lguRegionLoading} progress={progressState} counts={counts} moduleLoading={moduleLoading} onModuleClick={scrollToReport}/>
       </div>
     </div>
   );
