@@ -76,6 +76,46 @@ const makeTd = (val: any, opts: any = {}): HTMLTableCellElement => {
     return td;
 };
 
+// Try to fetch an image and convert to a data URL to avoid cross-origin tainting
+const fetchImageAsDataUrl = async (url: string): Promise<string | null> => {
+  try {
+    const res = await fetch(url, { mode: 'cors' });
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    return await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onerror = () => resolve(null);
+      reader.onloadend = () => resolve(String(reader.result));
+      reader.readAsDataURL(blob);
+    });
+  } catch (err) {
+    return null;
+  }
+};
+
+// Ensure images inside an element are either same-origin/CORS or inlined as data URLs.
+const inlineImagesInElement = async (root: HTMLElement) => {
+  const imgs = Array.from(root.querySelectorAll('img')) as HTMLImageElement[];
+  await Promise.all(imgs.map(async (img) => {
+    if (!img.src) return;
+    if (img.src.startsWith('data:')) return;
+    try {
+      // try to set crossorigin first to allow html2canvas to fetch via CORS
+      img.crossOrigin = 'anonymous';
+      // wait a moment if image is still loading
+      if (!img.complete) await new Promise((res) => { img.onload = () => res(null); img.onerror = () => res(null); });
+      // if the image failed to load (naturalWidth === 0) attempt to fetch and inline
+      if (img.naturalWidth === 0) {
+        const dataUrl = await fetchImageAsDataUrl(img.src);
+        if (dataUrl) img.src = dataUrl;
+      }
+    } catch (err) {
+      const dataUrl = await fetchImageAsDataUrl(img.src);
+      if (dataUrl) img.src = dataUrl;
+    }
+  }));
+};
+
 const createPdfHeader = (
     logoUrl: string,
     moduleLabel: string,
@@ -552,12 +592,41 @@ export async function exportTableReportToPDF(params: ExportTableReportToPDFParam
             const isLastPage = i === totalChunks - 1;
             const tableDiv = createPageContent(chunk, isLastPage, params, generatedAt, isSimpleReport, isBC, isCO, isBldg, isDayMode, isLandscape);
             const hiddenDiv = document.createElement("div");
-            hiddenDiv.style.position = "fixed"; hiddenDiv.style.left = "-9999px"; hiddenDiv.style.display = "inline-block";
+            // place off-screen using transform so element remains "visible" to the rendering engine
+            hiddenDiv.style.position = "absolute";
+            hiddenDiv.style.left = "0";
+            hiddenDiv.style.top = "0";
+            hiddenDiv.style.transform = "translateX(-20000px)"; // safely off-screen
+            hiddenDiv.style.display = "inline-block";
+            hiddenDiv.style.zIndex = "9999";
+            hiddenDiv.style.pointerEvents = "none";
+            // ensure it's visible (not visibility:hidden) so html2canvas can capture it
+            hiddenDiv.style.visibility = "visible";
             document.body.appendChild(hiddenDiv);
             hiddenDiv.appendChild(tableDiv);
-            await new Promise(res => setTimeout(res, 30));
+            // allow layout to stabilize
+            await flushFrame();
+            // small extra delay helps with complex table layouts
+            await new Promise(res => setTimeout(res, 120));
+            // inline any external images to avoid tainting/cors issues
+            try { await inlineImagesInElement(tableDiv); } catch (e) { /* continue even if inline fails */ }
+            // wait for fonts to be ready (if supported)
+            try { if ((document as any).fonts && (document as any).fonts.ready) await (document as any).fonts.ready; } catch (e) { }
             
-            const canvas = await html2canvas(tableDiv, { scale: 1.25, useCORS: true, backgroundColor: "#fff" });
+            // Pass explicit dimensions so html2canvas captures the full table content (tbody included)
+            const width = Math.max(tableDiv.scrollWidth, tableDiv.offsetWidth || 0);
+            const height = Math.max(tableDiv.scrollHeight, tableDiv.offsetHeight || 0);
+            const canvas = await html2canvas(tableDiv, {
+              scale: 1.25,
+              useCORS: true,
+              backgroundColor: "#fff",
+              width,
+              height,
+              windowWidth: width,
+              windowHeight: height,
+              scrollX: 0,
+              scrollY: 0,
+            });
             const imgData = canvas.toDataURL("image/jpeg", 0.7);
             const maxWidth = pageWidth - marginX * 2;
             const maxHeight = pageHeight - marginY * 2;

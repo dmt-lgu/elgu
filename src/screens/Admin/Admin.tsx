@@ -1554,8 +1554,8 @@ const totalRegions = locations.length;
         </div>
       </div>
 
-      {/* Floating Cancel Button */}
-      {isLoading && (
+  {/* Floating Cancel Button (Dashboard only) */}
+  {isLoading && location.pathname === "/elgu/admin/dashboard" && (
         <button
           onClick={() => {
             if (controllerRef.current) {

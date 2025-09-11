@@ -9,9 +9,10 @@ interface DateRange {
 interface DateRangePickerProps {
   value?: DateRange;
   onChange?: (range: DateRange) => void;
+  onClose?: () => void; // --- DUgangi kini ---
 }
 
-const DateRangeDay: React.FC<DateRangePickerProps> = ({ value, onChange }) => {
+const DateRangeDay: React.FC<DateRangePickerProps> = ({ value, onChange, onClose }) => { // --- Ug kini ---
   // Last applied values
   const [_appliedStart, setAppliedStart] = useState<string | null>(value?.start ?? null);
   const [_appliedEnd, setAppliedEnd] = useState<string | null>(value?.end ?? null);
@@ -28,9 +29,9 @@ const DateRangeDay: React.FC<DateRangePickerProps> = ({ value, onChange }) => {
     setDraftEnd(value?.end ?? null);
   }, [value?.start, value?.end]);
 
-const handleDraftStartChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-  setDraftStart(e.target.value || null);
-};
+  const handleDraftStartChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setDraftStart(e.target.value || null);
+  };
 
   const handleDraftEndChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const date = e.target.value ? e.target.value : null;
@@ -41,6 +42,7 @@ const handleDraftStartChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setAppliedStart(draftStart);
     setAppliedEnd(draftEnd);
     onChange?.({ start: draftStart, end: draftEnd });
+    onClose?.(); // --- DUgangi kini nga linya ---
   };
 
   const handleClear = () => {

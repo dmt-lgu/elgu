@@ -14,12 +14,14 @@ interface DateRangeYearProps {
   className?: string;
   value?: { start: string | null; end: string | null };
   onChange?: (range: { start: string | null; end: string | null }) => void;
+  onClose?: () => void;
 }
 
 function DateRangeYear({
   className,
   value,
   onChange,
+  onClose,
 }: DateRangeYearProps) {
   // Get startDate and endDate from Redux (if you want to use them for min/max)
   // const data = useSelector(selectData);
@@ -77,6 +79,7 @@ function DateRangeYear({
 
   // Apply button handler
   const handleApply = () => {
+    onClose?.();
     if (from && to && onChange) {
       onChange({
         start: `${from}-01-01`,
