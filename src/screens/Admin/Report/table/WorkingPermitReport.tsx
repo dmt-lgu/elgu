@@ -254,7 +254,8 @@ const WorkingPermitReport = forwardRef<HTMLDivElement, WorkingPermitProps>(({
     const totals = {
       newPaid: 0, newGeoPay: 0, newPending: 0,
       renewalPaid: 0, renewalGeoPay: 0, renewalPending: 0,
-      malePaid: 0, malePending: 0, femalePaid: 0, femalePending: 0
+      malePaid: 0, malePending: 0, femalePaid: 0, femalePending: 0,
+      applications: 0
     };
     normalizedResults.forEach((lgu: any) => {
       if (!lgu.hasError && Array.isArray(lgu.monthlyResults)) {
@@ -272,6 +273,8 @@ const WorkingPermitReport = forwardRef<HTMLDivElement, WorkingPermitProps>(({
         });
       }
     });
+    // Compute derived applications total (male + female, paid + pending)
+    totals.applications = totals.malePaid + totals.malePending + totals.femalePaid + totals.femalePending;
     return totals;
   }, [normalizedResults]);
 
@@ -291,7 +294,7 @@ const WorkingPermitReport = forwardRef<HTMLDivElement, WorkingPermitProps>(({
       allRows.push(
         <TableRow key={`${region}-trigger`}>
           <TableCell
-            colSpan={16}
+            colSpan={17}
             className="text-center p-2 cursor-pointer bg-slate-100 hover:bg-slate-200 font-semibold text-blue-600 text-xs"
             onClick={() => toggleRegion(region)}
           >
@@ -328,7 +331,7 @@ const WorkingPermitReport = forwardRef<HTMLDivElement, WorkingPermitProps>(({
                   {lgu.lgu}<br/>
                   <span className="text-[10px] font-bold text-orange-600 mt-0.5 uppercase">{lgu.error || 'NO DATA AVAILABLE'}</span>
                 </TableCell>
-                <TableCell colSpan={14} className="p-2 text-center text-slate-500">-</TableCell>
+                <TableCell colSpan={15} className="p-2 text-center text-slate-500">-</TableCell>
               </TableRow>
             );
             isFirstRowOfRegion = false;
@@ -361,6 +364,7 @@ const WorkingPermitReport = forwardRef<HTMLDivElement, WorkingPermitProps>(({
                   <div>{lgu.lgu}<span className="text-[11px] font-medium text-slate-500 ml-1.5">{lgu.province ? `(${lgu.province})` : ""}</span></div>
                   <div className="text-[10px] font-semibold text-blue-700 mt-0.5">{periodLabel}</div>
                 </TableCell>
+                <TableCell className="p-2 text-center font-bold text-slate-900 bg-slate-100 tabular-nums">{formatNumber((Number(item.malePaid || 0) + Number(item.malePending || 0) + Number(item.femalePaid || 0) + Number(item.femalePending || 0)))}</TableCell>
                 <TableCell className="p-2 text-center tabular-nums text-green-700">{formatNumber(item.newPaid)}</TableCell>
                 <TableCell className="p-2 text-center tabular-nums text-green-700">{formatNumber(item.newPaidViaEgov)}</TableCell>
                 <TableCell className="p-2 text-center tabular-nums text-blue-700">{formatNumber(item.newPending)}</TableCell>
@@ -395,10 +399,11 @@ const WorkingPermitReport = forwardRef<HTMLDivElement, WorkingPermitProps>(({
               totals.malePending += Number(item.malePending || 0);
               totals.femalePaid += Number(item.femalePaid || 0);
               totals.femalePending += Number(item.femalePending || 0);
+              totals.applications += (Number(item.malePaid || 0) + Number(item.malePending || 0) + Number(item.femalePaid || 0) + Number(item.femalePending || 0));
             });
           }
           return totals;
-        }, { newPaid: 0, newGeoPay: 0, newPending: 0, renewalPaid: 0, renewalGeoPay: 0, renewalPending: 0, malePaid: 0, malePending: 0, femalePaid: 0, femalePending: 0 });
+        }, { newPaid: 0, newGeoPay: 0, newPending: 0, renewalPaid: 0, renewalGeoPay: 0, renewalPending: 0, malePaid: 0, malePending: 0, femalePaid: 0, femalePending: 0, applications: 0 });
 
         allRows.push(
           <TableRow key={`${region}-subtotal`} className="font-bold text-white">
@@ -406,6 +411,7 @@ const WorkingPermitReport = forwardRef<HTMLDivElement, WorkingPermitProps>(({
               <div className="font-extrabold tracking-wider text-xs">SUB-TOTAL</div>
               <div className='text-[10px] font-medium text-slate-300'>({getRegionCode(region) || region})</div>
             </TableCell>
+            <TableCell className="bg-slate-500 p-2 text-center tabular-nums text-sm">{formatNumber(regionTotals.applications)}</TableCell>
             <TableCell className="bg-slate-500 p-2 text-center tabular-nums text-sm">{formatNumber(regionTotals.newPaid)}</TableCell>
             <TableCell className="bg-slate-500 p-2 text-center tabular-nums text-sm">{formatNumber(regionTotals.newGeoPay)}</TableCell>
             <TableCell className="bg-slate-500 p-2 text-center tabular-nums text-sm">{formatNumber(regionTotals.newPending)}</TableCell>
@@ -456,6 +462,7 @@ const WorkingPermitReport = forwardRef<HTMLDivElement, WorkingPermitProps>(({
               <TableRow>
                 <TableHead rowSpan={2} className="bg-[#9ec6f7] text-black font-bold p-2 text-center align-middle sticky top-0 z-20 text-[11px] border-b border-r border-slate-300">Region</TableHead>
                 <TableHead rowSpan={2} className="bg-[#9ec6f7] text-black font-bold p-2 text-center align-middle sticky top-0 z-20 text-[11px] border-b border-r border-slate-300">LGU</TableHead>
+          <TableHead rowSpan={2} className="bg-[#9ec6f7] text-black font-bold p-2 text-center align-middle sticky top-0 z-20 text-[11px] border-b border-r border-slate-300">Applications</TableHead>
                 <TableHead colSpan={4} className="bg-[#9ec6f7] text-black font-bold p-2 text-center sticky top-0 z-20 uppercase tracking-wider text-[11px] border-b border-r border-slate-300">New</TableHead>
                 <TableHead colSpan={4} className="bg-[#9ec6f7] text-black font-bold p-2 text-center sticky top-0 z-20 uppercase tracking-wider text-[11px] border-b border-r border-slate-300">Renewal</TableHead>
                 <TableHead colSpan={3} className="bg-[#9ec6f7] text-black font-bold p-2 text-center sticky top-0 z-20 uppercase tracking-wider text-[11px] border-b border-r border-slate-300">Male</TableHead>
@@ -486,20 +493,20 @@ const WorkingPermitReport = forwardRef<HTMLDivElement, WorkingPermitProps>(({
                   {renderTableRows()}
                   {Object.keys(regionMappingGrouped).length > 1 && (
                     <TableRow>
-                      <TableCell colSpan={16} className="text-center p-2 cursor-pointer bg-slate-200 hover:bg-slate-300 font-bold text-slate-700 text-xs" onClick={toggleAllRegions}>
+                      <TableCell colSpan={17} className="text-center p-2 cursor-pointer bg-slate-200 hover:bg-slate-300 font-bold text-slate-700 text-xs" onClick={toggleAllRegions}>
                         {openRegions.size === Object.keys(regionMappingGrouped).length ? 'Hide All Regions' : 'View All Regions'}
                       </TableCell>
                     </TableRow>
                   )}
                   {(loading || isProgressive) && (
-                    <TableRow><TableCell colSpan={16} className="p-0"><LoaderTable message={isProgressive ? "Please wait for other regions..." : "Updating data..."} /></TableCell></TableRow>
+                    <TableRow><TableCell colSpan={17} className="p-0"><LoaderTable message={isProgressive ? "Please wait for other regions..." : "Updating data..."} /></TableCell></TableRow>
                   )}
                 </>
               ) : loading ? (
-                <TableRow><TableCell colSpan={16} className="text-center py-12"><LoaderTable /></TableCell></TableRow>
+                <TableRow><TableCell colSpan={17} className="text-center py-12"><LoaderTable /></TableCell></TableRow>
               ) : (
                 <TableRow>
-                  <TableCell colSpan={16} className="text-center py-16 bg-white">
+                  <TableCell colSpan={17} className="text-center py-16 bg-white">
                     <div className='flex flex-col items-center justify-center'>
                       <div className="rounded-full bg-slate-100 p-3"><Search className="h-8 w-8 text-slate-400" /></div>
                       <p className='font-bold text-sm text-slate-600 mt-4'>{hasSearched ? 'No Results Found' : 'Generate a Report'}</p>
@@ -517,6 +524,7 @@ const WorkingPermitReport = forwardRef<HTMLDivElement, WorkingPermitProps>(({
                   <div className='text-[10px] font-medium text-slate-300'>({dateRangeLabel})</div>
                 </TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 p-2 text-center tabular-nums text-sm">{formatNumber(grandTotals.newPaid)}</TableCell>
+                <TableCell className="sticky bottom-0 z-20 bg-slate-800 p-2 text-center tabular-nums text-sm">{formatNumber(grandTotals.applications)}</TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 p-2 text-center tabular-nums text-sm">{formatNumber(grandTotals.newGeoPay)}</TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 p-2 text-center tabular-nums text-sm">{formatNumber(grandTotals.newPending)}</TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 p-2 text-center tabular-nums text-sm">{formatNumber(grandTotals.newPaid + grandTotals.newGeoPay + grandTotals.newPending)}</TableCell>

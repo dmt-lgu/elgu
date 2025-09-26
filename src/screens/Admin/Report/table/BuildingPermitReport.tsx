@@ -229,12 +229,15 @@ const BuildingPermitReport = forwardRef<HTMLDivElement, BuildingPermitProps>(({
 
   // Totals computed from normalized results to avoid double counting
   const grandTotals = useMemo(() => {
-    const totals = { paid: 0, pending: 0 };
+    const totals = { paid: 0, pending: 0, applications: 0 };
     normalizedResults.forEach((lgu: any) => {
       if (!lgu.hasError && lgu.monthlyResults && Array.isArray(lgu.monthlyResults)) {
         lgu.monthlyResults.forEach((item: any) => {
-          totals.paid += Number(item.buildingPaid || 0);
-          totals.pending += Number(item.buildingPending || 0);
+          const paid = Number(item.buildingPaid || 0);
+          const pending = Number(item.buildingPending || 0);
+          totals.paid += paid;
+          totals.pending += pending;
+          totals.applications += paid + pending;
         });
       }
     });
@@ -257,7 +260,7 @@ const BuildingPermitReport = forwardRef<HTMLDivElement, BuildingPermitProps>(({
       allRows.push(
         <TableRow key={`${region}-trigger`}>
           <TableCell
-            colSpan={4}
+            colSpan={5}
             className="text-center p-2 cursor-pointer bg-slate-100 hover:bg-slate-200 font-semibold text-blue-600 text-xs"
             onClick={() => toggleRegion(region)}
           >
@@ -336,6 +339,7 @@ const BuildingPermitReport = forwardRef<HTMLDivElement, BuildingPermitProps>(({
                 </TableCell>
                 <TableCell className="p-2 text-center font-bold tabular-nums text-green-700">{formatNumber(item.buildingPaid)}</TableCell>
                 <TableCell className="p-2 text-center font-bold tabular-nums text-blue-700">{formatNumber(item.buildingPending)}</TableCell>
+                <TableCell className="p-2 text-center font-bold tabular-nums text-slate-700">{formatNumber(Number(item.buildingPaid || 0) + Number(item.buildingPending || 0))}</TableCell>
               </TableRow>
             );
             isFirstRowOfRegion = false;
@@ -361,6 +365,7 @@ const BuildingPermitReport = forwardRef<HTMLDivElement, BuildingPermitProps>(({
             </TableCell>
             <TableCell className="bg-slate-500 p-2 text-center text-sm tabular-nums">{formatNumber(regionTotal.paid)}</TableCell>
             <TableCell className="bg-slate-500 p-2 text-center text-sm tabular-nums">{formatNumber(regionTotal.pending)}</TableCell>
+            <TableCell className="bg-slate-500 p-2 text-center text-sm tabular-nums">{formatNumber(regionTotal.paid + regionTotal.pending)}</TableCell>
           </TableRow>
         );
       }
@@ -393,8 +398,9 @@ const BuildingPermitReport = forwardRef<HTMLDivElement, BuildingPermitProps>(({
               <TableRow>
                 <TableHead className="bg-[#9ec6f7] text-black font-bold p-2 text-center align-middle sticky top-0 z-10 uppercase text-[11px] border-b border-r border-slate-300">Region</TableHead>
                 <TableHead className="bg-[#9ec6f7] text-black font-bold p-2 text-center align-middle sticky top-0 z-10 uppercase text-[11px] border-b border-r border-slate-300">LGU</TableHead>
-                <TableHead className="bg-[#9ec6f7] text-black font-bold p-2 text-center align-middle sticky top-0 z-10 uppercase text-[11px] border-b border-slate-300">Paid</TableHead>
-                <TableHead className="bg-[#9ec6f7] text-black font-bold p-2 text-center align-middle sticky top-0 z-10 uppercase text-[11px] border-b border-slate-300">Ongoing</TableHead>
+                <TableHead className="bg-[#9ec6f7] text-black font-bold p-2 text-center align-middle sticky top-0 z-10 uppercase text-[11px] border-b border-r border-slate-300">Paid</TableHead>
+                <TableHead className="bg-[#9ec6f7] text-black font-bold p-2 text-center align-middle sticky top-0 z-10 uppercase text-[11px] border-b border-r border-slate-300">Ongoing</TableHead>
+                <TableHead className="bg-[#9ec6f7] text-black font-bold p-2 text-center align-middle sticky top-0 z-10 uppercase text-[11px] border-b border-r border-slate-300">Applications</TableHead>
               </TableRow>
             </TableHeader>
             {/* Add bottom padding so sticky footer doesn't overlap the last rows */}
@@ -404,20 +410,20 @@ const BuildingPermitReport = forwardRef<HTMLDivElement, BuildingPermitProps>(({
                   {renderTableRows()}
                   {Object.keys(regionMappingGrouped).length > 1 && (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center p-2 cursor-pointer bg-slate-200 hover:bg-slate-300 font-bold text-slate-700 text-xs" onClick={toggleAllRegions}>
+                      <TableCell colSpan={5} className="text-center p-2 cursor-pointer bg-slate-200 hover:bg-slate-300 font-bold text-slate-700 text-xs" onClick={toggleAllRegions}>
                         {openRegions.size === Object.keys(regionMappingGrouped).length ? 'Hide All Regions' : 'View All Regions'}
                       </TableCell>
                     </TableRow>
                   )}
                   {(loading || isProgressive) && (
-                    <TableRow><TableCell colSpan={4} className="p-0"><LoaderTable message={isProgressive ? "Please wait for other regions..." : "Updating data..."} /></TableCell></TableRow>
+                    <TableRow><TableCell colSpan={5} className="p-0"><LoaderTable message={isProgressive ? "Please wait for other regions..." : "Updating data..."} /></TableCell></TableRow>
                   )}
                 </>
               ) : loading ? (
-                <TableRow><TableCell colSpan={4} className="text-center py-12"><LoaderTable /></TableCell></TableRow>
+                <TableRow><TableCell colSpan={5} className="text-center py-12"><LoaderTable /></TableCell></TableRow>
               ) : (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center py-16 bg-white">
+                  <TableCell colSpan={5} className="text-center py-16 bg-white">
                     <div className='flex flex-col items-center justify-center'>
                       <div className="rounded-full bg-slate-100 p-3"><Search className="h-8 w-8 text-slate-400" /></div>
                       <p className='font-bold text-sm text-slate-600 mt-4'>{hasSearched ? 'No Results Found' : 'Generate a Report'}</p>
@@ -436,6 +442,7 @@ const BuildingPermitReport = forwardRef<HTMLDivElement, BuildingPermitProps>(({
                 </TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 p-2 text-center text-sm tabular-nums">{loading && normalizedResults.length === 0 ? '-' : formatNumber(grandTotals.paid)}</TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 p-2 text-center text-sm tabular-nums">{loading && normalizedResults.length === 0 ? '-' : formatNumber(grandTotals.pending)}</TableCell>
+                <TableCell className="sticky bottom-0 z-20 bg-slate-800 p-2 text-center text-sm tabular-nums">{loading && normalizedResults.length === 0 ? '-' : formatNumber(grandTotals.applications)}</TableCell>
               </TableRow>
             </tfoot>
           </Table>

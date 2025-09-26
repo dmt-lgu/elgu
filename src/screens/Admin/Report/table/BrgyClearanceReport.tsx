@@ -246,7 +246,11 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
   const grandTotal = useMemo(() => {
     return normalizedResults.reduce((total: number, lgu: any) => {
       if (lgu.hasError) return total;
-      const monthlyTotal = (lgu.monthlyResults || []).reduce((mSum: number, month: any) => mSum + Number(month.totalCount || 0), 0);
+      const monthlyTotal = (lgu.monthlyResults || []).reduce((mSum: number, month: any) => {
+        const maleFemaleSum = Number(month.malePaid || 0) + Number(month.malePending || 0) + Number(month.femalePaid || 0) + Number(month.femalePending || 0);
+        const used = maleFemaleSum || Number(month.totalCount || 0);
+        return mSum + used;
+      }, 0);
       return total + monthlyTotal;
     }, 0);
   }, [normalizedResults]);
@@ -357,7 +361,7 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
                   <span className="text-[10px] font-semibold text-blue-700 mt-0.5">{periodLabel}</span>
                 </TableCell>
                 <TableCell className="p-2 text-center font-bold tabular-nums text-slate-800">
-                  {formatNumber(item.totalCount)}
+                  {formatNumber((Number(item.malePaid || 0) + Number(item.malePending || 0) + Number(item.femalePaid || 0) + Number(item.femalePending || 0)) || Number(item.totalCount || 0))}
                 </TableCell>
               </TableRow>
             );
@@ -369,7 +373,11 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
 
         const regionTotal = lguList.reduce((total, lgu) => {
           if (lgu.hasError) return total;
-          return total + (lgu.monthlyResults || []).reduce((mSum: number, month: any) => mSum + Number(month.totalCount || 0), 0);
+          return total + (lgu.monthlyResults || []).reduce((mSum: number, month: any) => {
+            const maleFemaleSum = Number(month.malePaid || 0) + Number(month.malePending || 0) + Number(month.femalePaid || 0) + Number(month.femalePending || 0);
+            const used = maleFemaleSum || Number(month.totalCount || 0);
+            return mSum + used;
+          }, 0);
         }, 0);
 
         allRows.push(
