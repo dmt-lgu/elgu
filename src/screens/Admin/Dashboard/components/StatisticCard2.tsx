@@ -100,12 +100,12 @@ const StatisticCard2: React.FC<StatisticCardProps> = ({ title, value, showInfo, 
           </div>
           
           {showInfo && (
-            <div className="relative group">
+            <div className="relative group z-[100]">
               <InfoIcon 
                 size={14} 
                 className="text-gray-400 hover:text-gray-600 cursor-pointer transition-colors duration-200" 
               />
-              <div className="absolute right-0 top-5 w-64 p-3 bg-gray-900 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-20 shadow-xl">
+              <div className="absolute right-0 top-5 w-64 p-3 bg-gray-900 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-100 shadow-xl">
                 {showInfo}
                 <div className="absolute -top-1 right-4 w-2 h-2 bg-gray-900 transform rotate-45"></div>
               </div>
