@@ -323,7 +323,7 @@ interface PdfParams {
   };
 
 
-  export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal) => {
+export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal) => {
     // Use deduped/normalized data for Certificate of Occupancy to match the table totals/format
     const baseData = params.data.filter(lgu => !lgu.hasError);
     const exportableData =
@@ -443,64 +443,64 @@ interface PdfParams {
       const lguText = `${lguInfo.lgu}\n${periodLabel}`;
       const regionDisplay = getRegionDisplayName(normalizeRegionKey(lguInfo.region));
 
-      const dataCells: any[] = [];
-      if (isComplex) {
-        // New
-        const newIssued = (itemToDisplay.newPaid || 0) + (itemToDisplay.newPaidViaEgov || 0);
-        dataCells.push(
-          formatNumberForDisplay(newIssued),
-          formatNumberForDisplay(itemToDisplay.newPaid),
-          formatNumberForDisplay(itemToDisplay.newPaidViaEgov),
-          formatNumberForDisplay(itemToDisplay.newPending),
-          { content: formatNumberForDisplay((itemToDisplay.newPaid || 0) + (itemToDisplay.newPaidViaEgov || 0) + (itemToDisplay.newPending || 0)), styles: { fontStyle: 'bold' } }
-        );
-        // Renewal
-        const renewIssued = (itemToDisplay.renewPaid || 0) + (itemToDisplay.renewPaidViaEgov || 0);
-        dataCells.push(
-          formatNumberForDisplay(renewIssued),
-          formatNumberForDisplay(itemToDisplay.renewPaid),
-          formatNumberForDisplay(itemToDisplay.renewPaidViaEgov),
-          formatNumberForDisplay(itemToDisplay.renewPending),
-          { content: formatNumberForDisplay((itemToDisplay.renewPaid || 0) + (itemToDisplay.renewPaidViaEgov || 0) + (itemToDisplay.renewPending || 0)), styles: { fontStyle: 'bold' } }
-        );
-        // Male
-        const maleIssued = (itemToDisplay.malePaid || 0);
-        dataCells.push(
-          formatNumberForDisplay(maleIssued),
-          formatNumberForDisplay(itemToDisplay.malePaid),
-          formatNumberForDisplay(itemToDisplay.malePending),
-          { content: formatNumberForDisplay((itemToDisplay.malePaid || 0) + (itemToDisplay.malePending || 0)), styles: { fontStyle: 'bold' } }
-        );
-        // Female
-        const femaleIssued = (itemToDisplay.femalePaid || 0);
-        dataCells.push(
-          formatNumberForDisplay(femaleIssued),
-          formatNumberForDisplay(itemToDisplay.femalePaid),
-          formatNumberForDisplay(itemToDisplay.femalePending),
-          { content: formatNumberForDisplay((itemToDisplay.femalePaid || 0) + (itemToDisplay.femalePending || 0)), styles: { fontStyle: 'bold' } }
-        );
-      } else {
-        if (moduleLabel === 'Barangay Clearance') {
-          dataCells.push(formatNumberForDisplay(itemToDisplay.totalCount));
-        } else if (moduleLabel === 'Building Permit' || moduleLabel === 'Certificate of Occupancy') {
-          const paidKey = moduleLabel === 'Building Permit' ? 'buildingPaid' : 'coPaid';
-          const pendingKey = moduleLabel === 'Building Permit' ? 'buildingPending' : 'coPending';
-          const paid = Number(itemToDisplay[paidKey] || 0);
-          const pending = Number(itemToDisplay[pendingKey] || 0);
-          const issued = paid; // License Issued equals Paid
-          const total = paid + pending;
+        const dataCells: any[] = [];
+        if (isComplex) {
+          // New
+          const newIssued = (itemToDisplay.newPaid || 0) + (itemToDisplay.newPaidViaEgov || 0);
           dataCells.push(
-            formatNumberForDisplay(issued),
-            formatNumberForDisplay(paid),
-            formatNumberForDisplay(pending),
-            formatNumberForDisplay(total)
+            formatNumberForDisplay(newIssued),
+            formatNumberForDisplay(itemToDisplay.newPaid),
+            formatNumberForDisplay(itemToDisplay.newPaidViaEgov),
+            formatNumberForDisplay(itemToDisplay.newPending),
+            { content: formatNumberForDisplay((itemToDisplay.newPaid || 0) + (itemToDisplay.newPaidViaEgov || 0) + (itemToDisplay.newPending || 0)), styles: { fontStyle: 'bold' } }
+          );
+          // Renewal
+          const renewIssued = (itemToDisplay.renewPaid || 0) + (itemToDisplay.renewPaidViaEgov || 0);
+          dataCells.push(
+            formatNumberForDisplay(renewIssued),
+            formatNumberForDisplay(itemToDisplay.renewPaid),
+            formatNumberForDisplay(itemToDisplay.renewPaidViaEgov),
+            formatNumberForDisplay(itemToDisplay.renewPending),
+            { content: formatNumberForDisplay((itemToDisplay.renewPaid || 0) + (itemToDisplay.renewPaidViaEgov || 0) + (itemToDisplay.renewPending || 0)), styles: { fontStyle: 'bold' } }
+          );
+          // Male
+          const maleIssued = (itemToDisplay.malePaid || 0);
+          dataCells.push(
+            formatNumberForDisplay(maleIssued),
+            formatNumberForDisplay(itemToDisplay.malePaid),
+            formatNumberForDisplay(itemToDisplay.malePending),
+            { content: formatNumberForDisplay((itemToDisplay.malePaid || 0) + (itemToDisplay.malePending || 0)), styles: { fontStyle: 'bold' } }
+          );
+          // Female
+          const femaleIssued = (itemToDisplay.femalePaid || 0);
+          dataCells.push(
+            formatNumberForDisplay(femaleIssued),
+            formatNumberForDisplay(itemToDisplay.femalePaid),
+            formatNumberForDisplay(itemToDisplay.femalePending),
+            { content: formatNumberForDisplay((itemToDisplay.femalePaid || 0) + (itemToDisplay.femalePending || 0)), styles: { fontStyle: 'bold' } }
           );
         } else {
-          const paidKey = moduleLabel === 'Building Permit' ? 'buildingPaid' : 'coPaid';
-          const pendingKey = moduleLabel === 'Building Permit' ? 'buildingPending' : 'coPending';
-          dataCells.push(formatNumberForDisplay(itemToDisplay[paidKey]), formatNumberForDisplay(itemToDisplay[pendingKey]));
+          if (moduleLabel === 'Barangay Clearance') {
+            dataCells.push(formatNumberForDisplay(itemToDisplay.totalCount));
+          } else if (moduleLabel === 'Building Permit' || moduleLabel === 'Certificate of Occupancy') {
+            const paidKey = moduleLabel === 'Building Permit' ? 'buildingPaid' : 'coPaid';
+            const pendingKey = moduleLabel === 'Building Permit' ? 'buildingPending' : 'coPending';
+            const paid = Number(itemToDisplay[paidKey] || 0);
+            const pending = Number(itemToDisplay[pendingKey] || 0);
+            const issued = paid; // License Issued equals Paid
+            const total = paid + pending;
+            dataCells.push(
+              formatNumberForDisplay(issued),
+              formatNumberForDisplay(paid),
+              formatNumberForDisplay(pending),
+              formatNumberForDisplay(total)
+            );
+          } else {
+            const paidKey = moduleLabel === 'Building Permit' ? 'buildingPaid' : 'coPaid';
+            const pendingKey = moduleLabel === 'Building Permit' ? 'buildingPending' : 'coPending';
+            dataCells.push(formatNumberForDisplay(itemToDisplay[paidKey]), formatNumberForDisplay(itemToDisplay[pendingKey]));
+          }
         }
-      }
 
       dataRows.push([
         { content: regionDisplay, styles: { valign: 'middle' } }, // Region column cell
@@ -513,7 +513,7 @@ interface PdfParams {
     const totalCellStyles = {
       halign: 'center',
       valign: 'middle',
-      fillColor: '#1e293b', // updated per request
+      fillColor: '#1e293b', // requested color
       textColor: '#ffffff',
       fontStyle: 'bold',
       lineWidth: 0.5,
@@ -678,7 +678,7 @@ interface PdfParams {
             data.cell.styles.halign = 'center';
           }
 
-          // Detect Grand Total row: first body cell has "GRAND TOTAL" with colSpan=2
+          // Detect Grand Total row
           const isGrandTotalRow =
             data.section === 'body' &&
             data.row?.raw &&
@@ -773,7 +773,8 @@ interface PdfParams {
     };
 
     // Pagination:
-    // - For Business/Working Permit: limit to 8 unique LGUs per page (keep all rows of an LGU on the same page)
+    // - For Business/Working Permit: keep all rows of an LGU together.
+    //   If month/year is selected (isDayMode), limit to 7 unique LGUs per page; otherwise 8.
     // - For others (Barangay/Building/CO): keep existing row-based pagination (26 rows)
     if (isComplex) {
       // Pair each rendered row with its LGU key
@@ -781,6 +782,8 @@ interface PdfParams {
         lguKey: String(rowData.lguInfo?.lgu || ''),
         row: dataRows[idx]
       }));
+
+      const lguLimit = isDayMode ? 7 : 8;
 
       const chunks: any[][] = [];
       let currentChunk: any[][] = [];
@@ -790,8 +793,8 @@ interface PdfParams {
       for (const item of rowsWithKey) {
         const sameLgu = prevLguKey !== null && item.lguKey === prevLguKey;
 
-        // If we're starting a new LGU and already have 8 LGUs in this page, start a new page
-        if (!sameLgu && currentLguCount === 7) {
+        // If we're starting a new LGU and already reached the page limit, start a new page
+        if (!sameLgu && currentLguCount === lguLimit) {
           chunks.push(currentChunk);
           currentChunk = [];
           currentLguCount = 0;
