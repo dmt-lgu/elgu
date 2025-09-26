@@ -32,7 +32,7 @@ const ScrollToTopButton: React.FC<ScrollToTopButtonProps> = ({
 
     // Try to reference tableRowSelector and DEFAULT_ROW_HEIGHT so linter doesn't mark them unused
     // We'll compute an approximate rows height but still perform a smooth jump to bottom.
-    let estimatedScrollBy = DEFAULT_ROW_HEIGHT * 10;
+    // let estimatedScrollBy = DEFAULT_ROW_HEIGHT * 10;
     try {
       const rows = (scrollContainer instanceof HTMLElement ? scrollContainer : document).querySelectorAll(tableRowSelector);
       if (rows && rows.length > 0) {
@@ -43,7 +43,7 @@ const ScrollToTopButton: React.FC<ScrollToTopButtonProps> = ({
           totalHeight += r.offsetHeight || DEFAULT_ROW_HEIGHT;
           count++;
         }
-        if (count > 0) estimatedScrollBy = Math.max(16, Math.round(totalHeight));
+        // if (count > 0) estimatedScrollBy = Math.max(16, Math.round(totalHeight));
       }
     } catch (e) {
       // ignore parsing/query errors
