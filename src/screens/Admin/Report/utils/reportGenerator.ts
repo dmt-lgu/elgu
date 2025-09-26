@@ -791,7 +791,7 @@ interface PdfParams {
         const sameLgu = prevLguKey !== null && item.lguKey === prevLguKey;
 
         // If we're starting a new LGU and already have 8 LGUs in this page, start a new page
-        if (!sameLgu && currentLguCount === 8) {
+        if (!sameLgu && currentLguCount === 7) {
           chunks.push(currentChunk);
           currentChunk = [];
           currentLguCount = 0;
