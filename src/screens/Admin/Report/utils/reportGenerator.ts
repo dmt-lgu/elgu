@@ -783,7 +783,7 @@ export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal)
         row: dataRows[idx]
       }));
 
-      const lguLimit = isDayMode ? 7 : 8;
+      const lguLimit = isDayMode ? 7 : 7;
 
       const chunks: any[][] = [];
       let currentChunk: any[][] = [];
