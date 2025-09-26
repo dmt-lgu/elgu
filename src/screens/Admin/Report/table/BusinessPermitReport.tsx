@@ -234,7 +234,6 @@ const BusinessPermitReport = forwardRef<HTMLDivElement, BusinessPermitProps>(({
   // 4) Grand totals computed from normalizedResults to avoid double counting
   const grandTotals = useMemo(() => {
     const totals = {
-      totalCount: 0,
       newPaid: 0, newGeoPay: 0, newPending: 0,
       renewalPaid: 0, renewalGeoPay: 0, renewalPending: 0,
       malePaid: 0, malePending: 0, femalePaid: 0, femalePending: 0
@@ -242,8 +241,6 @@ const BusinessPermitReport = forwardRef<HTMLDivElement, BusinessPermitProps>(({
     normalizedResults.forEach((lgu: any) => {
       if (!lgu.hasError && Array.isArray(lgu.monthlyResults)) {
         lgu.monthlyResults.forEach((item: any) => {
-          // License Issued = malePaid + malePending + femalePaid + femalePending
-          totals.totalCount += Number(item.malePaid || 0) + Number(item.malePending || 0) + Number(item.femalePaid || 0) + Number(item.femalePending || 0);
           totals.newPaid += Number(item.newPaid || 0);
           totals.newGeoPay += Number(item.newPaidViaEgov || 0);
           totals.newPending += Number(item.newPending || 0);
@@ -275,7 +272,7 @@ const BusinessPermitReport = forwardRef<HTMLDivElement, BusinessPermitProps>(({
       // Always render a trigger row so regions are user-expandable even if only one exists.
       allRows.push(
         <TableRow key={`${region}-trigger`}>
-          <TableCell colSpan={17} className="text-center p-2 cursor-pointer bg-slate-100 hover:bg-slate-200 font-semibold text-blue-600 text-xs" onClick={() => toggleRegion(region)}>
+          <TableCell colSpan={20} className="text-center p-2 cursor-pointer bg-slate-100 hover:bg-slate-200 font-semibold text-blue-600 text-xs" onClick={() => toggleRegion(region)}>
             {isRegionOpen ? `Hide ${getRegionCode(region) || region} Data` : `View ${getRegionCode(region) || region} Data`}
           </TableCell>
         </TableRow>
@@ -309,7 +306,7 @@ const BusinessPermitReport = forwardRef<HTMLDivElement, BusinessPermitProps>(({
                   {lgu.lgu}<br/>
                   <span className="text-[10px] font-bold text-orange-600 mt-0.5 uppercase">{lgu.error || 'NO DATA AVAILABLE'}</span>
                 </TableCell>
-                <TableCell colSpan={15} className="p-2 text-center text-slate-500">-</TableCell>
+                <TableCell colSpan={18} className="p-2 text-center text-slate-500">-</TableCell>
               </TableRow>
             );
             isFirstRowOfRegion = false;
@@ -342,18 +339,29 @@ const BusinessPermitReport = forwardRef<HTMLDivElement, BusinessPermitProps>(({
                   <div>{lgu.lgu}<span className="text-[11px] font-medium text-slate-500 ml-1.5">{lgu.province ? `(${lgu.province})` : ""}</span></div>
                   <div className="text-[10px] font-semibold text-blue-700 mt-0.5">{periodLabel}</div>
                 </TableCell>
-                <TableCell className="p-2 text-center tabular-nums text-slate-700">{formatNumber((item.malePaid || 0) + (item.malePending || 0) + (item.femalePaid || 0) + (item.femalePending || 0))}</TableCell>
+                
+                {/* New */}
+                <TableCell className="p-2 text-center tabular-nums text-green-700">{formatNumber(item.newPaid)}</TableCell>
                 <TableCell className="p-2 text-center tabular-nums text-green-700">{formatNumber(item.newPaid)}</TableCell>
                 <TableCell className="p-2 text-center tabular-nums text-green-700">{formatNumber(item.newPaidViaEgov)}</TableCell>
                 <TableCell className="p-2 text-center tabular-nums text-blue-700">{formatNumber(item.newPending)}</TableCell>
                 <TableCell className="p-2 text-center font-bold text-slate-900 bg-slate-100 tabular-nums">{formatNumber((item.newPaid || 0) + (item.newPaidViaEgov || 0) + (item.newPending || 0))}</TableCell>
+                
+                {/* Renewal */}
+                <TableCell className="p-2 text-center tabular-nums text-green-700">{formatNumber(item.renewPaid)}</TableCell>
                 <TableCell className="p-2 text-center tabular-nums text-green-700">{formatNumber(item.renewPaid)}</TableCell>
                 <TableCell className="p-2 text-center tabular-nums text-green-700">{formatNumber(item.renewPaidViaEgov)}</TableCell>
                 <TableCell className="p-2 text-center tabular-nums text-blue-700">{formatNumber(item.renewPending)}</TableCell>
                 <TableCell className="p-2 text-center font-bold text-slate-900 bg-slate-100 tabular-nums">{formatNumber((item.renewPaid || 0) + (item.renewPaidViaEgov || 0) + (item.renewPending || 0))}</TableCell>
+                
+                {/* Male */}
+                <TableCell className="p-2 text-center tabular-nums text-green-700">{formatNumber(item.malePaid)}</TableCell>
                 <TableCell className="p-2 text-center tabular-nums text-green-700">{formatNumber(item.malePaid)}</TableCell>
                 <TableCell className="p-2 text-center tabular-nums text-blue-700">{formatNumber(item.malePending)}</TableCell>
                 <TableCell className="p-2 text-center font-bold text-slate-900 bg-slate-100 tabular-nums">{formatNumber((item.malePaid || 0) + (item.malePending || 0))}</TableCell>
+                
+                {/* Female */}
+                <TableCell className="p-2 text-center tabular-nums text-green-700">{formatNumber(item.femalePaid)}</TableCell>
                 <TableCell className="p-2 text-center tabular-nums text-green-700">{formatNumber(item.femalePaid)}</TableCell>
                 <TableCell className="p-2 text-center tabular-nums text-blue-700">{formatNumber(item.femalePending)}</TableCell>
                 <TableCell className="p-2 text-center font-bold text-slate-900 bg-slate-100 tabular-nums">{formatNumber((item.femalePaid || 0) + (item.femalePending || 0))}</TableCell>
@@ -367,8 +375,6 @@ const BusinessPermitReport = forwardRef<HTMLDivElement, BusinessPermitProps>(({
         const regionTotals = lguList.reduce((totals, lgu) => {
           if (!lgu.hasError && lgu.monthlyResults) {
             lgu.monthlyResults.forEach((item: any) => {
-              // region subtotal uses male+female (paid + pending)
-              totals.totalCount += Number(item.malePaid || 0) + Number(item.malePending || 0) + Number(item.femalePaid || 0) + Number(item.femalePending || 0);
               totals.newPaid += Number(item.newPaid || 0);
               totals.newGeoPay += Number(item.newPaidViaEgov || 0);
               totals.newPending += Number(item.newPending || 0);
@@ -382,7 +388,7 @@ const BusinessPermitReport = forwardRef<HTMLDivElement, BusinessPermitProps>(({
             });
           }
           return totals;
-  }, { totalCount: 0, newPaid: 0, newGeoPay: 0, newPending: 0, renewalPaid: 0, renewalGeoPay: 0, renewalPending: 0, malePaid: 0, malePending: 0, femalePaid: 0, femalePending: 0 });
+        }, { newPaid: 0, newGeoPay: 0, newPending: 0, renewalPaid: 0, renewalGeoPay: 0, renewalPending: 0, malePaid: 0, malePending: 0, femalePaid: 0, femalePending: 0 });
 
         allRows.push(
           <TableRow key={`${region}-subtotal`} className="font-bold text-white">
@@ -390,18 +396,25 @@ const BusinessPermitReport = forwardRef<HTMLDivElement, BusinessPermitProps>(({
               <div className="font-extrabold tracking-wider text-xs">SUB-TOTAL</div>
               <div className='text-[10px] font-medium text-slate-300'>({getRegionCode(region) || region})</div>
             </TableCell>
-            <TableCell className="bg-slate-500 p-2 text-center tabular-nums text-sm">{formatNumber(regionTotals.totalCount)}</TableCell>
+            {/* New */}
+            <TableCell className="bg-slate-500 p-2 text-center tabular-nums text-sm">{formatNumber(regionTotals.newPaid)}</TableCell>
             <TableCell className="bg-slate-500 p-2 text-center tabular-nums text-sm">{formatNumber(regionTotals.newPaid)}</TableCell>
             <TableCell className="bg-slate-500 p-2 text-center tabular-nums text-sm">{formatNumber(regionTotals.newGeoPay)}</TableCell>
             <TableCell className="bg-slate-500 p-2 text-center tabular-nums text-sm">{formatNumber(regionTotals.newPending)}</TableCell>
             <TableCell className="bg-slate-500 p-2 text-center tabular-nums text-sm">{formatNumber(regionTotals.newPaid + regionTotals.newGeoPay + regionTotals.newPending)}</TableCell>
+            {/* Renewal */}
+            <TableCell className="bg-slate-500 p-2 text-center tabular-nums text-sm">{formatNumber(regionTotals.renewalPaid)}</TableCell>
             <TableCell className="bg-slate-500 p-2 text-center tabular-nums text-sm">{formatNumber(regionTotals.renewalPaid)}</TableCell>
             <TableCell className="bg-slate-500 p-2 text-center tabular-nums text-sm">{formatNumber(regionTotals.renewalGeoPay)}</TableCell>
             <TableCell className="bg-slate-500 p-2 text-center tabular-nums text-sm">{formatNumber(regionTotals.renewalPending)}</TableCell>
             <TableCell className="bg-slate-500 p-2 text-center tabular-nums text-sm">{formatNumber(regionTotals.renewalPaid + regionTotals.renewalGeoPay + regionTotals.renewalPending)}</TableCell>
+            {/* Male */}
+            <TableCell className="bg-slate-500 p-2 text-center tabular-nums text-sm">{formatNumber(regionTotals.malePaid)}</TableCell>
             <TableCell className="bg-slate-500 p-2 text-center tabular-nums text-sm">{formatNumber(regionTotals.malePaid)}</TableCell>
             <TableCell className="bg-slate-500 p-2 text-center tabular-nums text-sm">{formatNumber(regionTotals.malePending)}</TableCell>
             <TableCell className="bg-slate-500 p-2 text-center tabular-nums text-sm">{formatNumber(regionTotals.malePaid + regionTotals.malePending)}</TableCell>
+            {/* Female */}
+            <TableCell className="bg-slate-500 p-2 text-center tabular-nums text-sm">{formatNumber(regionTotals.femalePaid)}</TableCell>
             <TableCell className="bg-slate-500 p-2 text-center tabular-nums text-sm">{formatNumber(regionTotals.femalePaid)}</TableCell>
             <TableCell className="bg-slate-500 p-2 text-center tabular-nums text-sm">{formatNumber(regionTotals.femalePending)}</TableCell>
             <TableCell className="bg-slate-500 p-2 text-center tabular-nums text-sm">{formatNumber(regionTotals.femalePaid + regionTotals.femalePending)}</TableCell>
@@ -441,27 +454,34 @@ const BusinessPermitReport = forwardRef<HTMLDivElement, BusinessPermitProps>(({
               <TableRow>
                 <TableHead rowSpan={2} className="bg-[#9ec6f7] text-black font-bold p-2 text-center align-middle sticky top-0 z-20 text-[11px] border-b border-r border-slate-300">Region</TableHead>
                 <TableHead rowSpan={2} className="bg-[#9ec6f7] text-black font-bold p-2 text-center align-middle sticky top-0 z-20 text-[11px] border-b border-r border-slate-300">LGU</TableHead>
-                <TableHead rowSpan={2} className="bg-[#9ec6f7] text-black font-bold p-2 text-center align-middle sticky top-0 z-20 text-[11px] border-b border-r border-slate-300">License Issued</TableHead>
-                <TableHead colSpan={4} className="bg-[#9ec6f7] text-black font-bold p-2 text-center sticky top-0 z-20 uppercase tracking-wider text-[11px] border-b border-r border-slate-300">New</TableHead>
-                <TableHead colSpan={4} className="bg-[#9ec6f7] text-black font-bold p-2 text-center sticky top-0 z-20 uppercase tracking-wider text-[11px] border-b border-r border-slate-300">Renewal</TableHead>
-                <TableHead colSpan={3} className="bg-[#9ec6f7] text-black font-bold p-2 text-center sticky top-0 z-20 uppercase tracking-wider text-[11px] border-b border-r border-slate-300">Male</TableHead>
-                <TableHead colSpan={3} className="bg-[#9ec6f7] text-black font-bold p-2 text-center sticky top-0 z-20 uppercase tracking-wider text-[11px] border-b border-slate-300">Female</TableHead>
+                <TableHead colSpan={5} className="bg-[#9ec6f7] text-black font-bold p-2 text-center sticky top-0 z-20 uppercase tracking-wider text-[11px] border-b border-r border-slate-300">New</TableHead>
+                <TableHead colSpan={5} className="bg-[#9ec6f7] text-black font-bold p-2 text-center sticky top-0 z-20 uppercase tracking-wider text-[11px] border-b border-r border-slate-300">Renewal</TableHead>
+                <TableHead colSpan={4} className="bg-[#9ec6f7] text-black font-bold p-2 text-center sticky top-0 z-20 uppercase tracking-wider text-[11px] border-b border-r border-slate-300">Male</TableHead>
+                <TableHead colSpan={4} className="bg-[#9ec6f7] text-black font-bold p-2 text-center sticky top-0 z-20 uppercase tracking-wider text-[11px] border-b border-slate-300">Female</TableHead>
               </TableRow>
               <TableRow>
                 {/* Note: top offset for second header row. Adjust if header height changes. */}
-                <TableHead className="bg-blue-100 text-black p-2 sticky top-[45px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">PAID <br /><span className='text-[10px]'>(For Issuance to License Issued)</span></TableHead>
+                {/* New */}
+                <TableHead className="bg-blue-100 text-black p-2 sticky top-[45px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">License Issued</TableHead>
+                <TableHead className="bg-blue-100 text-black p-2 sticky top-[45px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">PAID <br /><span className='text-[10px] text-nowrap'>(For Issuance to <br /> License Issued)</span></TableHead>
                 <TableHead className="bg-blue-100 text-black p-2 sticky top-[45px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">PAID <br /><span className='font-medium'>(eGOVPay)</span></TableHead>
-                <TableHead className="bg-blue-100 text-black p-2 sticky top-[45px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">ONGOING <br /><span className='text-[10px]'>(For verification to For Payment)</span></TableHead>
+                <TableHead className="bg-blue-100 text-black p-2 sticky top-[45px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">ONGOING <br /><span className='text-[10px] text-nowrap'>(For verification to <br /> For Payment)</span></TableHead>
                 <TableHead className="bg-blue-200 text-black p-2 sticky top-[45px] z-20 text-center font-bold uppercase text-[10px] border-b border-r border-slate-300">Total</TableHead>
-                <TableHead className="bg-blue-100 text-black p-2 sticky top-[45px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">PAID <br /><span className='text-[10px]'>(For Issuance to License Issued)</span></TableHead>
+                {/* Renewal */}
+                <TableHead className="bg-blue-100 text-black p-2 sticky top-[45px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">License Issued</TableHead>
+                <TableHead className="bg-blue-100 text-black p-2 sticky top-[45px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">PAID <br /><span className='text-[10px] text-nowrap'>(For Issuance to <br /> License Issued)</span></TableHead>
                 <TableHead className="bg-blue-100 text-black p-2 sticky top-[45px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">PAID <br /><span className='font-medium'>(eGOVPay)</span></TableHead>
-                <TableHead className="bg-blue-100 text-black p-2 sticky top-[45px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">ONGOING <br /><span className='text-[10px]'>(For verification to For Payment)</span></TableHead>
+                <TableHead className="bg-blue-100 text-black p-2 sticky top-[45px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">ONGOING <br /><span className='text-[10px] text-nowrap'>(For verification to <br /> For Payment)</span></TableHead>
                 <TableHead className="bg-blue-200 text-black p-2 sticky top-[45px] z-20 text-center font-bold uppercase text-[10px] border-b border-r border-slate-300">Total</TableHead>
-                <TableHead className="bg-blue-100 text-black p-2 sticky top-[45px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">PAID <br /><span className='text-[10px]'>(For Issuance to License Issued)</span></TableHead>
-                <TableHead className="bg-blue-100 text-black p-2 sticky top-[45px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">ONGOING <br /><span className='text-[10px]'>(For verification to For Payment)</span></TableHead>
+                {/* Male */}
+                <TableHead className="bg-blue-100 text-black p-2 sticky top-[45px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">License Issued</TableHead>
+                <TableHead className="bg-blue-100 text-black p-2 sticky top-[45px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">PAID <br /><span className='text-[10px] text-nowrap'>(For Issuance to <br /> License Issued)</span></TableHead>
+                <TableHead className="bg-blue-100 text-black p-2 sticky top-[45px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">ONGOING <br /><span className='text-[10px] text-nowrap'>(For verification to <br /> For Payment)</span></TableHead>
                 <TableHead className="bg-blue-200 text-black p-2 sticky top-[45px] z-20 text-center font-bold uppercase text-[10px] border-b border-r border-slate-300">Total</TableHead>
-                <TableHead className="bg-blue-100 text-black p-2 sticky top-[45px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">PAID <br /><span className='text-[10px]'>(For Issuance to License Issued)</span></TableHead>
-                <TableHead className="bg-blue-100 text-black p-2 sticky top-[45px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">ONGOING <br /><span className='text-[10px]'>(For verification to For Payment)</span></TableHead>
+                {/* Female */}
+                <TableHead className="bg-blue-100 text-black p-2 sticky top-[45px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">License Issued</TableHead>
+                <TableHead className="bg-blue-100 text-black p-2 sticky top-[45px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">PAID <br /><span className='text-[10px] text-nowrap'>(For Issuance to <br /> License Issued)</span></TableHead>
+                <TableHead className="bg-blue-100 text-black p-2 sticky top-[45px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">ONGOING <br /><span className='text-[10px] text-nowrap'>(For verification to <br /> For Payment)</span></TableHead>
                 <TableHead className="bg-blue-200 text-black p-2 sticky top-[45px] z-20 text-center font-bold uppercase text-[10px] border-b border-slate-300">Total</TableHead>
               </TableRow>
             </TableHeader>
@@ -472,20 +492,20 @@ const BusinessPermitReport = forwardRef<HTMLDivElement, BusinessPermitProps>(({
                   {renderTableRows()}
                   {Object.keys(regionMappingGrouped).length > 1 && (
                     <TableRow>
-                      <TableCell colSpan={17} className="text-center p-2 cursor-pointer bg-slate-200 hover:bg-slate-300 font-bold text-slate-700 text-xs" onClick={toggleAllRegions}>
+                      <TableCell colSpan={20} className="text-center p-2 cursor-pointer bg-slate-200 hover:bg-slate-300 font-bold text-slate-700 text-xs" onClick={toggleAllRegions}>
                         {openRegions.size === Object.keys(regionMappingGrouped).length ? 'Hide All Regions' : 'View All Regions'}
                       </TableCell>
                     </TableRow>
                   )}
                   {(loading || isProgressive) && (
-                    <TableRow><TableCell colSpan={17} className="p-0"><LoaderTable message={isProgressive ? "Please wait for other regions..." : "Updating data..."} /></TableCell></TableRow>
+                    <TableRow><TableCell colSpan={20} className="p-0"><LoaderTable message={isProgressive ? "Please wait for other regions..." : "Updating data..."} /></TableCell></TableRow>
                   )}
                 </>
               ) : loading ? (
-                <TableRow><TableCell colSpan={17} className="text-center py-12"><LoaderTable /></TableCell></TableRow>
+                <TableRow><TableCell colSpan={20} className="text-center py-12"><LoaderTable /></TableCell></TableRow>
               ) : (
                 <TableRow>
-                  <TableCell colSpan={17} className="text-center py-16 bg-white">
+                  <TableCell colSpan={20} className="text-center py-16 bg-white">
                     <div className='flex flex-col items-center justify-center'>
                       <div className="rounded-full bg-slate-100 p-3"><Search className="h-8 w-8 text-slate-400" /></div>
                       <p className='font-bold text-sm text-slate-600 mt-4'>{hasSearched ? 'No Results Found' : 'Generate a Report'}</p>
@@ -502,18 +522,25 @@ const BusinessPermitReport = forwardRef<HTMLDivElement, BusinessPermitProps>(({
                   <div className="font-extrabold tracking-wider text-sm">GRAND TOTAL</div>
                   <div className='text-[10px] font-medium text-slate-300'>({dateRangeLabel})</div>
                 </TableCell>
-                <TableCell className="sticky bottom-0 z-20 bg-slate-800 p-2 text-center tabular-nums text-sm">{formatNumber(grandTotals.totalCount)}</TableCell>
+                {/* New */}
+                <TableCell className="sticky bottom-0 z-20 bg-slate-800 p-2 text-center tabular-nums text-sm">{formatNumber(grandTotals.newPaid)}</TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 p-2 text-center tabular-nums text-sm">{formatNumber(grandTotals.newPaid)}</TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 p-2 text-center tabular-nums text-sm">{formatNumber(grandTotals.newGeoPay)}</TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 p-2 text-center tabular-nums text-sm">{formatNumber(grandTotals.newPending)}</TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 p-2 text-center tabular-nums text-sm">{formatNumber(grandTotals.newPaid + grandTotals.newGeoPay + grandTotals.newPending)}</TableCell>
+                {/* Renewal */}
+                <TableCell className="sticky bottom-0 z-20 bg-slate-800 p-2 text-center tabular-nums text-sm">{formatNumber(grandTotals.renewalPaid)}</TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 p-2 text-center tabular-nums text-sm">{formatNumber(grandTotals.renewalPaid)}</TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 p-2 text-center tabular-nums text-sm">{formatNumber(grandTotals.renewalGeoPay)}</TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 p-2 text-center tabular-nums text-sm">{formatNumber(grandTotals.renewalPending)}</TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 p-2 text-center tabular-nums text-sm">{formatNumber(grandTotals.renewalPaid + grandTotals.renewalGeoPay + grandTotals.renewalPending)}</TableCell>
+                {/* Male */}
+                <TableCell className="sticky bottom-0 z-20 bg-slate-800 p-2 text-center tabular-nums text-sm">{formatNumber(grandTotals.malePaid)}</TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 p-2 text-center tabular-nums text-sm">{formatNumber(grandTotals.malePaid)}</TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 p-2 text-center tabular-nums text-sm">{formatNumber(grandTotals.malePending)}</TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 p-2 text-center tabular-nums text-sm">{formatNumber(grandTotals.malePaid + grandTotals.malePending)}</TableCell>
+                {/* Female */}
+                <TableCell className="sticky bottom-0 z-20 bg-slate-800 p-2 text-center tabular-nums text-sm">{formatNumber(grandTotals.femalePaid)}</TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 p-2 text-center tabular-nums text-sm">{formatNumber(grandTotals.femalePaid)}</TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 p-2 text-center tabular-nums text-sm">{formatNumber(grandTotals.femalePending)}</TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 p-2 text-center tabular-nums text-sm">{formatNumber(grandTotals.femalePaid + grandTotals.femalePending)}</TableCell>

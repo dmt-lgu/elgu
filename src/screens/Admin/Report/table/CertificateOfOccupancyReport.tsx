@@ -258,7 +258,7 @@ const CertificateOfOccupancyReport = forwardRef<HTMLDivElement, CertificateOfOcc
 
   // Totals should be computed from normalizedResults to avoid double counting
   const grandTotals = useMemo(() => {
-    const totals = { paid: 0, pending: 0, applications: 0 };
+    const totals = { paid: 0, pending: 0, total: 0 };
     normalizedResults.forEach((lgu: any) => {
       if (!lgu.hasError && Array.isArray(lgu.monthlyResults)) {
         lgu.monthlyResults.forEach((item: any) => {
@@ -266,7 +266,7 @@ const CertificateOfOccupancyReport = forwardRef<HTMLDivElement, CertificateOfOcc
           const pending = Number(item.coPending || 0);
           totals.paid += paid;
           totals.pending += pending;
-          totals.applications += paid + pending;
+          totals.total += paid + pending;
         });
       }
     });
@@ -290,7 +290,7 @@ const CertificateOfOccupancyReport = forwardRef<HTMLDivElement, CertificateOfOcc
       allRows.push(
         <TableRow key={`${region}-trigger`}>
           <TableCell
-            colSpan={5}
+            colSpan={6}
             className="text-center p-2 cursor-pointer bg-slate-100 hover:bg-slate-200 font-semibold text-blue-600 text-xs"
             onClick={() => toggleRegion(region)}
           >
@@ -335,6 +335,7 @@ const CertificateOfOccupancyReport = forwardRef<HTMLDivElement, CertificateOfOcc
                 <TableCell className="p-2 text-center font-bold tabular-nums text-slate-500">-</TableCell>
                 <TableCell className="p-2 text-center font-bold tabular-nums text-slate-500">-</TableCell>
                 <TableCell className="p-2 text-center font-bold tabular-nums text-slate-500">-</TableCell>
+                <TableCell className="p-2 text-center font-bold tabular-nums text-slate-500">-</TableCell>
               </TableRow>
             );
             isFirstRowOfRegion = false;
@@ -376,9 +377,10 @@ const CertificateOfOccupancyReport = forwardRef<HTMLDivElement, CertificateOfOcc
                   <span className="ml-1.5 text-[11px] font-medium text-slate-500">{lgu.province ? `(${lgu.province})` : ""}</span><br />
                   <span className="text-[10px] font-semibold text-blue-700 mt-0.5">{periodLabel}</span>
                 </TableCell>
-                <TableCell className="p-2 text-center font-bold tabular-nums text-indigo-800">{formatNumber((Number(item.coPaid || 0) + Number(item.coPending || 0)))}</TableCell>
+                <TableCell className="p-2 text-center font-bold tabular-nums text-green-700">{formatNumber(item.coPaid)}</TableCell>
                 <TableCell className="p-2 text-center font-bold tabular-nums text-green-700">{formatNumber(item.coPaid)}</TableCell>
                 <TableCell className="p-2 text-center font-bold tabular-nums text-blue-700">{formatNumber(item.coPending)}</TableCell>
+                <TableCell className="p-2 text-center font-bold tabular-nums text-slate-900 bg-slate-100">{formatNumber((Number(item.coPaid || 0) + Number(item.coPending || 0)))}</TableCell>
               </TableRow>
             );
             isFirstRowOfRegion = false;
@@ -386,7 +388,7 @@ const CertificateOfOccupancyReport = forwardRef<HTMLDivElement, CertificateOfOcc
         });
         allRows.push(...rows);
 
-        const regionTotal = { paid: 0, pending: 0, applications: 0 };
+        const regionTotal = { paid: 0, pending: 0, total: 0 };
         lguList.forEach((lgu: any) => {
           if (!lgu.hasError && lgu.monthlyResults && Array.isArray(lgu.monthlyResults)) {
             lgu.monthlyResults.forEach((item: any) => {
@@ -394,7 +396,7 @@ const CertificateOfOccupancyReport = forwardRef<HTMLDivElement, CertificateOfOcc
               const pending = Number(item.coPending || 0);
               regionTotal.paid += paid;
               regionTotal.pending += pending;
-              regionTotal.applications += paid + pending;
+              regionTotal.total += paid + pending;
             });
           }
         });
@@ -405,15 +407,10 @@ const CertificateOfOccupancyReport = forwardRef<HTMLDivElement, CertificateOfOcc
               <div className="font-extrabold tracking-wider text-xs">SUB-TOTAL</div>
               <div className='text-[10px] font-medium text-slate-300'>({getRegionCode(region) || region})</div>
             </TableCell>
-            <TableCell className="bg-slate-500 p-2 text-center text-sm tabular-nums">
-              {formatNumber(regionTotal.applications)}
-            </TableCell>
-            <TableCell className="bg-slate-500 p-2 text-center text-sm tabular-nums">
-              {formatNumber(regionTotal.paid)}
-            </TableCell>
-            <TableCell className="bg-slate-500 p-2 text-center text-sm tabular-nums">
-              {formatNumber(regionTotal.pending)}
-            </TableCell>
+            <TableCell className="bg-slate-500 p-2 text-center text-sm tabular-nums">{formatNumber(regionTotal.paid)}</TableCell>
+            <TableCell className="bg-slate-500 p-2 text-center text-sm tabular-nums">{formatNumber(regionTotal.paid)}</TableCell>
+            <TableCell className="bg-slate-500 p-2 text-center text-sm tabular-nums">{formatNumber(regionTotal.pending)}</TableCell>
+            <TableCell className="bg-slate-500 p-2 text-center text-sm tabular-nums">{formatNumber(regionTotal.total)}</TableCell>
           </TableRow>
         );
       }
@@ -447,11 +444,12 @@ const CertificateOfOccupancyReport = forwardRef<HTMLDivElement, CertificateOfOcc
           <Table className="w-full border-collapse" containerClassName="max-h-[70vh]">
             <TableHeader>
               <TableRow>
-                <TableHead className="bg-[#9ec6f7] text-black font-bold p-2 text-center align-middle sticky top-0 z-10 uppercase text-[11px] border-b border-r border-slate-300">Region</TableHead>
-                <TableHead className="bg-[#9ec6f7] text-black font-bold p-2 text-center align-middle sticky top-0 z-10 uppercase text-[11px] border-b border-r border-slate-300">LGU</TableHead>
-                <TableHead className="bg-[#9ec6f7] text-black font-bold p-2 text-center align-middle sticky top-0 z-10 uppercase text-[11px] border-b border-r border-slate-300">Applications</TableHead>
-                <TableHead className="bg-[#9ec6f7] text-black font-bold p-2 text-center align-middle sticky top-0 z-10 uppercase text-[11px] border-b border-r border-slate-300">Paid</TableHead>
-                <TableHead className="bg-[#9ec6f7] text-black font-bold p-2 text-center align-middle sticky top-0 z-10 uppercase text-[11px] border-b border-r border-slate-300">Ongoing</TableHead>
+                <TableHead className="bg-[#9ec6f7] text-black font-bold p-2 text-center align-middle sticky top-0 z-10 text-[11px] border-b border-r border-slate-300 uppercase">Region</TableHead>
+                <TableHead className="bg-[#9ec6f7] text-black font-bold p-2 text-center align-middle sticky top-0 z-10 text-[11px] border-b border-r border-slate-300">LGU</TableHead>
+                <TableHead className="bg-[#9ec6f7] text-black font-bold p-2 text-center align-middle sticky top-0 z-10 text-[11px] border-b border-r border-slate-300 uppercase">License Issued</TableHead>
+                <TableHead className="bg-[#9ec6f7] text-black font-bold p-2 text-center align-middle sticky top-0 z-10 text-[11px] border-b border-r border-slate-300">Paid <br /><span className='text-[10px] text-nowrap'>(For Issuance to <br /> License Issued)</span></TableHead>
+                <TableHead className="bg-[#9ec6f7] text-black font-bold p-2 text-center align-middle sticky top-0 z-10 text-[11px] border-b border-r border-slate-300">Ongoing <br /><span className='text-[10px] text-nowrap'>(For verification to <br /> For Payment)</span></TableHead>
+                <TableHead className="bg-[#9ec6f7] text-black font-bold p-2 text-center align-middle sticky top-0 z-10 text-[11px] border-b border-slate-300 uppercase">Total</TableHead>
               </TableRow>
             </TableHeader>
             {/* Add bottom padding so the sticky footer doesn't overlap the last rows */}
@@ -462,7 +460,7 @@ const CertificateOfOccupancyReport = forwardRef<HTMLDivElement, CertificateOfOcc
                   {Object.keys(regionMappingGrouped).length > 1 && (
                     <TableRow>
                       <TableCell
-                        colSpan={5}
+                        colSpan={6}
                         className="text-center p-2 cursor-pointer bg-slate-200 hover:bg-slate-300 font-bold text-slate-700 text-xs"
                         onClick={toggleAllRegions}
                       >
@@ -472,7 +470,7 @@ const CertificateOfOccupancyReport = forwardRef<HTMLDivElement, CertificateOfOcc
                   )}
                   {(loading || isProgressive) && (
                     <TableRow>
-                      <TableCell colSpan={5} className="p-0">
+                      <TableCell colSpan={6} className="p-0">
                         <LoaderTable message={isProgressive ? "Please wait for other regions..." : "Updating data..."} />
                       </TableCell>
                     </TableRow>
@@ -480,13 +478,13 @@ const CertificateOfOccupancyReport = forwardRef<HTMLDivElement, CertificateOfOcc
                 </>
               ) : loading ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-12">
+                  <TableCell colSpan={6} className="text-center py-12">
                     <LoaderTable />
                   </TableCell>
                 </TableRow>
               ) : (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-16 bg-white">
+                  <TableCell colSpan={6} className="text-center py-16 bg-white">
                     <div className='flex flex-col items-center justify-center'>
                       <div className="rounded-full bg-slate-100 p-3">
                         <Search className="h-8 w-8 text-slate-400" />
@@ -507,15 +505,10 @@ const CertificateOfOccupancyReport = forwardRef<HTMLDivElement, CertificateOfOcc
                   <div className="font-extrabold tracking-wider text-sm">GRAND TOTAL</div>
                   <div className='text-[10px] font-medium text-slate-300'>({dateRangeLabel})</div>
                 </TableCell>
-                <TableCell className="sticky bottom-0 z-20 bg-slate-800 p-2 text-center text-sm tabular-nums">
-                  {loading && normalizedResults.length === 0 ? '-' : formatNumber(grandTotals.applications)}
-                </TableCell>
-                <TableCell className="sticky bottom-0 z-20 bg-slate-800 p-2 text-center text-sm tabular-nums">
-                  {loading && normalizedResults.length === 0 ? '-' : formatNumber(grandTotals.paid)}
-                </TableCell>
-                <TableCell className="sticky bottom-0 z-20 bg-slate-800 p-2 text-center text-sm tabular-nums">
-                  {loading && normalizedResults.length === 0 ? '-' : formatNumber(grandTotals.pending)}
-                </TableCell>
+                <TableCell className="sticky bottom-0 z-20 bg-slate-800 p-2 text-center text-sm tabular-nums">{loading && normalizedResults.length === 0 ? '-' : formatNumber(grandTotals.paid)}</TableCell>
+                <TableCell className="sticky bottom-0 z-20 bg-slate-800 p-2 text-center text-sm tabular-nums">{loading && normalizedResults.length === 0 ? '-' : formatNumber(grandTotals.paid)}</TableCell>
+                <TableCell className="sticky bottom-0 z-20 bg-slate-800 p-2 text-center text-sm tabular-nums">{loading && normalizedResults.length === 0 ? '-' : formatNumber(grandTotals.pending)}</TableCell>
+                <TableCell className="sticky bottom-0 z-20 bg-slate-800 p-2 text-center text-sm tabular-nums">{loading && normalizedResults.length === 0 ? '-' : formatNumber(grandTotals.total)}</TableCell>
               </TableRow>
             </tfoot>
           </Table>

@@ -127,8 +127,12 @@ const getPeriodLabel = (lgu: any, isDayMode: boolean, month?: string): string =>
 
 const calculateGrandTotals = (data: any[], moduleLabel: string) => {
   const totals = {
-    newPaid: 0, newGeoPay: 0, newPending: 0, renewalPaid: 0, renewalGeoPay: 0, renewalPending: 0,
-    malePaid: 0, malePending: 0, femalePaid: 0, femalePending: 0,
+    // For Business/Working Permit
+    newIssued: 0, newPaid: 0, newGeoPay: 0, newPending: 0,
+    renewalIssued: 0, renewalPaid: 0, renewalGeoPay: 0, renewalPending: 0,
+    maleIssued: 0, malePaid: 0, malePending: 0,
+    femaleIssued: 0, femalePaid: 0, femalePending: 0,
+    // For Building/CO/Barangay
     paid: 0, pending: 0, totalCount: 0
   };
 
@@ -143,14 +147,27 @@ const calculateGrandTotals = (data: any[], moduleLabel: string) => {
         totals.paid += item[paidKey] || 0;
         totals.pending += item[pendingKey] || 0;
       } else { // For Business and Working Permit
+        // Derived "License Issued" values
+        const newIssued = (item.newPaid || 0) + (item.newPaidViaEgov || 0);
+        const renewalIssued = (item.renewPaid || 0) + (item.renewPaidViaEgov || 0);
+        const maleIssued = (item.malePaid || 0);
+        const femaleIssued = (item.femalePaid || 0);
+
+        totals.newIssued += newIssued;
         totals.newPaid += item.newPaid || 0;
         totals.newGeoPay += item.newPaidViaEgov || 0;
         totals.newPending += item.newPending || 0;
+
+        totals.renewalIssued += renewalIssued;
         totals.renewalPaid += item.renewPaid || 0;
         totals.renewalGeoPay += item.renewPaidViaEgov || 0;
         totals.renewalPending += item.renewPending || 0;
+
+        totals.maleIssued += maleIssued;
         totals.malePaid += item.malePaid || 0;
         totals.malePending += item.malePending || 0;
+
+        totals.femaleIssued += femaleIssued;
         totals.femalePaid += item.femalePaid || 0;
         totals.femalePending += item.femalePending || 0;
       }
@@ -231,296 +248,856 @@ interface PdfParams {
 }
 
 // Note: pageCount added to support "Page X of Y"
-const addHeader = (doc: jsPDF, params: PdfParams, pageNumber: number, pageCount: number, base64Logo: string) => {
-  const { moduleLabel, dateRangeLabel, generatedAt } = params;
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const margin = 30;
-  if (base64Logo) {
-    try { doc.addImage(base64Logo, 'PNG', margin, 30, 90, 30); }
-    catch (e) { console.error("Error adding logo to PDF:", e); }
-  }
-  doc.setFontSize(16); doc.setFont('helvetica', 'bold'); doc.text(moduleLabel, margin + 100, 40);
-  doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.text(`Generated for the period: ${dateRangeLabel}`, margin + 100, 55);
-  doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.text('Generated On', pageWidth - margin, 40, { align: 'right' });
-  doc.setFont('courier', 'normal'); doc.text(format(generatedAt, "MMM dd, yyyy, h:mm:ss a"), pageWidth - margin, 50, { align: 'right' });
-  doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.text(`Page ${pageNumber} of ${pageCount}`, pageWidth - margin, doc.internal.pageSize.getHeight() - 20, { align: 'right' });
-};
+// Note: pageCount added to support "Page X of Y"
+  // Note: pageCount added to support "Page X of Y"
+  // Note: pageCount added to support "Page X of Y"
+  const addHeader = (doc: jsPDF, params: PdfParams, pageNumber: number, pageCount: number, base64Logo: string) => {
+    const { moduleLabel, dateRangeLabel, generatedAt } = params;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 30;
 
-export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal) => {
-  // Use deduped/normalized data for Certificate of Occupancy to match the table totals/format
-  const baseData = params.data.filter(lgu => !lgu.hasError);
-  const exportableData =
-    params.moduleLabel === 'Certificate of Occupancy'
-      ? normalizeCertificateOfOccupancyData(baseData)
-      : baseData;
+    // Logo sizing constraints (no stretch, preserve aspect ratio)
+    const maxLogoW = 140; // increased bounds
+    const maxLogoH = 48;
+    let logoW = 0;
+    let logoH = 0;
 
-  // --- FIX PARA SA TIMESTAMP ---
-  // Atong kuhaon ang saktong oras sa pag-click sa download
-  const finalParams = { ...params, generatedAt: new Date() };
+    // Fixed logo placement
+    const logoX = margin;
+    const logoY = 30;
 
-  const { moduleLabel, isDayMode, dateRangeLabel } = finalParams;
+    // Text start X; shifts right if a logo is drawn
+    let labelX = margin + 10;
 
-  // Sort by custom region order (after normalizing region keys)
-  const sortedData = [...exportableData].sort(compareByRegion);
+    if (base64Logo) {
+      try {
+        const props = (doc as any).getImageProperties ? (doc as any).getImageProperties(base64Logo) : null;
+        if (props && props.width && props.height) {
+          const scale = Math.min(maxLogoW / props.width, maxLogoH / props.height, 1); // never upscale
+          logoW = props.width * scale;
+          logoH = props.height * scale;
+        } else {
+          // Fallback if props unavailable
+          logoW = maxLogoW;
+          logoH = maxLogoH;
+        }
 
-  let base64Logo = '';
-  const throwIfAborted = () => {
-    if (signal?.aborted) {
-      const e: any = new Error('canceled');
-      e.name = 'CanceledError';
-      throw e;
+        // Draw logo at margin, preserving aspect ratio
+        doc.addImage(base64Logo, 'PNG', logoX, logoY, logoW, logoH);
+
+        // Draw a vertical border only at the right side of the logo with margins
+        doc.setDrawColor('#cbd5e1'); // subtle slate border to match table header lines
+        doc.setLineWidth(0.5);
+        const gapX = 6;   // horizontal gap between logo and border
+        const padY = 2;   // extra top/bottom so the line does not touch the logo edges
+        const borderX = logoX + logoW + gapX;
+        doc.line(borderX, logoY - padY, borderX, logoY + logoH + padY);
+
+        // Start text after the border (keep 10pt spacing after border)
+        labelX = borderX + 10;
+      } catch (e) {
+        console.error('Error adding logo to PDF:', e);
+      }
     }
+
+    // Left-side title and subtitle
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text(moduleLabel, labelX, 40);
+
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Generated for the period: ${dateRangeLabel}`, labelX, 55);
+
+    // Right-aligned "Generated On" section and page number
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Generated On', pageWidth - margin, 40, { align: 'right' });
+    doc.setFont('courier', 'normal');
+    doc.text(format(generatedAt, 'MMM dd, yyyy, h:mm:ss a'), pageWidth - margin, 50, { align: 'right' });
+
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Page ${pageNumber} of ${pageCount}`, pageWidth - margin, pageHeight - 20, { align: 'right' });
   };
-  try {
-    throwIfAborted();
-    base64Logo = await loadImageAsBase64(finalParams.logoUrl);
-  } catch (error) {
-    if ((error as any)?.name === 'CanceledError') throw error;
-    console.error("Could not load logo for PDF.", error);
-  }
 
-  const isComplex = ['Business Permit', 'Working Permit'].includes(moduleLabel);
-  const orientation = isComplex ? 'landscape' : 'portrait';
-  const doc = new jsPDF({ orientation, unit: 'pt', format: 'a4' });
 
-  const head: any[] = isComplex
-    ? [
-        [{ content: 'Region', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } }, { content: 'LGU', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } }, { content: 'New', colSpan: 4, styles: { halign: 'center' } }, { content: 'Renewal', colSpan: 4, styles: { halign: 'center' } }, { content: 'Male', colSpan: 3, styles: { halign: 'center' } }, { content: 'Female', colSpan: 3, styles: { halign: 'center' } }],
-        ['PAID', 'PAID (eGOVPay)', 'ONGOING', 'Total', 'PAID', 'PAID (eGOVPay)', 'ONGOING', 'Total', 'PAID', 'ONGOING', 'Total', 'PAID', 'ONGOING', 'Total']
-      ]
-    : [['Region', 'LGU', ...(moduleLabel === 'Barangay Clearance' ? ['Total Results'] : ['Paid', 'Ongoing'])]];
+  export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal) => {
+    // Use deduped/normalized data for Certificate of Occupancy to match the table totals/format
+    const baseData = params.data.filter(lgu => !lgu.hasError);
+    const exportableData =
+      params.moduleLabel === 'Certificate of Occupancy'
+        ? normalizeCertificateOfOccupancyData(baseData)
+        : baseData;
 
-  const allRows = sortedData.flatMap(lgu => {
-    if (isDayMode) {
-      const results = lgu.monthlyResults?.length > 0 ? lgu.monthlyResults : [{ month: lgu.months?.[0] || '' }];
-      return results.map((monthData: any) => ({
-        lguInfo: lgu, itemToDisplay: monthData, periodLabel: getPeriodLabel(lgu, true, monthData.month)
-      }));
-    } else {
-      const aggregatedItem = (lgu.monthlyResults || []).reduce((acc: any, month: any) => {
-        Object.keys(month).forEach(key => {
-          if (typeof month[key] === 'number') { acc[key] = (acc[key] || 0) + month[key]; }
-        });
-        return acc;
-      }, {});
-      return [{ lguInfo: lgu, itemToDisplay: aggregatedItem, periodLabel: getPeriodLabel(lgu, false) }];
+    // Ensure accurate timestamp at click time
+    const finalParams = { ...params, generatedAt: new Date() };
+    const { moduleLabel, isDayMode, dateRangeLabel } = finalParams;
+
+    // Sort by custom region order (after normalizing region keys)
+    const sortedData = [...exportableData].sort(compareByRegion);
+
+    let base64Logo = '';
+    const throwIfAborted = () => {
+      if (signal?.aborted) {
+        const e: any = new Error('canceled');
+        e.name = 'CanceledError';
+        throw e;
+      }
+    };
+
+    try {
+      throwIfAborted();
+      base64Logo = await loadImageAsBase64(finalParams.logoUrl);
+    } catch (error) {
+      if ((error as any)?.name === 'CanceledError') throw error;
+      console.error('Could not load logo for PDF.', error);
     }
-  });
 
-  const totals = calculateGrandTotals(sortedData, moduleLabel);
-  const rowsPerPage = isComplex ? 17 : 25;
-  const numPages = allRows.length > 0 ? Math.ceil(allRows.length / rowsPerPage) : 1;
+    const isComplex = ['Business Permit', 'Working Permit'].includes(moduleLabel);
+    const orientation = isComplex ? 'landscape' : 'portrait';
+    const doc = new jsPDF({ orientation, unit: 'pt', format: 'a4' });
 
-  for (let i = 0; i < numPages; i++) {
-    throwIfAborted();
-    const pageData = allRows.slice(i * rowsPerPage, (i + 1) * rowsPerPage);
-    const pageBody: any[] = [];
-    let lastRegionOnPage: string | null = null;
+    // Table header (with explanatory notes on PAID/ONGOING)
+    const head: any[] = isComplex
+      ? [
+          [
+            { content: 'REGION', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } },
+            { content: 'LGU', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } },
+            { content: 'New', colSpan: 5, styles: { halign: 'center' } },
+            { content: 'Renewal', colSpan: 5, styles: { halign: 'center' } },
+            { content: 'Male', colSpan: 4, styles: { halign: 'center' } },
+            { content: 'Female', colSpan: 4, styles: { halign: 'center' } }
+          ],
+          [
+            'License Issued',
+            'PAID\n(For Issuance to License Issued)',
+            'PAID (eGOVPay)\n(For Issuance to License Issued)',
+            'ONGOING\n(For verification to For Payment)',
+            'Total',
 
-    pageData.forEach(rowData => {
+            'License Issued',
+            'PAID\n(For Issuance to License Issued)',
+            'PAID (eGOVPay)\n(For Issuance to License Issued)',
+            'ONGOING\n(For verification to For Payment)',
+            'Total',
+
+            'License Issued',
+            'PAID\n(For Issuance to License Issued)',
+            'ONGOING\n(For verification to For Payment)',
+            'Total',
+
+            'License Issued',
+            'PAID\n(For Issuance to License Issued)',
+            'ONGOING\n(For verification to For Payment)',
+            'Total'
+          ]
+        ]
+      : [[
+          'REGION',
+          'LGU',
+          ...(moduleLabel === 'Barangay Clearance'
+            ? ['Total Results']
+            : (moduleLabel === 'Building Permit' || moduleLabel === 'Certificate of Occupancy')
+              ? [
+                  'License Issued',
+                  'Paid\n(For Issuance to License Issued)',
+                  'Ongoing\n(For verification to For Payment)',
+                  'Total'
+                ]
+              : [
+                  'Paid\n(For Issuance to License Issued)',
+                  'Ongoing\n(For verification to For Payment)'
+                ])
+        ]];
+
+    // Build all rows (flattened)
+    const allRows = sortedData.flatMap(lgu => {
+      if (isDayMode) {
+        const results = lgu.monthlyResults?.length > 0 ? lgu.monthlyResults : [{ month: lgu.months?.[0] || '' }];
+        return results.map((monthData: any) => ({
+          lguInfo: lgu,
+          itemToDisplay: monthData,
+          periodLabel: getPeriodLabel(lgu, true, monthData.month)
+        }));
+      } else {
+        const aggregatedItem = (lgu.monthlyResults || []).reduce((acc: any, month: any) => {
+          Object.keys(month).forEach(key => {
+            if (typeof month[key] === 'number') {
+              acc[key] = (acc[key] || 0) + month[key];
+            }
+          });
+          return acc;
+        }, {});
+        return [{ lguInfo: lgu, itemToDisplay: aggregatedItem, periodLabel: getPeriodLabel(lgu, false) }];
+      }
+    });
+
+    const totals = calculateGrandTotals(sortedData, moduleLabel);
+
+    // Build table data rows (keep Grand Total separate for last page)
+    const dataRows: any[] = [];
+    allRows.forEach(rowData => {
       const { lguInfo, itemToDisplay, periodLabel } = rowData;
       const lguText = `${lguInfo.lgu}\n${periodLabel}`;
-      const dataCells: any[] = [];
+      const regionDisplay = getRegionDisplayName(normalizeRegionKey(lguInfo.region));
 
+      const dataCells: any[] = [];
       if (isComplex) {
-        dataCells.push(formatNumberForDisplay(itemToDisplay.newPaid), formatNumberForDisplay(itemToDisplay.newPaidViaEgov), formatNumberForDisplay(itemToDisplay.newPending), { content: formatNumberForDisplay((itemToDisplay.newPaid||0)+(itemToDisplay.newPaidViaEgov||0)+(itemToDisplay.newPending||0)), styles: { fontStyle: 'bold' } });
-        dataCells.push(formatNumberForDisplay(itemToDisplay.renewPaid), formatNumberForDisplay(itemToDisplay.renewPaidViaEgov), formatNumberForDisplay(itemToDisplay.renewPending), { content: formatNumberForDisplay((itemToDisplay.renewPaid||0)+(itemToDisplay.renewPaidViaEgov||0)+(itemToDisplay.renewPending||0)), styles: { fontStyle: 'bold' } });
-        dataCells.push(formatNumberForDisplay(itemToDisplay.malePaid), formatNumberForDisplay(itemToDisplay.malePending), { content: formatNumberForDisplay((itemToDisplay.malePaid||0)+(itemToDisplay.malePending||0)), styles: { fontStyle: 'bold' } });
-        dataCells.push(formatNumberForDisplay(itemToDisplay.femalePaid), formatNumberForDisplay(itemToDisplay.femalePending), { content: formatNumberForDisplay((itemToDisplay.femalePaid||0)+(itemToDisplay.femalePending||0)), styles: { fontStyle: 'bold' } });
+        // New
+        const newIssued = (itemToDisplay.newPaid || 0) + (itemToDisplay.newPaidViaEgov || 0);
+        dataCells.push(
+          formatNumberForDisplay(newIssued),
+          formatNumberForDisplay(itemToDisplay.newPaid),
+          formatNumberForDisplay(itemToDisplay.newPaidViaEgov),
+          formatNumberForDisplay(itemToDisplay.newPending),
+          { content: formatNumberForDisplay((itemToDisplay.newPaid || 0) + (itemToDisplay.newPaidViaEgov || 0) + (itemToDisplay.newPending || 0)), styles: { fontStyle: 'bold' } }
+        );
+        // Renewal
+        const renewIssued = (itemToDisplay.renewPaid || 0) + (itemToDisplay.renewPaidViaEgov || 0);
+        dataCells.push(
+          formatNumberForDisplay(renewIssued),
+          formatNumberForDisplay(itemToDisplay.renewPaid),
+          formatNumberForDisplay(itemToDisplay.renewPaidViaEgov),
+          formatNumberForDisplay(itemToDisplay.renewPending),
+          { content: formatNumberForDisplay((itemToDisplay.renewPaid || 0) + (itemToDisplay.renewPaidViaEgov || 0) + (itemToDisplay.renewPending || 0)), styles: { fontStyle: 'bold' } }
+        );
+        // Male
+        const maleIssued = (itemToDisplay.malePaid || 0);
+        dataCells.push(
+          formatNumberForDisplay(maleIssued),
+          formatNumberForDisplay(itemToDisplay.malePaid),
+          formatNumberForDisplay(itemToDisplay.malePending),
+          { content: formatNumberForDisplay((itemToDisplay.malePaid || 0) + (itemToDisplay.malePending || 0)), styles: { fontStyle: 'bold' } }
+        );
+        // Female
+        const femaleIssued = (itemToDisplay.femalePaid || 0);
+        dataCells.push(
+          formatNumberForDisplay(femaleIssued),
+          formatNumberForDisplay(itemToDisplay.femalePaid),
+          formatNumberForDisplay(itemToDisplay.femalePending),
+          { content: formatNumberForDisplay((itemToDisplay.femalePaid || 0) + (itemToDisplay.femalePending || 0)), styles: { fontStyle: 'bold' } }
+        );
       } else {
-        if (moduleLabel === 'Barangay Clearance') { dataCells.push(formatNumberForDisplay(itemToDisplay.totalCount)); } 
-        else {
+        if (moduleLabel === 'Barangay Clearance') {
+          dataCells.push(formatNumberForDisplay(itemToDisplay.totalCount));
+        } else if (moduleLabel === 'Building Permit' || moduleLabel === 'Certificate of Occupancy') {
+          const paidKey = moduleLabel === 'Building Permit' ? 'buildingPaid' : 'coPaid';
+          const pendingKey = moduleLabel === 'Building Permit' ? 'buildingPending' : 'coPending';
+          const paid = Number(itemToDisplay[paidKey] || 0);
+          const pending = Number(itemToDisplay[pendingKey] || 0);
+          const issued = paid; // License Issued equals Paid
+          const total = paid + pending;
+          dataCells.push(
+            formatNumberForDisplay(issued),
+            formatNumberForDisplay(paid),
+            formatNumberForDisplay(pending),
+            formatNumberForDisplay(total)
+          );
+        } else {
           const paidKey = moduleLabel === 'Building Permit' ? 'buildingPaid' : 'coPaid';
           const pendingKey = moduleLabel === 'Building Permit' ? 'buildingPending' : 'coPending';
           dataCells.push(formatNumberForDisplay(itemToDisplay[paidKey]), formatNumberForDisplay(itemToDisplay[pendingKey]));
         }
       }
 
-      // Normalize region for display/row span
-      const canonicalRegion = normalizeRegionKey(lguInfo.region);
-      if (canonicalRegion !== lastRegionOnPage) {
-        lastRegionOnPage = canonicalRegion;
-        const regionRowCountOnPage = pageData.filter(r => normalizeRegionKey(r.lguInfo.region) === lastRegionOnPage).length;
-        const regionCell = { content: getRegionDisplayName(canonicalRegion), rowSpan: regionRowCountOnPage, styles: { valign: 'middle' } };
-        pageBody.push([regionCell, { content: lguText, styles: { halign: 'left' } }, ...dataCells]);
-      } else {
-        pageBody.push([{ content: lguText, styles: { halign: 'left' } }, ...dataCells]);
-      }
+      dataRows.push([
+        { content: regionDisplay, styles: { valign: 'middle' } }, // Region column cell
+        { content: lguText, styles: { halign: 'left' } },        // LGU column
+        ...dataCells
+      ]);
     });
 
-    if (i === numPages - 1 && allRows.length > 0) {
-      const grandTotalLabel = `GRAND TOTAL\n(${dateRangeLabel})`;
-      const totalCellStyles = { halign: 'center', valign: 'middle', fillColor: '#1e2b3b', textColor: '#ffffff', fontStyle: 'bold', lineWidth: 0.5, lineColor: '#475569' };
+    // Totals row and table rendering helpers
+    const totalCellStyles = {
+      halign: 'center',
+      valign: 'middle',
+      fillColor: '#1e293b', // updated per request
+      textColor: '#ffffff',
+      fontStyle: 'bold',
+      lineWidth: 0.5,
+      lineColor: '#475569'
+    };
+    let grandTotalRow: any[] | null = null;
+    if (allRows.length > 0) {
       if (isComplex) {
-        const grandTotalRow = [
-          { content: grandTotalLabel, colSpan: 2, styles: { ...totalCellStyles, halign: 'left' } },
-          { content: formatNumberForDisplay(totals.newPaid), styles: totalCellStyles }, { content: formatNumberForDisplay(totals.newGeoPay), styles: totalCellStyles }, { content: formatNumberForDisplay(totals.newPending), styles: totalCellStyles }, { content: formatNumberForDisplay(totals.newPaid + totals.newGeoPay + totals.newPending), styles: totalCellStyles },
-          { content: formatNumberForDisplay(totals.renewalPaid), styles: totalCellStyles }, { content: formatNumberForDisplay(totals.renewalGeoPay), styles: totalCellStyles }, { content: formatNumberForDisplay(totals.renewalPending), styles: totalCellStyles }, { content: formatNumberForDisplay(totals.renewalPaid + totals.renewalGeoPay + totals.renewalPending), styles: totalCellStyles },
-          { content: formatNumberForDisplay(totals.malePaid), styles: totalCellStyles }, { content: formatNumberForDisplay(totals.malePending), styles: totalCellStyles }, { content: formatNumberForDisplay(totals.malePaid + totals.malePending), styles: totalCellStyles },
-          { content: formatNumberForDisplay(totals.femalePaid), styles: totalCellStyles }, { content: formatNumberForDisplay(totals.femalePending), styles: totalCellStyles }, { content: formatNumberForDisplay(totals.femalePaid + totals.femalePending), styles: totalCellStyles }
+        // For Business Permit, License Issued grand totals must equal PAID (For Issuance to License Issued)
+        const licenseIssuedNewTotal =
+          moduleLabel === 'Business Permit' ? totals.newPaid : totals.newIssued;
+        const licenseIssuedRenewalTotal =
+          moduleLabel === 'Business Permit' ? totals.renewalPaid : totals.renewalIssued;
+
+        grandTotalRow = [
+          { content: `GRAND TOTAL\n(${dateRangeLabel})`, colSpan: 2, styles: { ...totalCellStyles, halign: 'left' } },
+
+          // New
+          { content: formatNumberForDisplay(licenseIssuedNewTotal), styles: totalCellStyles },
+          { content: formatNumberForDisplay(totals.newPaid), styles: totalCellStyles },
+          { content: formatNumberForDisplay(totals.newGeoPay), styles: totalCellStyles },
+          { content: formatNumberForDisplay(totals.newPending), styles: totalCellStyles },
+          { content: formatNumberForDisplay(totals.newPaid + totals.newGeoPay + totals.newPending), styles: totalCellStyles },
+
+          // Renewal
+          { content: formatNumberForDisplay(licenseIssuedRenewalTotal), styles: totalCellStyles },
+          { content: formatNumberForDisplay(totals.renewalPaid), styles: totalCellStyles },
+          { content: formatNumberForDisplay(totals.renewalGeoPay), styles: totalCellStyles },
+          { content: formatNumberForDisplay(totals.renewalPending), styles: totalCellStyles },
+          { content: formatNumberForDisplay(totals.renewalPaid + totals.renewalGeoPay + totals.renewalPending), styles: totalCellStyles },
+
+          // Male
+          { content: formatNumberForDisplay(totals.maleIssued), styles: totalCellStyles },
+          { content: formatNumberForDisplay(totals.malePaid), styles: totalCellStyles },
+          { content: formatNumberForDisplay(totals.malePending), styles: totalCellStyles },
+          { content: formatNumberForDisplay(totals.malePaid + totals.malePending), styles: totalCellStyles },
+
+          // Female
+          { content: formatNumberForDisplay(totals.femaleIssued), styles: totalCellStyles },
+          { content: formatNumberForDisplay(totals.femalePaid), styles: totalCellStyles },
+          { content: formatNumberForDisplay(totals.femalePending), styles: totalCellStyles },
+          { content: formatNumberForDisplay(totals.femalePaid + totals.femalePending), styles: totalCellStyles }
         ];
-        pageBody.push(grandTotalRow);
       } else {
-        const totalCells = moduleLabel === 'Barangay Clearance'
-          ? [{ content: formatNumberForDisplay(totals.totalCount), styles: totalCellStyles }]
-          : [
-              { content: formatNumberForDisplay(totals.paid), styles: totalCellStyles },
-              { content: formatNumberForDisplay(totals.pending), styles: totalCellStyles }
-            ];
-        const grandTotalRow = [{ content: grandTotalLabel, colSpan: 2, styles: { ...totalCellStyles, halign: 'left' } }, ...totalCells];
-        pageBody.push(grandTotalRow);
+        let totalCells: any[] = [];
+        if (moduleLabel === 'Barangay Clearance') {
+          totalCells = [{ content: formatNumberForDisplay(totals.totalCount), styles: totalCellStyles }];
+        } else if (moduleLabel === 'Building Permit' || moduleLabel === 'Certificate of Occupancy') {
+          // License Issued = Paid; Total = Paid + Ongoing
+          totalCells = [
+            { content: formatNumberForDisplay(totals.paid), styles: totalCellStyles },   // License Issued
+            { content: formatNumberForDisplay(totals.paid), styles: totalCellStyles },   // Paid
+            { content: formatNumberForDisplay(totals.pending), styles: totalCellStyles },// Ongoing
+            { content: formatNumberForDisplay(totals.paid + totals.pending), styles: totalCellStyles } // Total
+          ];
+        } else {
+          totalCells = [
+            { content: formatNumberForDisplay(totals.paid), styles: totalCellStyles },
+            { content: formatNumberForDisplay(totals.pending), styles: totalCellStyles }
+          ];
+        }
+        grandTotalRow = [{ content: `GRAND TOTAL\n(${dateRangeLabel})`, colSpan: 2, styles: { ...totalCellStyles, halign: 'left' } }, ...totalCells];
       }
     }
 
-  if (i > 0) doc.addPage();
-    autoTable(doc, {
-      head, body: pageBody,
-      // Use the loop index and computed numPages to render "Page X of Y" correctly.
-      didDrawPage: () => { addHeader(doc, finalParams, i + 1, numPages, base64Logo); },
-      margin: { top: 90 },
-      styles: { fontSize: 7, cellPadding: 4, halign: 'center', lineWidth: 0.5, lineColor: '#dee2e6' },
-      headStyles: { fontStyle: 'bold', fillColor: '#9ec6f7', textColor: '#000000', lineWidth: 0.5, lineColor: '#cbd5e1' },
-      alternateRowStyles: { fillColor: '#f8fafc' }
-    });
-  }
-  if (signal?.aborted) {
-    const e: any = new Error('canceled');
-    e.name = 'CanceledError';
-    throw e;
-  }
-  doc.save(`${moduleLabel.toLowerCase().replace(/\s/g, '-')}-report.pdf`);
-};
+    type RegionGroup = { text: string; page: number; x: number; width: number; yTop: number; yBottom: number; };
+    const pageGroups: Record<number, { openGroup: RegionGroup | null }> = {};
+    const lineColor = '#dee2e6';
+    const WHITE = '#FFFFFF';
 
-interface ExcelParams { data: any[]; moduleLabel: string; isDayMode: boolean; }
+    // Table margins aligned with header margins (Generated On at right = 30)
+    const TABLE_MARGINS = { top: 100, left: 30, right: 30 };
+    const getContentWidth = () =>
+      doc.internal.pageSize.getWidth() - TABLE_MARGINS.left - TABLE_MARGINS.right;
 
-export const exportReportToExcel = (params: ExcelParams, signal?: AbortSignal) => {
-  // Use deduped/normalized data for Certificate of Occupancy to match the table totals/format
-  const baseData = params.data.filter(lgu => !lgu.hasError);
-  const exportableData =
-    params.moduleLabel === 'Certificate of Occupancy'
-      ? normalizeCertificateOfOccupancyData(baseData)
-      : baseData;
+    // Compute column styles to make layout cleaner and consistent
+    const buildColumnStyles = () => {
+      const columnStyles: Record<number, any> = {};
+      // Region and LGU column widths
+      columnStyles[0] = { cellWidth: 70, halign: 'center' }; // REGION fixed for readability
+      // LGU: flexible width so the table can stretch with the page
+      columnStyles[1] = { halign: 'left', fontStyle: 'bold' }; // no fixed width
 
-  const { moduleLabel, isDayMode } = params;
-  const throwIfAborted = () => {
+      let totalColumns = 0;
+      if (isComplex) {
+        const leafCols = head[1]?.length || 0;
+        totalColumns = 2 + leafCols;
+      } else {
+        totalColumns = head[0]?.length || 0;
+      }
+
+      // Right align all numeric columns; allow auto width so the table can expand to the right margin
+      for (let idx = 2; idx < totalColumns; idx++) {
+        columnStyles[idx] = { halign: 'right' }; // no fixed width here
+      }
+      return columnStyles;
+    };
+
+    const drawHBorder = (x: number, width: number, y: number) => {
+      doc.setDrawColor(lineColor);
+      doc.setLineWidth(0.5);
+      doc.line(x, y, x + width, y);
+    };
+    const drawMergedRegionText = (grp: RegionGroup) => {
+      if (!grp) return;
+      const centerX = grp.x + grp.width / 2;
+      const centerY = grp.yTop + (grp.yBottom - grp.yTop) / 2;
+      try {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7);
+        doc.text(grp.text, centerX, centerY, { align: 'center', baseline: 'middle' as any });
+      } catch {
+        doc.text(grp.text, centerX, centerY + 2.5, { align: 'center' });
+      }
+    };
+
+    const renderChunk = (chunkRows: any[], appendGrandTotal: boolean, _isFirstChunk: boolean) => {
+      autoTable(doc, {
+        head,
+        body: appendGrandTotal && grandTotalRow ? [...chunkRows, grandTotalRow] : chunkRows,
+        theme: 'grid',
+        margin: TABLE_MARGINS,
+        // Make the table width flush with the right margin (same as "Generated On")
+        tableWidth: getContentWidth(),
+        styles: {
+          font: 'helvetica',
+          fontSize: 7,
+          cellPadding: { top: 2, right: 3, bottom: 2, left: 3 },
+          halign: 'center',
+          valign: 'middle',
+          lineWidth: 0.4,
+          lineColor: lineColor,
+          overflow: 'linebreak'
+        },
+        headStyles: {
+          fontStyle: 'bold',
+          fillColor: '#9ec6f7', // keep requested header background color
+          textColor: '#000000',
+          lineWidth: 0.5,
+          lineColor: '#cbd5e1',
+          halign: 'center',
+          valign: 'middle',
+          fontSize: 7
+        },
+        bodyStyles: {
+          fillColor: WHITE,
+          textColor: '#111827'
+        },
+        alternateRowStyles: {
+          fillColor: '#f8fafc' // subtle zebra striping
+        },
+        columnStyles: buildColumnStyles(),
+
+        // Ensure Region column (index 0) is never zebra-striped, except on the Grand Total row
+        didParseCell: (data: any) => {
+          if (data.section === 'head') {
+            if (isComplex && data.row.index === 1) {
+              data.cell.styles.fontSize = 6;
+              data.cell.styles.cellPadding = { top: 1.5, right: 2, bottom: 1.5, left: 2 };
+              data.cell.styles.lineHeight = 1.1;
+            }
+            data.cell.styles.halign = 'center';
+          }
+
+          // Detect Grand Total row: first body cell has "GRAND TOTAL" with colSpan=2
+          const isGrandTotalRow =
+            data.section === 'body' &&
+            data.row?.raw &&
+            Array.isArray(data.row.raw) &&
+            (() => {
+              const first = data.row.raw[0];
+              const content =
+                first && typeof first === 'object' && 'content' in first ? (first.content as any) : null;
+              return typeof content === 'string' ? content.startsWith('GRAND TOTAL') : false;
+            })();
+
+          // Region column: force white background to override alternateRowStyles,
+          // but NOT on the Grand Total row so it keeps the total styles.
+          if (data.section === 'body' && data.column.index === 0 && !isGrandTotalRow) {
+            data.cell.styles.fillColor = WHITE;
+          }
+
+          // LGU rows: keep LGU left aligned and allow wrapping
+          if (data.section === 'body' && data.column.index === 1) {
+            data.cell.styles.halign = 'left';
+            data.cell.styles.fontStyle = 'bold';
+            data.cell.styles.valign = 'top';
+          }
+
+          // Numbers: right align for better readability
+          if (data.section === 'body' && data.column.index >= 2) {
+            data.cell.styles.halign = 'right';
+          }
+        },
+
+        // Make Region col clean (merged look) and preserve group borders
+        willDrawCell: (data: any) => {
+          if (data.section !== 'body') return;
+          if (data.column.index !== 0) return;
+          if (data.cell.colSpan && data.cell.colSpan > 1) return; // Grand Total has colSpan=2; don't override its styles
+
+          // Remove interior grid for region col and keep vertical outer borders
+          data.cell.styles.fillColor = WHITE; // ensure it's not striped on normal rows
+          (data.cell.styles as any).lineWidth = { top: 0, right: 0.5, bottom: 0, left: 0.5 };
+          (data.cell.styles as any).lineColor = { top: lineColor, right: lineColor, bottom: lineColor, left: lineColor };
+
+          const raw = data.cell.raw as any;
+          if (raw && typeof raw === 'object' && raw.content) {
+            raw._regionText = raw.content;
+          } else {
+            raw._regionText = Array.isArray(data.cell.text) ? data.cell.text.join('') : String(data.cell.text || '');
+          }
+          data.cell.text = [''];
+        },
+
+        didDrawCell: (data: any) => {
+          if (data.section !== 'body') return;
+          if (data.column.index !== 0) return;
+          if (data.cell.colSpan && data.cell.colSpan > 1) return;
+
+          const page = data.table.pageNumber as number;
+          const raw = data.cell.raw as any;
+          const text: string = (raw && raw._regionText) || (raw && raw.content) || '';
+          if (!pageGroups[page]) pageGroups[page] = { openGroup: null };
+          const state = pageGroups[page];
+
+          if (!state.openGroup || state.openGroup.text !== text) {
+            if (state.openGroup) {
+              state.openGroup.yBottom = data.cell.y;
+              drawHBorder(state.openGroup.x, state.openGroup.width, state.openGroup.yBottom);
+              drawMergedRegionText(state.openGroup);
+            }
+            state.openGroup = {
+              text,
+              page,
+              x: data.cell.x,
+              width: data.cell.width,
+              yTop: data.cell.y,
+              yBottom: data.cell.y + data.cell.height
+            };
+            drawHBorder(state.openGroup.x, state.openGroup.width, state.openGroup.yTop);
+          } else {
+            state.openGroup.yBottom = data.cell.y + data.cell.height;
+          }
+        },
+
+        didDrawPage: (data: any) => {
+          const page = data.table.pageNumber as number;
+          const state = pageGroups[page];
+          if (state?.openGroup) {
+            drawHBorder(state.openGroup.x, state.openGroup.width, state.openGroup.yBottom);
+            drawMergedRegionText(state.openGroup);
+            state.openGroup = null;
+          }
+        }
+      });
+    };
+
+    // Pagination:
+    // - For Business/Working Permit: limit to 8 unique LGUs per page (keep all rows of an LGU on the same page)
+    // - For others (Barangay/Building/CO): keep existing row-based pagination (26 rows)
+    if (isComplex) {
+      // Pair each rendered row with its LGU key
+      const rowsWithKey = allRows.map((rowData, idx) => ({
+        lguKey: String(rowData.lguInfo?.lgu || ''),
+        row: dataRows[idx]
+      }));
+
+      const chunks: any[][] = [];
+      let currentChunk: any[][] = [];
+      let currentLguCount = 0;
+      let prevLguKey: string | null = null;
+
+      for (const item of rowsWithKey) {
+        const sameLgu = prevLguKey !== null && item.lguKey === prevLguKey;
+
+        // If we're starting a new LGU and already have 8 LGUs in this page, start a new page
+        if (!sameLgu && currentLguCount === 8) {
+          chunks.push(currentChunk);
+          currentChunk = [];
+          currentLguCount = 0;
+        }
+
+        if (!sameLgu) {
+          currentLguCount += 1;
+        }
+
+        currentChunk.push(item.row);
+        prevLguKey = item.lguKey;
+      }
+      if (currentChunk.length) chunks.push(currentChunk);
+
+      // Render all chunks; only the last chunk gets the grand total row
+      chunks.forEach((chunk, i) => {
+        if (i > 0) doc.addPage();
+        const isLast = i === chunks.length - 1;
+        renderChunk(chunk, isLast, i === 0);
+      });
+    } else {
+      const enforceLguLimit = ['Barangay Clearance', 'Building Permit', 'Certificate of Occupancy'].includes(moduleLabel);
+      const rowsPerPage = enforceLguLimit ? 26 : 0;
+      const dataRowsToUse = dataRows;
+
+      if (!rowsPerPage || dataRowsToUse.length <= rowsPerPage) {
+        renderChunk(dataRowsToUse, true, true);
+      } else {
+        const totalChunks = Math.ceil(dataRowsToUse.length / rowsPerPage);
+        for (let i = 0; i < totalChunks; i++) {
+          if (i > 0) doc.addPage();
+          const start = i * rowsPerPage;
+          const end = Math.min(start + rowsPerPage, dataRowsToUse.length);
+          const segment = dataRowsToUse.slice(start, end);
+          const isLast = i === totalChunks - 1;
+          renderChunk(segment, isLast, i === 0);
+        }
+      }
+    }
+
+    const pageCount = doc.getNumberOfPages();
+    for (let p = 1; p <= pageCount; p++) {
+      throwIfAborted();
+      doc.setPage(p);
+      addHeader(doc, finalParams, p, pageCount, base64Logo);
+    }
     if (signal?.aborted) {
       const e: any = new Error('canceled');
       e.name = 'CanceledError';
       throw e;
     }
+    doc.save(`${moduleLabel.toLowerCase().replace(/\s/g, '-')}-report.pdf`);
   };
-  throwIfAborted();
+        
 
-  // Sort by custom region order (after normalizing region keys)
-  const sortedData = [...exportableData].sort(compareByRegion);
 
-  const isComplex = ['Business Permit', 'Working Permit'].includes(moduleLabel);
-  let headers: any[][] = [];
-  let body: any[][] = [];
-  let merges: xlsx.Range[] = [];
-  const totals = calculateGrandTotals(sortedData, moduleLabel);
+interface ExcelParams { data: any[]; moduleLabel: string; isDayMode: boolean; }
+  export const exportReportToExcel = (params: ExcelParams, signal?: AbortSignal) => {
+    // Use deduped/normalized data for Certificate of Occupancy to match the table totals/format
+    const baseData = params.data.filter(lgu => !lgu.hasError);
+    const exportableData =
+      params.moduleLabel === 'Certificate of Occupancy'
+        ? normalizeCertificateOfOccupancyData(baseData)
+        : baseData;
 
-  const allRows = sortedData.flatMap(lgu => {
-    if (isDayMode) {
-      const results = lgu.monthlyResults?.length > 0 ? lgu.monthlyResults : [{ month: lgu.months?.[0] || '' }];
-      return results.map((monthData: any) => ({
-        lguInfo: lgu, itemToDisplay: monthData, periodLabel: getPeriodLabel(lgu, true, monthData.month)
-      }));
-    } else {
-      const aggregatedItem = (lgu.monthlyResults || []).reduce((acc: any, month: any) => {
-        Object.keys(month).forEach(key => {
-          if (typeof month[key] === 'number') { acc[key] = (acc[key] || 0) + month[key]; }
-        });
-        return acc;
-      }, {});
-      return [{ lguInfo: lgu, itemToDisplay: aggregatedItem, periodLabel: getPeriodLabel(lgu, false) }];
-    }
-  });
-  
-  if (isComplex) {
-    headers = [
-      ['Region', 'LGU', 'New', null, null, null, 'Renewal', null, null, null, 'Male', null, null, 'Female', null, null],
-      [null, null, 'PAID', 'PAID (eGOVPay)', 'ONGOING', 'Total', 'PAID', 'PAID (eGOVPay)', 'ONGOING', 'Total', 'PAID', 'ONGOING', 'Total', 'PAID', 'ONGOING', 'Total']
-    ];
-  } else {
-    headers = [moduleLabel === 'Barangay Clearance' ? ['Region', 'LGU', 'Total Results'] : ['Region', 'LGU', 'Paid', 'Ongoing']];
-  }
-  
-  let currentRowIndex = headers.length;
-  let lastRegion: string | null = null;
-  let regionStartIndex = currentRowIndex;
-
-  allRows.forEach(rowData => {
-    const { lguInfo, itemToDisplay, periodLabel } = rowData;
-    let row: any[] = [];
-    
-    const canonicalRegion = normalizeRegionKey(lguInfo.region);
-    if (canonicalRegion !== lastRegion) {
-      if (lastRegion !== null && currentRowIndex > regionStartIndex + 1) {
-        merges.push({ s: { r: regionStartIndex, c: 0 }, e: { r: currentRowIndex - 1, c: 0 } });
+    const { moduleLabel, isDayMode } = params;
+    const throwIfAborted = () => {
+      if (signal?.aborted) {
+        const e: any = new Error('canceled');
+        e.name = 'CanceledError';
+        throw e;
       }
-      lastRegion = canonicalRegion;
-      regionStartIndex = currentRowIndex;
-      row.push(getRegionDisplayName(canonicalRegion));
-    } else {
-      row.push(null);
-    }
+    };
+    throwIfAborted();
 
-    const lguText = `${lguInfo.lgu} ${periodLabel}`;
-    row.push(lguText);
+    // Sort by custom region order (after normalizing region keys)
+    const sortedData = [...exportableData].sort(compareByRegion);
+
+    const isComplex = ['Business Permit', 'Working Permit'].includes(moduleLabel);
+    let headers: any[][] = [];
+    let body: any[][] = [];
+    let merges: xlsx.Range[] = [];
+    const totals = calculateGrandTotals(sortedData, moduleLabel);
+
+    const allRows = sortedData.flatMap(lgu => {
+      if (isDayMode) {
+        const results = lgu.monthlyResults?.length > 0 ? lgu.monthlyResults : [{ month: lgu.months?.[0] || '' }];
+        return results.map((monthData: any) => ({
+          lguInfo: lgu, itemToDisplay: monthData, periodLabel: getPeriodLabel(lgu, true, monthData.month)
+        }));
+      } else {
+        const aggregatedItem = (lgu.monthlyResults || []).reduce((acc: any, month: any) => {
+          Object.keys(month).forEach(key => {
+            if (typeof month[key] === 'number') { acc[key] = (acc[key] || 0) + month[key]; }
+          });
+          return acc;
+        }, {});
+        return [{ lguInfo: lgu, itemToDisplay: aggregatedItem, periodLabel: getPeriodLabel(lgu, false) }];
+      }
+    });
 
     if (isComplex) {
-      row.push(formatNumberForExcel(itemToDisplay.newPaid), formatNumberForExcel(itemToDisplay.newPaidViaEgov), formatNumberForExcel(itemToDisplay.newPending), (itemToDisplay.newPaid||0)+(itemToDisplay.newPaidViaEgov||0)+(itemToDisplay.newPending||0));
-      row.push(formatNumberForExcel(itemToDisplay.renewPaid), formatNumberForExcel(itemToDisplay.renewPaidViaEgov), formatNumberForExcel(itemToDisplay.renewPending), (itemToDisplay.renewPaid||0)+(itemToDisplay.renewPaidViaEgov||0)+(itemToDisplay.renewPending||0));
-      row.push(formatNumberForExcel(itemToDisplay.malePaid), formatNumberForExcel(itemToDisplay.malePending), (itemToDisplay.malePaid||0)+(itemToDisplay.malePending||0));
-      row.push(formatNumberForExcel(itemToDisplay.femalePaid), formatNumberForExcel(itemToDisplay.femalePending), (itemToDisplay.femalePaid||0)+(itemToDisplay.femalePending||0));
-    } else if (moduleLabel === 'Barangay Clearance') {
-      row.push(formatNumberForExcel(itemToDisplay.totalCount));
-    } else {
-      const paidKey = moduleLabel === 'Building Permit' ? 'buildingPaid' : 'coPaid';
-      const pendingKey = moduleLabel === 'Building Permit' ? 'buildingPending' : 'coPending';
-      row.push(formatNumberForExcel(itemToDisplay[paidKey]), formatNumberForExcel(itemToDisplay[pendingKey]));
-    }
-    
-    body.push(row);
-    currentRowIndex++;
-  });
-  
-  if (lastRegion !== null && currentRowIndex > regionStartIndex + 1) {
-    merges.push({ s: { r: regionStartIndex, c: 0 }, e: { r: currentRowIndex - 1, c: 0 } });
-  }
+      // Updated headers with explanatory notes
+      headers = [
+        // Row 0 (group headers)
+        ['Region', 'LGU', 'New', null, null, null, null, 'Renewal', null, null, null, null, 'Male', null, null, null, 'Female', null, null, null],
+        // Row 1 (detail headers)
+        [null, null,
+          'License Issued',
+          'PAID\n(For Issuance to License Issued)',
+          'PAID (eGOVPay)\n(For Issuance to License Issued)',
+          'ONGOING\n(For verification to For Payment)',
+          'Total',
 
-  if (allRows.length > 0) {
-    let totalRow: any[];
+          'License Issued',
+          'PAID\n(For Issuance to License Issued)',
+          'PAID (eGOVPay)\n(For Issuance to License Issued)',
+          'ONGOING\n(For verification to For Payment)',
+          'Total',
+
+          'License Issued',
+          'PAID\n(For Issuance to License Issued)',
+          'ONGOING\n(For verification to For Payment)',
+          'Total',
+
+          'License Issued',
+          'PAID\n(For Issuance to License Issued)',
+          'ONGOING\n(For verification to For Payment)',
+          'Total'
+        ]
+      ];
+    } else {
+      headers = [
+        moduleLabel === 'Barangay Clearance'
+          ? ['Region', 'LGU', 'Total Results']
+          : (moduleLabel === 'Building Permit' || moduleLabel === 'Certificate of Occupancy')
+            ? ['Region', 'LGU',
+                'License Issued',
+                'Paid\n(For Issuance to License Issued)',
+                'Ongoing\n(For verification to For Payment)',
+                'Total'
+              ]
+            : ['Region', 'LGU',
+                'Paid\n(For Issuance to License Issued)',
+                'Ongoing\n(For verification to For Payment)'
+              ]
+      ];
+    }
+
+    let currentRowIndex = headers.length;
+    let lastRegion: string | null = null;
+    let regionStartIndex = currentRowIndex;
+
+    allRows.forEach(rowData => {
+      const { lguInfo, itemToDisplay, periodLabel } = rowData;
+      let row: any[] = [];
+
+      const canonicalRegion = normalizeRegionKey(lguInfo.region);
+      if (canonicalRegion !== lastRegion) {
+        if (lastRegion !== null && currentRowIndex > regionStartIndex + 1) {
+          merges.push({ s: { r: regionStartIndex, c: 0 }, e: { r: currentRowIndex - 1, c: 0 } });
+        }
+        lastRegion = canonicalRegion;
+        regionStartIndex = currentRowIndex;
+        row.push(getRegionDisplayName(canonicalRegion));
+      } else {
+        row.push(null);
+      }
+
+      const lguText = `${lguInfo.lgu} ${periodLabel}`;
+      row.push(lguText);
+
+      if (isComplex) {
+        // New
+        const newIssued = (itemToDisplay.newPaid || 0) + (itemToDisplay.newPaidViaEgov || 0);
+        row.push(
+          formatNumberForExcel(newIssued),
+          formatNumberForExcel(itemToDisplay.newPaid),
+          formatNumberForExcel(itemToDisplay.newPaidViaEgov),
+          formatNumberForExcel(itemToDisplay.newPending),
+          (itemToDisplay.newPaid || 0) + (itemToDisplay.newPaidViaEgov || 0) + (itemToDisplay.newPending || 0)
+        );
+        // Renewal
+        const renewIssued = (itemToDisplay.renewPaid || 0) + (itemToDisplay.renewPaidViaEgov || 0);
+        row.push(
+          formatNumberForExcel(renewIssued),
+          formatNumberForExcel(itemToDisplay.renewPaid),
+          formatNumberForExcel(itemToDisplay.renewPaidViaEgov),
+          formatNumberForExcel(itemToDisplay.renewPending),
+          (itemToDisplay.renewPaid || 0) + (itemToDisplay.renewPaidViaEgov || 0) + (itemToDisplay.renewPending || 0)
+        );
+        // Male
+        const maleIssued = (itemToDisplay.malePaid || 0);
+        row.push(
+          formatNumberForExcel(maleIssued),
+          formatNumberForExcel(itemToDisplay.malePaid),
+          formatNumberForExcel(itemToDisplay.malePending),
+          (itemToDisplay.malePaid || 0) + (itemToDisplay.malePending || 0)
+        );
+        // Female
+        const femaleIssued = (itemToDisplay.femalePaid || 0);
+        row.push(
+          formatNumberForExcel(femaleIssued),
+          formatNumberForExcel(itemToDisplay.femalePaid),
+          formatNumberForExcel(itemToDisplay.femalePending),
+          (itemToDisplay.femalePaid || 0) + (itemToDisplay.femalePending || 0)
+        );
+      } else if (moduleLabel === 'Barangay Clearance') {
+        row.push(formatNumberForExcel(itemToDisplay.totalCount));
+      } else if (moduleLabel === 'Building Permit' || moduleLabel === 'Certificate of Occupancy') {
+        const paidKey = moduleLabel === 'Building Permit' ? 'buildingPaid' : 'coPaid';
+        const pendingKey = moduleLabel === 'Building Permit' ? 'buildingPending' : 'coPending';
+        const paid = Number(itemToDisplay[paidKey] || 0);
+        const pending = Number(itemToDisplay[pendingKey] || 0);
+        const issued = paid; // License Issued equals Paid
+        const total = paid + pending;
+        row.push(
+          formatNumberForExcel(issued),
+          formatNumberForExcel(paid),
+          formatNumberForExcel(pending),
+          total
+        );
+      } else {
+        const paidKey = moduleLabel === 'Building Permit' ? 'buildingPaid' : 'coPaid';
+        const pendingKey = moduleLabel === 'Building Permit' ? 'buildingPending' : 'coPending';
+        row.push(formatNumberForExcel(itemToDisplay[paidKey]), formatNumberForExcel(itemToDisplay[pendingKey]));
+      }
+
+      body.push(row);
+      currentRowIndex++;
+    });
+
+    if (lastRegion !== null && currentRowIndex > regionStartIndex + 1) {
+      merges.push({ s: { r: regionStartIndex, c: 0 }, e: { r: currentRowIndex - 1, c: 0 } });
+    }
+
+    if (allRows.length > 0) {
+      let totalRow: any[];
+      if (isComplex) {
+        // For Business Permit, License Issued grand totals must equal PAID (For Issuance to License Issued)
+        const licenseIssuedNewTotal =
+          moduleLabel === 'Business Permit' ? totals.newPaid : totals.newIssued;
+        const licenseIssuedRenewalTotal =
+          moduleLabel === 'Business Permit' ? totals.renewalPaid : totals.renewalIssued;
+
+        totalRow = [
+          'GRAND TOTAL', null,
+          // New
+          licenseIssuedNewTotal, totals.newPaid, totals.newGeoPay, totals.newPending, (totals.newPaid + totals.newGeoPay + totals.newPending),
+          // Renewal
+          licenseIssuedRenewalTotal, totals.renewalPaid, totals.renewalGeoPay, totals.renewalPending, (totals.renewalPaid + totals.renewalGeoPay + totals.renewalPending),
+          // Male
+          totals.maleIssued, totals.malePaid, totals.malePending, (totals.malePaid + totals.malePending),
+          // Female
+          totals.femaleIssued, totals.femalePaid, totals.femalePending, (totals.femalePaid + totals.femalePending)
+        ];
+        merges.push({ s: { r: currentRowIndex, c: 0 }, e: { r: currentRowIndex, c: 1 } });
+      } else {
+        if (moduleLabel === 'Barangay Clearance') {
+          totalRow = ['GRAND TOTAL', null, totals.totalCount];
+        } else if (moduleLabel === 'Building Permit' || moduleLabel === 'Certificate of Occupancy') {
+          // License Issued = Paid; Total = Paid + Ongoing
+          totalRow = [
+            'GRAND TOTAL', null,
+            totals.paid,   // License Issued
+            totals.paid,   // Paid
+            totals.pending,// Ongoing
+            (totals.paid + totals.pending) // Total
+          ];
+        } else {
+          totalRow = ['GRAND TOTAL', null, totals.paid, totals.pending];
+        }
+        merges.push({ s: { r: currentRowIndex, c: 0 }, e: { r: currentRowIndex, c: 1 } });
+      }
+      body.push(totalRow);
+    }
+
+    const ws = xlsx.utils.aoa_to_sheet([...headers, ...body]);
     if (isComplex) {
-      totalRow = ['GRAND TOTAL', null, totals.newPaid, totals.newGeoPay, totals.newPending, (totals.newPaid+totals.newGeoPay+totals.newPending), totals.renewalPaid, totals.renewalGeoPay, totals.renewalPending, (totals.renewalPaid+totals.renewalGeoPay+totals.renewalPending), totals.malePaid, totals.malePending, (totals.malePaid+totals.malePending), totals.femalePaid, totals.femalePending, (totals.femalePaid+totals.femalePending)];
-      merges.push({ s: { r: currentRowIndex, c: 0 }, e: { r: currentRowIndex, c: 1 } });
-    } else {
-      totalRow = ['GRAND TOTAL', null, totals.paid, totals.pending];
-      if(moduleLabel === 'Barangay Clearance') totalRow = ['GRAND TOTAL', null, totals.totalCount];
-      merges.push({ s: { r: currentRowIndex, c: 0 }, e: { r: currentRowIndex, c: 1 } });
+      merges.push(
+        // Region and LGU headers span 2 rows
+        { s: { r: 0, c: 0 }, e: { r: 1, c: 0 } },
+        { s: { r: 0, c: 1 }, e: { r: 1, c: 1 } },
+        // Group headers
+        { s: { r: 0, c: 2 }, e: { r: 0, c: 6 } },   // New (5 cols)
+        { s: { r: 0, c: 7 }, e: { r: 0, c: 11 } },  // Renewal (5 cols)
+        { s: { r: 0, c: 12 }, e: { r: 0, c: 15 } }, // Male (4 cols)
+        { s: { r: 0, c: 16 }, e: { r: 0, c: 19 } }  // Female (4 cols)
+      );
     }
-    body.push(totalRow);
-  }
-  
-  const ws = xlsx.utils.aoa_to_sheet([...headers, ...body]);
-  if (isComplex) {
-    merges.push(
-      { s: { r: 0, c: 0 }, e: { r: 1, c: 0 } }, { s: { r: 0, c: 1 }, e: { r: 1, c: 1 } },
-      { s: { r: 0, c: 2 }, e: { r: 0, c: 5 } }, { s: { r: 0, c: 6 }, e: { r: 0, c: 9 } },
-      { s: { r: 0, c: 10 }, e: { r: 0, c: 12 } }, { s: { r: 0, c: 13 }, e: { r: 0, c: 15 } }
-    );
-  }
-  ws['!merges'] = merges;
-  const colWidths = headers[headers.length - 1].map(() => ({ wch: 20 }));
-  ws['!cols'] = colWidths;
+    ws['!merges'] = merges;
 
-  const wb = xlsx.utils.book_new();
-  xlsx.utils.book_append_sheet(wb, ws, 'Report');
-  if (signal?.aborted) {
-    const e: any = new Error('canceled');
-    e.name = 'CanceledError';
-    throw e;
-  }
-  xlsx.writeFile(wb, `${moduleLabel.toLowerCase().replace(/\s/g, '-')}-report.xlsx`);
-};
+    // Slightly wider columns to accommodate wrapped header notes
+    const lastHeaderRow = headers[headers.length - 1];
+    const colWidths = lastHeaderRow.map((_c: any, idx: number) => {
+      if (idx <= 1) return { wch: 22 };
+      return { wch: 24 };
+    });
+    ws['!cols'] = colWidths;
+
+    const wb = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(wb, ws, 'Report');
+    if (signal?.aborted) {
+      const e: any = new Error('canceled');
+      e.name = 'CanceledError';
+      throw e;
+    }
+    xlsx.writeFile(wb, `${moduleLabel.toLowerCase().replace(/\s/g, '-')}-report.xlsx`);
+  };
