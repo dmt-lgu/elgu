@@ -1319,19 +1319,19 @@ const scrollToStatusChart = () => {
           <StatisticCard2 
             title="No. of LGU Operational"
             value={totalOperational}
-            showInfo={`Total of Operational Status on ${formatList(data?.modules)} as of ${data.startDate} - ${data.endDate}`}
+            showInfo={`Number of Local Government Units with Operational status for ${formatList(data?.modules)} within the period of ${data.startDate} to ${data.endDate}`}
             onClick={scrollToStatusChart}
           />
           <StatisticCard2 
             title="No. of LGU Developmental"
             value={totalDevelopmental}
-            showInfo={`Total of Developmental Status on ${formatList(data?.modules)}  as of ${data.startDate} - ${data.endDate}`}
+            showInfo={`Number of Local Government Units in Developmental stage for ${formatList(data?.modules)} within the period of ${data.startDate} to ${data.endDate}`}
             onClick={scrollToStatusChart}
           />
           <StatisticCard2
             title="No. of LGU Withdraw"
             value={totalWithdraw}
-            showInfo={`Total of Withdraw Status on ${formatList(data?.modules)}  as of ${data.startDate} - ${data.endDate}`}
+            showInfo={`Number of Local Government Units that have withdrawn from ${formatList(data?.modules)} within the period of ${data.startDate} to ${data.endDate}`}
             onClick={scrollToStatusChart}
           />
         </div>
@@ -1385,7 +1385,7 @@ const scrollToStatusChart = () => {
             (filteredCard?.brgyTotalrenewPending ?? 0) +
             (filteredCard?.brgyTotalrenewPaid ?? 0)
           }
-          showInfo={`total no. of transaction on ${formatList(getSelectedCardModules(data))} as of ${data.startDate} - ${data.endDate}`}
+          showInfo={`Total number of transactions across ${formatList(getSelectedCardModules(data))} from ${data.startDate} to ${data.endDate}`}
           />
           <StatisticCard 
             title="No. of Male"
@@ -1395,7 +1395,7 @@ const scrollToStatusChart = () => {
             bpcoValue={(filteredCard?.bpcoTotalmalePaid ?? 0) + (filteredCard?.bpcoTotalmalePending ?? 0)}
             bpbpValue={(filteredCard?.bpbpTotalmalePaid ?? 0) + (filteredCard?.bpbpTotalmalePending ?? 0)}
             brgyValue={(filteredCard?.brgyTotalmalePaid ?? 0) + (filteredCard?.brgyTotalmalePending ?? 0)}
-            showInfo={`total no. of male applicants on ${formatList(getSelectedCardModules(data))} as of ${data.startDate} - ${data.endDate}`}
+            showInfo={`Total number of male applicants for ${formatList(getSelectedCardModules(data))} from ${data.startDate} to ${data.endDate}`}
           />
           <StatisticCard 
             title="No. of Female"
@@ -1405,7 +1405,7 @@ const scrollToStatusChart = () => {
             bpcoValue={(filteredCard?.bpcoTotalfemalePaid ?? 0) + (filteredCard?.bpcoTotalfemalePending ?? 0)}
             bpbpValue={(filteredCard?.bpbpTotalfemalePaid ?? 0) + (filteredCard?.bpbpTotalfemalePending ?? 0)}
             brgyValue={(filteredCard?.brgyTotalfemalePaid ?? 0) + (filteredCard?.brgyTotalfemalePending ?? 0)}
-            showInfo={`total no. of female applicants on ${formatList(getSelectedCardModules(data))} as of ${data.startDate} - ${data.endDate}`}
+            showInfo={`Total number of female applicants for ${formatList(getSelectedCardModules(data))} from ${data.startDate} to ${data.endDate}`}
           />
           <StatisticCard 
             title="No. of eGovPay"
@@ -1415,7 +1415,7 @@ const scrollToStatusChart = () => {
             bpcoValue={(filteredCard?.bpcoTotalrenewPaidViaEgov ?? 0) + (filteredCard?.bpcoTotalnewPaidViaEgov ?? 0)}
             bpbpValue={(filteredCard?.bpbpTotalrenewPaidViaEgov ?? 0) + (filteredCard?.bpbpTotalnewPaidViaEgov ?? 0)}
             brgyValue={(filteredCard?.brgyTotalrenewPaidViaEgov ?? 0) + (filteredCard?.brgyTotalnewPaidViaEgov ?? 0)}
-            showInfo={`total no. of eGovPay transactions on ${formatList(getSelectedCardModules(data))} as of ${data.startDate} - ${data.endDate}`}
+            showInfo={`Total number of transactions processed through eGovPay for ${formatList(getSelectedCardModules(data))} from ${data.startDate} to ${data.endDate}`}
           />
           <StatisticCard 
             title="Non-Binary"
@@ -1449,7 +1449,7 @@ const scrollToStatusChart = () => {
               - (((filteredCard?.brgyTotalmalePaid ?? 0) + (filteredCard?.brgyTotalmalePending ?? 0)) + ((filteredCard?.brgyTotalfemalePaid ?? 0) + (filteredCard?.brgyTotalfemalePending ?? 0))) < 0 ? 0 : ((filteredCard?.brgyTotalnewPending ?? 0) + (filteredCard?.brgyTotalnewPaid ?? 0) + (filteredCard?.brgyTotalrenewPending ?? 0) + (filteredCard?.brgyTotalrenewPaid ?? 0))
               - (((filteredCard?.brgyTotalmalePaid ?? 0) + (filteredCard?.brgyTotalmalePending ?? 0)) + ((filteredCard?.brgyTotalfemalePaid ?? 0) + (filteredCard?.brgyTotalfemalePending ?? 0)))
             }
-            showInfo={`calculated non-binary applicants on ${formatList(getSelectedCardModules(data))} as of ${data.startDate} - ${data.endDate}`}
+            showInfo={`Number of applicants identifying as non-binary for ${formatList(getSelectedCardModules(data))} from ${data.startDate} to ${data.endDate}`}
           />
         </div>
       </div>
@@ -1489,7 +1489,20 @@ const scrollToStatusChart = () => {
       )}
       </div>
 
-      {/* Date Range Comparison Chart */}
+    
+
+
+
+      {/* Charts Section */}
+      <div className="mb-6">
+  
+          <ModuleFilter 
+            title="Chart Analytics" 
+            filterType="chart" 
+            className=""
+          />
+
+            {/* Date Range Comparison Chart */}
       <div className="mb-6">
       {(data.modules?.includes("Business Permit") || 
         data.modules?.includes("Working Permit") || 
@@ -1510,22 +1523,9 @@ const scrollToStatusChart = () => {
           title="Date Range Comparison Analysis"
           startDate={data.startDate}
           endDate={data.endDate}
-          loading={loading}
         />
       )}
-      </div>
-
-
-
-      {/* Charts Section */}
-      <div className="mb-6">
-  
-          <ModuleFilter 
-            title="Chart Analytics" 
-            filterType="chart" 
-            className=""
-          />
-     
+      </div>     
         
         <div className="space-y-6">
           <TransactionChart

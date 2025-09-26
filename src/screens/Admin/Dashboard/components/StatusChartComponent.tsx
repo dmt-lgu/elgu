@@ -234,6 +234,10 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
           moduleData = bpbpData;
           moduleRaw = bpbpRaw;
           break;
+        case 'Building Permit & Certificate of Occupancy':
+          moduleData = [...bpbpData, ...bpcoData];
+          moduleRaw = [...bpbpRaw, ...bpcoRaw];
+          break;
       }
 
       // Combine data

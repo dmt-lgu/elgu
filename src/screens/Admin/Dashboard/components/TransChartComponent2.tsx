@@ -173,13 +173,15 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
     processedData.reduce((sum, item) => sum + (item.pendingMale ?? 0), 0),
     processedData.reduce((sum, item) => sum + (item.pendingFemale ?? 0), 0),
   ];
-  const pieTotal = pieValues.reduce((a, b) => a + b, 0);
+  // Filter out hidden values and recalculate total
+  const visiblePieValues = pieValues.map((value, idx) => hidden[idx] ? 0 : value);
+  const pieTotal = visiblePieValues.reduce((a, b) => a + b, 0);
 
   const pieData = {
     labels: pieLabels,
     datasets: [
       {
-        data: pieValues,
+        data: visiblePieValues,
         backgroundColor: ['#0047CC', '#FFD700', '#DC2626', '#38BDF8'],
       },
     ],
@@ -269,9 +271,12 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
           size: 10,
         },
         // Show percentage for pie, value for others
-        formatter: (value: number, _context: any) => {
+        formatter: (value: number, context: any) => {
           if (chartType === 'pie') {
             if (pieTotal === 0) return '0%';
+            // Only show label if the segment is visible
+            const index = context.dataIndex;
+            if (hidden[index]) return '';
             const percent = ((value / pieTotal) * 100);
             return percent > 0 ? `${percent.toFixed(1)}%` : '';
           }

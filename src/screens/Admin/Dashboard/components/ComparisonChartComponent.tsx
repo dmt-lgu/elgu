@@ -41,7 +41,6 @@ interface ComparisonChartProps {
   title: string;
   startDate: string;
   endDate: string;
-  loading?: boolean;
 }
 
 const ComparisonChartComponent: React.FC<ComparisonChartProps> = ({
@@ -59,7 +58,6 @@ const ComparisonChartComponent: React.FC<ComparisonChartProps> = ({
   title,
   startDate,
   endDate,
-  loading = false
 }) => {
   const data = useSelector(selectData);
   const charts = useSelector(selectCharts);
@@ -177,6 +175,47 @@ const ComparisonChartComponent: React.FC<ComparisonChartProps> = ({
     return moduleResults;
   }, [bpData, wpData, brgyData, bpcoData, bpbpData, bpRaw, wpRaw, brgyRaw, bpcoRaw, bpbpRaw, modules, startDate, endDate, data?.selectedChartModuleFilter, selectedStatus]);
 
+  // Calculate increase data for circular charts
+  const increaseData = useMemo(() => {
+    return Object.entries(comparisonData).map(([module, data]) => {
+      const startTotal = data.startDate || 0;
+      const endTotal = data.endDate || 0;
+      const increase = endTotal - startTotal;
+      
+      // Calculate percentage change based on different scenarios
+      let percentage = 0;
+      if (startTotal === 0 && endTotal > 0) {
+        // If starting from 0, use 100% increase
+        percentage = 100;
+      } else if (startTotal > 0 && endTotal === 0) {
+        // If ending at 0, use -100% decrease
+        percentage = -100;
+      } else if (startTotal === endTotal) {
+        // No change
+        percentage = 0;
+      } else {
+        // For all other cases, calculate absolute percentage change
+        // This ensures correct percentage for both increases and decreases
+        percentage = ((endTotal - startTotal) / Math.abs(startTotal)) * 100;
+      }
+
+      // Only include in results if there's actual data to show
+      return {
+        module,
+        increase,
+        percentage,
+        startTotal,
+        endTotal,
+        absolutePercentage: Math.abs(percentage)
+      };
+    }).filter(item => {
+      // Show the item if either:
+      // 1. There's data at the start or end
+      // 2. There's a change between start and end (to show items that went to 0)
+      return (item.startTotal > 0 || item.endTotal > 0) || item.increase !== 0;
+    });
+  }, [comparisonData]);
+
   // Format dates for display
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -190,14 +229,13 @@ const ComparisonChartComponent: React.FC<ComparisonChartProps> = ({
         label: formatDate(startDate),
         data: Object.values(comparisonData).map(item => hidden[0] ? 0 : item.startDate),
         backgroundColor: '#ffd700',
-       borderWidth: 0,
+        borderWidth: 0,
         hidden: hidden[0],
       },
       {
         label: formatDate(endDate),
         data: Object.values(comparisonData).map(item => hidden[1] ? 0 : item.endDate),
         backgroundColor: '#0047cd',
-       
         borderWidth: 0,
         hidden: hidden[1],
       },
@@ -360,17 +398,6 @@ const ComparisonChartComponent: React.FC<ComparisonChartProps> = ({
   // Calculate min width for chart
   const minWidth = Math.max(400, Object.keys(comparisonData).length * 120);
 
-  if (loading) {
-    return (
-      <div className="bg-white p-6 rounded-lg shadow-md">
-        <h2 className="text-sm font-bold uppercase mb-4">{title}</h2>
-        <div className="flex items-center justify-center h-96">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        </div>
-      </div>
-    );
-  }
-
   const hasData = Object.keys(comparisonData).length > 0 && 
                  Object.values(comparisonData).some(item => item.startDate > 0 || item.endDate > 0);
 
@@ -388,86 +415,186 @@ const ComparisonChartComponent: React.FC<ComparisonChartProps> = ({
     );
   }
 
-  return (
-    <div className="bg-white p-6 rounded-lg shadow-md">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-sm font-bold w-[85%] uppercase">
-          {chartType === "pie"
-            ? `Date Comparison (Percentage) - ${selectedStatus.charAt(0).toUpperCase() + selectedStatus.slice(1)} Data`
-            : `Date Comparison - ${selectedStatus.charAt(0).toUpperCase() + selectedStatus.slice(1)} Data`}
-        </h2>
-        <div className="flex gap-4">
-          {/* Status Selector */}
-          <div className="flex gap-2">
-            {statusOptions.map(status => (
-              <button
-                key={status.value}
-                className={`px-2 py-1 rounded text-xs border ${
-                  selectedStatus === status.value ? 'bg-blue-600 text-white' : 'bg-background'
-                }`}
-                onClick={() => setSelectedStatus(status.value as 'operational' | 'developmental' | 'withdraw')}
-              >
-                {status.label}
-              </button>
-            ))}
+  // Create half-circle progress chart component
+  const CircularProgressCard = ({ item }: { item: any }) => {
+    const getColorByPercentage = (percentage: number, isIncrease: boolean, startTotal: number, endTotal: number) => {
+      // No change
+      if (startTotal === endTotal) return '#3b82f6'; // blue
+      
+      // Complete changes
+      if (startTotal === 0 && endTotal > 0) return '#22c55e'; // New entries (green)
+      if (startTotal > 0 && endTotal === 0) return '#ef4444'; // Complete removal (red)
+      
+      // Percentage-based changes
+      if (isIncrease) {
+        if (percentage >= 100) return '#22c55e'; // green for doubling or more
+        if (percentage >= 50) return '#eab308'; // yellow for significant increase
+        return '#3b82f6'; // blue for moderate increase
+      } else {
+        if (percentage <= -100) return '#ef4444'; // red for complete loss
+        if (percentage <= -50) return '#f97316'; // orange for significant decrease
+        return '#3b82f6'; // blue for moderate decrease
+      }
+    };
+
+    const isIncrease = item.increase >= 0;
+    const color = getColorByPercentage(item.absolutePercentage, isIncrease, item.startTotal, item.endTotal);
+    const displayPercentage = Math.min(item.absolutePercentage, 100);
+    
+    // Calculate stroke-dasharray for half circle (semicircle)
+    const radius = 45;
+    const halfCircumference = Math.PI * radius; // Half of 2πr
+    const strokeDasharray = (displayPercentage / 100) * halfCircumference;
+
+    return (
+      <div className="bg-white p-4 rounded-lg border border-gray-200 min-w-[200px]">
+        <div className="flex flex-col gap-10">
+
+           <div className="flex items-center justify-center">
+            <div className="relative  w-44  h-24">
+              <svg className="w-full h-full" viewBox="0 0 100 50">
+                {/* Background half circle */}
+                <path
+                  d="M 10 45 A 35 35 0 0 1 90 45"
+                  stroke="#f3f4f6"
+                  strokeWidth="15"
+                  fill="transparent"
+                   strokeLinecap="butt"
+                />
+                {/* Progress half circle */}
+                <path
+                  d="M 10 45 A 35 35 0 0 1 90 45"
+                  stroke={color}
+                  strokeWidth="15"
+                  fill="transparent"
+                  strokeLinecap="butt"
+                  strokeDasharray={halfCircumference}
+                  strokeDashoffset={halfCircumference - strokeDasharray}
+                  className="transition-all duration-500 ease-in-out"
+                />
+              </svg>
+              <div className="absolute inset-0 flex items-end justify-center pb-1">
+                <div className="text-center">
+                  <div className="text-lg font-bold" style={{ color }}>
+                    {item.absolutePercentage.toFixed(1)}%
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="mb-3">
+            <h3 className="font-bold text-sm text-gray-900 mb-1">{item.module.toUpperCase()}</h3>
+            <p className="text-xs text-gray-600 mb-1">
+              An {isIncrease ? 'increase' : 'decrease'} of <span className="font-bold">{Math.abs(item.increase)}</span> {selectedStatus.toUpperCase()}s in
+            </p>
+            <p className="text-xs text-gray-600">
+              {item.module} from <span className="font-bold">{formatDate(startDate)}</span> ( {item.startTotal}-
+              {selectedStatus.toUpperCase()}s) to <span className="font-bold">{formatDate(endDate)}</span> ( {item.endTotal}-  
+              {selectedStatus.toUpperCase()}s)
+            </p>
           </div>
           
-          {/* Chart Type Selector */}
-          <div className="flex gap-2">
-            {chartTypes.map(type => (
-              <button
-                key={type.value}
-                className={`px-2 py-1 rounded text-xs border ${
-                  chartType === type.value ? 'bg-primary text-white' : 'bg-background'
-                }`}
-                onClick={() => setChartType(type.value as 'bar' | 'pie')}
-              >
-                {type.label}
-              </button>
+         
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Main Comparison Chart */}
+      <div className="bg-white p-6 rounded-lg shadow-md">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-bold w-[85%] uppercase">
+            {chartType === "pie"
+              ? `Date Comparison (Percentage) - ${selectedStatus.charAt(0).toUpperCase() + selectedStatus.slice(1)} Data`
+              : `Date Comparison - ${selectedStatus.charAt(0).toUpperCase() + selectedStatus.slice(1)} Data`}
+          </h2>
+          <div className="flex gap-4">
+            {/* Status Selector */}
+            <div className="flex gap-2">
+              {statusOptions.map(status => (
+                <button
+                  key={status.value}
+                  className={`px-2 py-1 rounded text-xs border ${
+                    selectedStatus === status.value ? 'bg-blue-600 text-white' : 'bg-gray-100'
+                  }`}
+                  onClick={() => setSelectedStatus(status.value as 'operational' | 'developmental' | 'withdraw')}
+                >
+                  {status.label}
+                </button>
+              ))}
+            </div>
+            
+            {/* Chart Type Selector */}
+            <div className="flex gap-2">
+              {chartTypes.map(type => (
+                <button
+                  key={type.value}
+                  className={`px-2 py-1 rounded text-xs border ${
+                    chartType === type.value ? 'bg-blue-600 text-white' : 'bg-gray-100'
+                  }`}
+                  onClick={() => setChartType(type.value as 'bar' | 'pie')}
+                >
+                  {type.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Custom legend styled like your other charts */}
+        <div className="flex flex-wrap gap-6 mb-2">
+          {legendItems.map((item) => (
+            <button
+              key={item.label}
+              type="button"
+              className={`flex items-center gap-2 focus:outline-none ${item.hidden ? 'opacity-40' : ''}`}
+              onClick={() => handleLegendClick(item.idx)}
+              tabIndex={0}
+              aria-pressed={!item.hidden}
+            >
+              <span 
+                className="w-10 h-[16px]" 
+                style={{
+                  display: 'inline-block',
+                  background: item.color as string,
+                  opacity: item.hidden ? 0.4 : 1,
+                  border: item.hidden ? '2px solid #ccc' : 'none',
+                }} 
+              />
+              <span className="text-xs">{item.label}</span>
+            </button>
+          ))}
+        </div>
+
+        <div className="w-full overflow-x-auto">
+          <div style={{ minWidth: chartType === 'pie' ? 400 : minWidth, height: 400 }} className="relative">
+            {chartType === 'bar' && (
+              <Bar data={chartData} options={options} plugins={[ChartDataLabels]} />
+            )}
+            {chartType === 'pie' && (
+              <Pie data={pieData} options={options} plugins={[ChartDataLabels]} />
+            )}
+          </div>
+        </div>
+
+        <p className="text-sm text-gray-600 mt-2">
+          Comparison Period: <span className="font-semibold">{startDate} vs {endDate}</span>
+        </p>
+      </div>
+
+      {/* Circular Progress Cards */}
+      {increaseData.length > 0 && (
+        <div className="space-y-4 bg-white p-6 rounded-lg shadow-md">
+          <h3 className="text-lg font-bold text-gray-900">Module Change Analysis</h3>
+          <div className="grid grid-cols-3 md:grid-cols-2 lg:grid-cols-3 sm:grid-cols-1 gap-4">
+            {increaseData.map((item, index) => (
+              <CircularProgressCard key={`${item.module}-${index}`} item={item} />
             ))}
           </div>
         </div>
-      </div>
-
-      {/* Custom legend styled like your other charts */}
-      <div className="flex flex-wrap gap-6 mb-2">
-        {legendItems.map((item) => (
-          <button
-            key={item.label}
-            type="button"
-            className={`flex items-center gap-2 focus:outline-none ${item.hidden ? 'opacity-40' : ''}`}
-            onClick={() => handleLegendClick(item.idx)}
-            tabIndex={0}
-            aria-pressed={!item.hidden}
-          >
-            <span 
-              className="w-10 h-[16px]" 
-              style={{
-                display: 'inline-block',
-                background: item.color as string,
-                opacity: item.hidden ? 0.4 : 1,
-                border: item.hidden ? '2px solid #ccc' : 'none',
-              }} 
-            />
-            <span className="text-xs">{item.label}</span>
-          </button>
-        ))}
-      </div>
-
-      <div className="w-full overflow-x-auto">
-        <div style={{ minWidth: chartType === 'pie' ? 400 : minWidth, height: 400 }} className="relative">
-          {chartType === 'bar' && (
-            <Bar data={chartData} options={options} plugins={[ChartDataLabels]} />
-          )}
-          {chartType === 'pie' && (
-            <Pie data={pieData} options={options} plugins={[ChartDataLabels]} />
-          )}
-        </div>
-      </div>
-
-      <p className="text-sm text-secondary-foreground mt-2">
-        Comparison Period: <span className="font-semibold">{startDate} vs {endDate}</span>
-      </p>
+      )}
     </div>
   );
 };
