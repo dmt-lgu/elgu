@@ -102,8 +102,15 @@ function DateRangeMonth({
       const start = format(startDate, "yyyy-MM-dd");
 
       let end: string | null = null;
+      // If the user didn't pick an explicit end month/year, default the
+      // end to the last day of the selected start month. This ensures
+      // month-mode searches always provide both start and end dates and
+      // prevents the reports from stalling when end is missing.
       if (toMonth !== undefined && toYear !== undefined) {
         const endDate = getLastDay(toMonth, toYear);
+        end = format(endDate, "yyyy-MM-dd");
+      } else {
+        const endDate = getLastDay(fromMonth, fromYear);
         end = format(endDate, "yyyy-MM-dd");
       }
 
