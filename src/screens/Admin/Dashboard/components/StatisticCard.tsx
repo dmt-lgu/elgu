@@ -1,5 +1,5 @@
 import React from 'react';
-import { InfoIcon, TrendingUp, Users, Activity, CreditCard } from 'lucide-react';
+import { InfoIcon, TrendingUp, Users, Activity, CreditCard, FileCheck, RefreshCw } from 'lucide-react';
 import IncreasingTextAnimation from './textAnimation';
 import { useSelector } from 'react-redux';
 import { selectLoad } from '@/redux/loadSlice';
@@ -73,21 +73,33 @@ const StatisticCard: React.FC<StatisticCardProps> = ({
       },
       'No. of Female': {
         icon: Users,
-        iconColor: 'bg-red-500',
-        accentColor: 'text-red-600',
-        borderAccent: 'border-l-red-500'
+        iconColor: 'bg-pink-500',
+        accentColor: 'text-pink-600',
+        borderAccent: 'border-l-pink-500'
       },
       'No. of eGovPay': {
         icon: CreditCard,
-        iconColor: 'bg-orange-500',
-        accentColor: 'text-orange-600',
-        borderAccent: 'border-l-orange-500'
+        iconColor: 'bg-blue-500',
+        accentColor: 'text-blue-600',
+        borderAccent: 'border-l-blue-500'
       },
       'Non-Binary': {
         icon: Users,
         iconColor: 'bg-purple-600',
         accentColor: 'text-purple-600',
         borderAccent: 'border-l-purple-500'
+      },
+      'New Licenses Issued': {
+        icon: FileCheck,
+        iconColor: 'bg-green-600',
+        accentColor: 'text-green-500',
+        borderAccent: 'border-l-green-500'
+      },
+      'Renew Licenses Issued': {
+        icon: RefreshCw,
+        iconColor: 'bg-yellow-500',
+        accentColor: 'text-yellow-500',
+        borderAccent: 'border-l-yellow-500'
       }
     };
 

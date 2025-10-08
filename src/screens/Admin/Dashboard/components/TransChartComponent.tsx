@@ -250,7 +250,7 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
   const labels = processedData.map(item => item.name);
 
   // Pie chart labels and values
-  const allPieLabels = ['Paid', 'Ongoing', 'Paid with eGovPay', 'Paid with LinkBiz'];
+  const allPieLabels = ['Paid (License Issued) ', 'Ongoing', 'Paid with eGovPay', 'Paid with LinkBiz'];
   const allPieValues = [
     processedData.reduce((sum, item) => sum + (item.paid ?? 0), 0),
     processedData.reduce((sum, item) => sum + (item.pending ?? 0), 0),
@@ -280,7 +280,7 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
     labels,
     datasets: [
       {
-        label: 'Paid',
+        label: 'Paid (License Issued) ',
         data: processedData.map(item => item.paid),
         backgroundColor: '#0047CC',
         borderColor: '#0047CC',

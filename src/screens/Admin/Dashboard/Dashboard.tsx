@@ -20,6 +20,7 @@ import { selectWp } from '@/redux/wpSlice';
 import { selectBrgy } from '@/redux/brgySlice';
 import { selectLoad2 } from '@/redux/loadSlice2';
 import StatisticCard2 from './components/StatisticCard2';
+import TrendLineChart from './components/TrendLineChart';
 
 
 
@@ -29,10 +30,11 @@ const DashboardPage = () => {
   const wp = useSelector(selectWp)
   const brgy = useSelector(selectBrgy);
   const data = useSelector(selectData);
-  const transactionData = useSelector(selectTransaction);
+  const transactionData:any = useSelector(selectTransaction);
   const loading = useSelector(selectLoad2);
+    // Loading states for each module
 
-  // Loading states for each module
+  
 
 
   // Enhanced filter and group logic
@@ -42,18 +44,18 @@ const DashboardPage = () => {
  
 
     
-    if (municipalities && municipalities.length > 0) {
+    if (municipalities && municipalities?.length > 0) {
       const selected = municipalities.map((m: any) => m.value);
       return results.filter((lgu: any) => selected.includes(lgu.lgu));
     }
     // 2. If provinces is not blank, group by province
-    if (provinces && provinces.length > 0) {
+    if (provinces && provinces?.length > 0) {
       const selectedProvinces = provinces.map((p: any) => p.value);
       const grouped: { [province: string]: any } = {};
       results.forEach((lgu: any) => {
         // Extract province from lgu.lgu (e.g., "Aloran, Misamis Occidental" → "Misamis Occidental")
         const parts = lgu.lgu.split(',');
-        const province = parts.length > 1 ? parts[1].trim() : '';
+        const province = parts?.length > 1 ? parts[1].trim() : '';
         if (selectedProvinces.includes(province)) {
           if (!grouped[province]) {
             grouped[province] = {
@@ -80,7 +82,7 @@ const DashboardPage = () => {
       return Object.values(grouped);
     }
     // 3. If regions are selected, filter by selected regions
-    if (regions && regions.length > 0) {
+    if (regions && regions?.length > 0) {
       const selectedRegions = Array.isArray(regions) ? regions : [regions];
       const filteredResults = results.filter((lgu: any) => selectedRegions.includes(lgu.region));
       
@@ -137,7 +139,7 @@ const DashboardPage = () => {
 
   const bpChartData: any = useMemo(() => {
   const bpArr = status?.BP;
-  if (!bpArr || !Array.isArray(bpArr) || bpArr.length === 0) return { current: [], breakdown: [] };
+  if (!bpArr || !Array.isArray(bpArr) || bpArr?.length === 0) return { current: [], breakdown: [] };
 
   // Prepare date and region filters
   const startDate = data.startDate ? parseISO(data.startDate) : null;
@@ -179,26 +181,26 @@ const DashboardPage = () => {
 
   // --- 1. Current: latest by date ---
   let current: any[] = [];
-  if (filteredBPArr.length > 0) {
+  if (filteredBPArr?.length > 0) {
     const sorted = [...filteredBPArr].sort((a, b) => (a.date > b.date ? -1 : 1));
     const latest = sorted[0];
     if (latest && latest.data) {
       let filteredData = latest.data;
 
       // Municipality filter (use lgu)
-      if (selectedMunicipalities.length > 0) {
+      if (selectedMunicipalities?.length > 0) {
         const selectedLGUs = selectedMunicipalities.map((m: any) => m.value);
         filteredData = filteredData.filter((item: any) => selectedLGUs.includes(item.lgu));
         current = groupAndSum(filteredData, "lgu");
       }
       // Province filter
-      else if (selectedProvinces.length > 0) {
+      else if (selectedProvinces?.length > 0) {
         const selectedProv = selectedProvinces.map((p: any) => p.value);
         filteredData = filteredData.filter((item: any) => selectedProv.includes(item.province));
         current = groupAndSum(filteredData, "province");
       }
       // Region filter
-      else if (selectedRegions.length > 0) {
+      else if (selectedRegions?.length > 0) {
         filteredData = filteredData.filter((item: any) => selectedRegions.includes(item.region));
         current = groupAndSum(filteredData, "region");
       } else {
@@ -212,21 +214,21 @@ const DashboardPage = () => {
   filteredBPArr.forEach((bp: any) => {
     let filteredData = bp.data;
 
-    if (selectedMunicipalities.length > 0) {
+    if (selectedMunicipalities?.length > 0) {
       const selectedLGUs = selectedMunicipalities.map((m: any) => m.value);
       filteredData = filteredData.filter((item: any) => selectedLGUs.includes(item.lgu));
       breakdown.push({
         date: bp.date,
         data: groupAndSum(filteredData, "lgu"),
       });
-    } else if (selectedProvinces.length > 0) {
+    } else if (selectedProvinces?.length > 0) {
       const selectedProv = selectedProvinces.map((p: any) => p.value);
       filteredData = filteredData.filter((item: any) => selectedProv.includes(item.province));
       breakdown.push({
         date: bp.date,
         data: groupAndSum(filteredData, "province"),
       });
-    } else if (selectedRegions.length > 0) {
+    } else if (selectedRegions?.length > 0) {
       filteredData = filteredData.filter((item: any) => selectedRegions.includes(item.region));
       breakdown.push({
         date: bp.date,
@@ -253,7 +255,7 @@ const DashboardPage = () => {
 
 const wpChartData: any = useMemo(() => {
   const bpArr = wp?.WP;
-  if (!bpArr || !Array.isArray(bpArr) || bpArr.length === 0) return { current: [], breakdown: [] };
+  if (!bpArr || !Array.isArray(bpArr) || bpArr?.length === 0) return { current: [], breakdown: [] };
 
   // Prepare date and region filters
   const startDate = data.startDate ? parseISO(data.startDate) : null;
@@ -295,26 +297,26 @@ const wpChartData: any = useMemo(() => {
 
   // --- 1. Current: latest by date ---
   let current: any[] = [];
-  if (filteredBPArr.length > 0) {
+  if (filteredBPArr?.length > 0) {
     const sorted = [...filteredBPArr].sort((a, b) => (a.date > b.date ? -1 : 1));
     const latest = sorted[0];
     if (latest && latest.data) {
       let filteredData = latest.data;
 
       // Municipality filter (use lgu)
-      if (selectedMunicipalities.length > 0) {
+      if (selectedMunicipalities?.length > 0) {
         const selectedLGUs = selectedMunicipalities.map((m: any) => m.value);
         filteredData = filteredData.filter((item: any) => selectedLGUs.includes(item.lgu));
         current = groupAndSum(filteredData, "lgu");
       }
       // Province filter
-      else if (selectedProvinces.length > 0) {
+      else if (selectedProvinces?.length > 0) {
         const selectedProv = selectedProvinces.map((p: any) => p.value);
         filteredData = filteredData.filter((item: any) => selectedProv.includes(item.province));
         current = groupAndSum(filteredData, "province");
       }
       // Region filter
-      else if (selectedRegions.length > 0) {
+      else if (selectedRegions?.length > 0) {
         filteredData = filteredData.filter((item: any) => selectedRegions.includes(item.region));
         current = groupAndSum(filteredData, "region");
       } else {
@@ -328,21 +330,21 @@ const wpChartData: any = useMemo(() => {
   filteredBPArr.forEach((bp: any) => {
     let filteredData = bp.data;
 
-    if (selectedMunicipalities.length > 0) {
+    if (selectedMunicipalities?.length > 0) {
       const selectedLGUs = selectedMunicipalities.map((m: any) => m.value);
       filteredData = filteredData.filter((item: any) => selectedLGUs.includes(item.lgu));
       breakdown.push({
         date: bp.date,
         data: groupAndSum(filteredData, "lgu"),
       });
-    } else if (selectedProvinces.length > 0) {
+    } else if (selectedProvinces?.length > 0) {
       const selectedProv = selectedProvinces.map((p: any) => p.value);
       filteredData = filteredData.filter((item: any) => selectedProv.includes(item.province));
       breakdown.push({
         date: bp.date,
         data: groupAndSum(filteredData, "province"),
       });
-    } else if (selectedRegions.length > 0) {
+    } else if (selectedRegions?.length > 0) {
       filteredData = filteredData.filter((item: any) => selectedRegions.includes(item.region));
       breakdown.push({
         date: bp.date,
@@ -369,7 +371,7 @@ const wpChartData: any = useMemo(() => {
 
 const brgyChartData: any = useMemo(() => {
   const bpArr = brgy?.BRGY;
-  if (!bpArr || !Array.isArray(bpArr) || bpArr.length === 0) return { current: [], breakdown: [] };
+  if (!bpArr || !Array.isArray(bpArr) || bpArr?.length === 0) return { current: [], breakdown: [] };
 
   // Prepare date and region filters
   const startDate = data.startDate ? parseISO(data.startDate) : null;
@@ -411,26 +413,26 @@ const brgyChartData: any = useMemo(() => {
 
   // --- 1. Current: latest by date ---
   let current: any[] = [];
-  if (filteredBPArr.length > 0) {
+  if (filteredBPArr?.length > 0) {
     const sorted = [...filteredBPArr].sort((a, b) => (a.date > b.date ? -1 : 1));
     const latest = sorted[0];
     if (latest && latest.data) {
       let filteredData = latest.data;
 
       // Municipality filter (use lgu)
-      if (selectedMunicipalities.length > 0) {
+      if (selectedMunicipalities?.length > 0) {
         const selectedLGUs = selectedMunicipalities.map((m: any) => m.value);
         filteredData = filteredData.filter((item: any) => selectedLGUs.includes(item.lgu));
         current = groupAndSum(filteredData, "lgu");
       }
       // Province filter
-      else if (selectedProvinces.length > 0) {
+      else if (selectedProvinces?.length > 0) {
         const selectedProv = selectedProvinces.map((p: any) => p.value);
         filteredData = filteredData.filter((item: any) => selectedProv.includes(item.province));
         current = groupAndSum(filteredData, "province");
       }
       // Region filter
-      else if (selectedRegions.length > 0) {
+      else if (selectedRegions?.length > 0) {
         filteredData = filteredData.filter((item: any) => selectedRegions.includes(item.region));
         current = groupAndSum(filteredData, "region");
       } else {
@@ -444,21 +446,21 @@ const brgyChartData: any = useMemo(() => {
   filteredBPArr.forEach((bp: any) => {
     let filteredData = bp.data;
 
-    if (selectedMunicipalities.length > 0) {
+    if (selectedMunicipalities?.length > 0) {
       const selectedLGUs = selectedMunicipalities.map((m: any) => m.value);
       filteredData = filteredData.filter((item: any) => selectedLGUs.includes(item.lgu));
       breakdown.push({
         date: bp.date,
         data: groupAndSum(filteredData, "lgu"),
       });
-    } else if (selectedProvinces.length > 0) {
+    } else if (selectedProvinces?.length > 0) {
       const selectedProv = selectedProvinces.map((p: any) => p.value);
       filteredData = filteredData.filter((item: any) => selectedProv.includes(item.province));
       breakdown.push({
         date: bp.date,
         data: groupAndSum(filteredData, "province"),
       });
-    } else if (selectedRegions.length > 0) {
+    } else if (selectedRegions?.length > 0) {
       filteredData = filteredData.filter((item: any) => selectedRegions.includes(item.region));
       breakdown.push({
         date: bp.date,
@@ -483,7 +485,7 @@ const brgyChartData: any = useMemo(() => {
 
 const bpcoChartData: any = useMemo(() => {
   const bpArr = status?.BPCO;
-  if (!bpArr || !Array.isArray(bpArr) || bpArr.length === 0) return { current: [], breakdown: [] };
+  if (!bpArr || !Array.isArray(bpArr) || bpArr?.length === 0) return { current: [], breakdown: [] };
 
   // Prepare date and region filters
   const startDate = data.startDate ? parseISO(data.startDate) : null;
@@ -525,26 +527,26 @@ const bpcoChartData: any = useMemo(() => {
 
   // --- 1. Current: latest by date ---
   let current: any[] = [];
-  if (filteredBPArr.length > 0) {
+  if (filteredBPArr?.length > 0) {
     const sorted = [...filteredBPArr].sort((a, b) => (a.date > b.date ? -1 : 1));
     const latest = sorted[0];
     if (latest && latest.data) {
       let filteredData = latest.data;
 
       // Municipality filter (use lgu)
-      if (selectedMunicipalities.length > 0) {
+      if (selectedMunicipalities?.length > 0) {
         const selectedLGUs = selectedMunicipalities.map((m: any) => m.value);
         filteredData = filteredData.filter((item: any) => selectedLGUs.includes(item.lgu));
         current = groupAndSum(filteredData, "lgu");
       }
       // Province filter
-      else if (selectedProvinces.length > 0) {
+      else if (selectedProvinces?.length > 0) {
         const selectedProv = selectedProvinces.map((p: any) => p.value);
         filteredData = filteredData.filter((item: any) => selectedProv.includes(item.province));
         current = groupAndSum(filteredData, "province");
       }
       // Region filter
-      else if (selectedRegions.length > 0) {
+      else if (selectedRegions?.length > 0) {
         filteredData = filteredData.filter((item: any) => selectedRegions.includes(item.region));
         current = groupAndSum(filteredData, "region");
       } else {
@@ -558,21 +560,21 @@ const bpcoChartData: any = useMemo(() => {
   filteredBPArr.forEach((bp: any) => {
     let filteredData = bp.data;
 
-    if (selectedMunicipalities.length > 0) {
+    if (selectedMunicipalities?.length > 0) {
       const selectedLGUs = selectedMunicipalities.map((m: any) => m.value);
       filteredData = filteredData.filter((item: any) => selectedLGUs.includes(item.lgu));
       breakdown.push({
         date: bp.date,
         data: groupAndSum(filteredData, "lgu"),
       });
-    } else if (selectedProvinces.length > 0) {
+    } else if (selectedProvinces?.length > 0) {
       const selectedProv = selectedProvinces.map((p: any) => p.value);
       filteredData = filteredData.filter((item: any) => selectedProv.includes(item.province));
       breakdown.push({
         date: bp.date,
         data: groupAndSum(filteredData, "province"),
       });
-    } else if (selectedRegions.length > 0) {
+    } else if (selectedRegions?.length > 0) {
       filteredData = filteredData.filter((item: any) => selectedRegions.includes(item.region));
       breakdown.push({
         date: bp.date,
@@ -1278,17 +1280,17 @@ useEffect(() => {
 
 
 function formatList(arr:any) {
-  if (arr.length === 0) return "";
-  if (arr.length === 1) return arr[0];
-  if (arr.length === 2) return arr.join(" and ");
+  if (arr?.length === 0) return "";
+  if (arr?.length === 1) return arr[0];
+  if (arr?.length === 2) return arr.join(" and ");
   
-  return arr.slice(0, -1).join(", ") + ", and " + arr[arr.length - 1];
+  return arr.slice(0, -1).join(", ") + ", and " + arr[arr?.length - 1];
 }
 
 // Function to get selected card modules for display
 function getSelectedCardModules(data: any) {
   const selectedModules = Array.isArray(data.selectedCardModuleFilter) ? data.selectedCardModuleFilter : [];
-  if (selectedModules.length === 0) {
+  if (selectedModules?.length === 0) {
     return data?.modules || []; // All modules
   }
   return selectedModules;
@@ -1336,6 +1338,8 @@ const scrollToStatusChart = () => {
           />
         </div>
       </div>
+
+    
       
       {/* Transaction Statistics Section */}
       <div className="mb-6">
@@ -1349,44 +1353,66 @@ const scrollToStatusChart = () => {
         <div className="grid grid-cols-3 md:grid-cols-2 sm:grid-cols-1 gap-4">
           <StatisticCard 
             title="No. of Transaction"
-          value={
-            (filteredCard?.totalnewPending ?? 0) +
-            (filteredCard?.totalnewPaid ?? 0) +
-            (filteredCard?.totalrenewPending ?? 0) +
-            (filteredCard?.totalrenewPaid ?? 0) 
-          }
-          bpValue={
-            (filteredCard?.bpTotalnewPending ?? 0) +
-            (filteredCard?.bpTotalnewPaid ?? 0) +
-            (filteredCard?.bpTotalrenewPending ?? 0) +
-            (filteredCard?.bpTotalrenewPaid ?? 0)
-          }
-          wpValue={
-            (filteredCard?.wpTotalnewPending ?? 0) +
-            (filteredCard?.wpTotalnewPaid ?? 0) +
-            (filteredCard?.wpTotalrenewPending ?? 0) +
-            (filteredCard?.wpTotalrenewPaid ?? 0)
-          }
-          bpcoValue={
-            (filteredCard?.bpcoTotalnewPending ?? 0) +
-            (filteredCard?.bpcoTotalnewPaid ?? 0) +
-            (filteredCard?.bpcoTotalrenewPending ?? 0) +
-            (filteredCard?.bpcoTotalrenewPaid ?? 0)
-          }
-          bpbpValue={
-            (filteredCard?.bpbpTotalnewPending ?? 0) +
-            (filteredCard?.bpbpTotalnewPaid ?? 0) +
-            (filteredCard?.bpbpTotalrenewPending ?? 0) +
-            (filteredCard?.bpbpTotalrenewPaid ?? 0)
-          }
-          brgyValue={
-            (filteredCard?.brgyTotalnewPending ?? 0) +
-            (filteredCard?.brgyTotalnewPaid ?? 0) +
-            (filteredCard?.brgyTotalrenewPending ?? 0) +
-            (filteredCard?.brgyTotalrenewPaid ?? 0)
-          }
-          showInfo={`Total number of transactions across ${formatList(getSelectedCardModules(data))} from ${data.startDate} to ${data.endDate}`}
+            value={
+              (filteredCard?.totalnewPending ?? 0) +
+              (filteredCard?.totalnewPaid ?? 0) +
+              (filteredCard?.totalrenewPending ?? 0) +
+              (filteredCard?.totalrenewPaid ?? 0) 
+            }
+            bpValue={
+              (filteredCard?.bpTotalnewPending ?? 0) +
+              (filteredCard?.bpTotalnewPaid ?? 0) +
+              (filteredCard?.bpTotalrenewPending ?? 0) +
+              (filteredCard?.bpTotalrenewPaid ?? 0)
+            }
+            wpValue={
+              (filteredCard?.wpTotalnewPending ?? 0) +
+              (filteredCard?.wpTotalnewPaid ?? 0) +
+              (filteredCard?.wpTotalrenewPending ?? 0) +
+              (filteredCard?.wpTotalrenewPaid ?? 0)
+            }
+            bpcoValue={
+              (filteredCard?.bpcoTotalnewPending ?? 0) +
+              (filteredCard?.bpcoTotalnewPaid ?? 0) +
+              (filteredCard?.bpcoTotalrenewPending ?? 0) +
+              (filteredCard?.bpcoTotalrenewPaid ?? 0)
+            }
+            bpbpValue={
+              (filteredCard?.bpbpTotalnewPending ?? 0) +
+              (filteredCard?.bpbpTotalnewPaid ?? 0) +
+              (filteredCard?.bpbpTotalrenewPending ?? 0) +
+              (filteredCard?.bpbpTotalrenewPaid ?? 0)
+            }
+            brgyValue={
+              (filteredCard?.brgyTotalnewPending ?? 0) +
+              (filteredCard?.brgyTotalnewPaid ?? 0) +
+              (filteredCard?.brgyTotalrenewPending ?? 0) +
+              (filteredCard?.brgyTotalrenewPaid ?? 0)
+            }
+            showInfo={`Total number of transactions across ${formatList(getSelectedCardModules(data))} from ${data.startDate} to ${data.endDate}`}
           />
+          <StatisticCard 
+            title="New Licenses Issued"
+            value={filteredCard?.totalnewPaid ?? 0}
+            bpValue={filteredCard?.bpTotalnewPaid ?? 0}
+            wpValue={filteredCard?.wpTotalnewPaid ?? 0}
+            bpcoValue={filteredCard?.bpcoTotalnewPaid ?? 0}
+            bpbpValue={filteredCard?.bpbpTotalnewPaid ?? 0}
+            brgyValue={filteredCard?.brgyTotalnewPaid ?? 0}
+            showInfo={`Total number of new licenses issued for ${formatList(getSelectedCardModules(data))} from ${data.startDate} to ${data.endDate}`}
+          />
+          <StatisticCard 
+            title="Renew Licenses Issued"
+            value={filteredCard?.totalrenewPaid ?? 0}
+            bpValue={filteredCard?.bpTotalrenewPaid ?? 0}
+            wpValue={filteredCard?.wpTotalrenewPaid ?? 0}
+            bpcoValue={filteredCard?.bpcoTotalrenewPaid ?? 0}
+            bpbpValue={filteredCard?.bpbpTotalrenewPaid ?? 0}
+            brgyValue={filteredCard?.brgyTotalrenewPaid ?? 0}
+            showInfo={`Total number of licenses renewed for ${formatList(getSelectedCardModules(data))} from ${data.startDate} to ${data.endDate}`}
+          />
+
+         
           <StatisticCard 
             title="No. of Male"
             value={(filteredCard?.totalmalePaid ?? 0) + (filteredCard?.totalmalePending ?? 0)}
@@ -1538,6 +1564,18 @@ const scrollToStatusChart = () => {
             title="TRANSACTION ANALYTICS BY GENDER"
             period={`${data.startDate} - ${data.endDate}`}
           />
+
+            <TrendLineChart
+  bpResults={transactionData?.bpResults || []}
+  wpResults={transactionData?.wpResults || []}
+  brgyResults={transactionData?.brgyResults || []}
+  bpcoResults={transactionData?.bpcoResults || []}
+  bpbpResults={transactionData?.bpbpResults || []}
+  startDate={data.startDate}
+  endDate={data.endDate}
+  availableModules={data.modules || []}
+  title="Transaction Trend Analysis"
+/>
         </div>
       </div>
     

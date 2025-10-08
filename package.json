@@ -21,6 +21,7 @@
     "@react-spring/web": "^10.0.1",
     "@reduxjs/toolkit": "^2.8.2",
     "@tanstack/react-table": "^8.20.5",
+    "@tremor/react": "^3.18.7",
     "@types/xlsx": "^0.0.35",
     "apexcharts": "^4.7.0",
     "axios": "^1.7.8",

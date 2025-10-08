@@ -166,7 +166,7 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
   const labels = processedData.map(item => item.name);
 
   // For Pie chart, aggregate all values
-  const pieLabels = ['Paid Male', 'Paid Female', 'Pending Male', 'Pending Female'];
+  const pieLabels = ['Paid Male (License Issued for Male)', 'Paid Female (License Issued for Female)', 'Pending Male', 'Pending Female'];
   const pieValues = [
     processedData.reduce((sum, item) => sum + (item.paidMale ?? 0), 0),
     processedData.reduce((sum, item) => sum + (item.paidFemale ?? 0), 0),
@@ -191,7 +191,7 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
     labels,
     datasets: [
       {
-        label: 'Paid Male',
+        label: 'Paid Male (License Issued for Male)',
         data: processedData.map(item => item.paidMale),
         backgroundColor: '#0047CC',
         borderColor: '#0047CC',
@@ -199,7 +199,7 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
         hidden: hidden[0],
       },
       {
-        label: 'Paid Female',
+        label: 'Paid Female (License Issued for Female)',
         data: processedData.map(item => item.paidFemale),
         backgroundColor: '#FFD700',
         borderColor: '#FFD700',
