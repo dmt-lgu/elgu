@@ -14,7 +14,6 @@ import WorkingPermitReport from './table/WorkingPermitReport';
 import BrgyClearanceReport from './table/BrgyClearanceReport';
 import { setWorkingPermitTableData, setWorkingPermitAppliedFilter } from '@/redux/workingPermitTableSlice';
 import { setBrgyClearanceTableData, setBrgyClearanceAppliedFilter } from '@/redux/brgyClearanceTableSlice';
-
 import BuildingPermitReport from './table/BuildingPermitReport';
 import { setbuildingPermiAppliedFilter, setbuildingPermitData } from '@/redux/buildingPermitSlice';
 import CertificateOfOccupancyReport from './table/CertificateOfOccupancyReport';
@@ -23,6 +22,7 @@ import ProgressIndicator from './components/ProgressIndicator';
 import { filterTableResults, getDateRangeLabel } from './utils/reportUtils';
 import BusinessPermitReport from './table/BusinessPermitReport';
 import { Filter } from 'lucide-react';
+
 
 // Type definitions and helper functions remain the same
 type DateRange = { start: string | null; end: string | null };

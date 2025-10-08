@@ -86,9 +86,12 @@ function DateRangeYear({
         end: `${to}-12-31`,
       });
     } else if (from && onChange) {
+      // When the user picks only a start year, treat it as that full year
+      // (start = Jan 1, end = Dec 31) so report consumers always receive
+      // a complete date range and don't skip fetches because end is null.
       onChange({
         start: `${from}-01-01`,
-        end: null,
+        end: `${from}-12-31`,
       });
     }
   };

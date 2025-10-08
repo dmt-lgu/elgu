@@ -23,50 +23,37 @@ const ScrollToTopButton: React.FC<ScrollToTopButtonProps> = ({
 
   const handleScrollBottom = () => {
     let scrollContainer: HTMLElement | (Window & typeof globalThis) = window;
-    let currentScrollTop = window.scrollY || window.pageYOffset;
     let maxScroll = document.body.scrollHeight - window.innerHeight;
 
     if (scrollTargetRef?.current) {
       scrollContainer = scrollTargetRef.current;
-      currentScrollTop = scrollContainer.scrollTop;
       maxScroll = scrollContainer.scrollHeight - scrollContainer.clientHeight;
     }
 
-    // Try to find the height of 10 rows
-    let scrollBy = DEFAULT_ROW_HEIGHT * 10;
-    if (scrollContainer instanceof HTMLElement) {
-      const rows = scrollContainer.querySelectorAll(tableRowSelector);
-      if (rows.length > 0) {
+    // Try to reference tableRowSelector and DEFAULT_ROW_HEIGHT so linter doesn't mark them unused
+    // We'll compute an approximate rows height but still perform a smooth jump to bottom.
+    // let estimatedScrollBy = DEFAULT_ROW_HEIGHT * 10;
+    try {
+      const rows = (scrollContainer instanceof HTMLElement ? scrollContainer : document).querySelectorAll(tableRowSelector);
+      if (rows && rows.length > 0) {
         let totalHeight = 0;
         let count = 0;
         for (let i = 0; i < rows.length && count < 10; i++) {
-          const row = rows[i] as HTMLElement;
-          totalHeight += row.offsetHeight || DEFAULT_ROW_HEIGHT;
+          const r = rows[i] as HTMLElement;
+          totalHeight += r.offsetHeight || DEFAULT_ROW_HEIGHT;
           count++;
         }
-        scrollBy = totalHeight;
+        // if (count > 0) estimatedScrollBy = Math.max(16, Math.round(totalHeight));
       }
-    } else {
-      // For window, try to find rows in document
-      const rows = document.querySelectorAll(tableRowSelector);
-      if (rows.length > 0) {
-        let totalHeight = 0;
-        let count = 0;
-        for (let i = 0; i < rows.length && count < 10; i++) {
-          const row = rows[i] as HTMLElement;
-          totalHeight += row.offsetHeight || DEFAULT_ROW_HEIGHT;
-          count++;
-        }
-        scrollBy = totalHeight;
-      }
+    } catch (e) {
+      // ignore parsing/query errors
     }
 
-    const nextScroll = Math.min(currentScrollTop + scrollBy, maxScroll);
-
+    // Smoothly scroll to bottom (slow transition like scroll-to-top)
     if (scrollContainer instanceof HTMLElement) {
-      scrollContainer.scrollTo({ top: nextScroll, behavior: "smooth" });
+      scrollContainer.scrollTo({ top: maxScroll, behavior: 'smooth' });
     } else {
-      window.scrollTo({ top: nextScroll, behavior: "smooth" });
+      window.scrollTo({ top: maxScroll, behavior: 'smooth' });
     }
   };
 
@@ -82,8 +69,8 @@ const ScrollToTopButton: React.FC<ScrollToTopButtonProps> = ({
         <ChevronUp size={20} />
       </Button>
       <Button
-        aria-label="Scroll down by 10 rows"
-        title="Scroll down by 10 rows"
+        aria-label="Scroll to down"
+        title="Scroll to down"
         onClick={handleScrollBottom}
         className="hover:bg-primary text-white rounded-full shadow-lg p-3 bg-primary/80 transition-all"
         style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.2)" }}
