@@ -1456,7 +1456,7 @@ const totalRegions = locations.length;
     <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme">
       <div className="flex h-screen">
         {/* Sidebar */}
-        <aside className="md:hidden flex w-[300px] bg-card border-r border-border flex-col">
+        <aside className="md:hidden flex w-[300px]  bg-card border-r border-border flex-col">
           <div className="flex justify-center items-center mt-5 border-border">
             <img src={eLGULogo} className="w-[140px]" alt="" />
           </div>
@@ -1489,7 +1489,7 @@ const totalRegions = locations.length;
 
         {/* Sidebar for mobile */}
         {sidebarOpen && (
-          <div className="fixed inset-0 z-40 md:flex hidden">
+          <div className="fixed inset-0 z-[999] md:flex hidden">
             <div className="w-[250px] bg-card border-r border-border flex flex-col h-full">
               <div className="flex justify-between items-center mt-5 px-4">
                 <img src={eLGULogo} className="w-[120px]" alt="" />

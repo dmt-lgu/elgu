@@ -98,7 +98,7 @@ const ModuleFilter: React.FC<ModuleFilterProps> = ({
 
   return (
     <div className={`bg-white border border-gray-200 rounded-lg shadow-sm mb-6 sticky top-0 z-50 ${className}`}>
-      <div className="flex items-center justify-between px-6 py-4">
+      <div className="flex items-center sm:flex-col sm:gap-4 justify-between px-6 py-4">
         <div className="flex items-center space-x-3">
           <div className="flex items-center justify-center w-10 h-10 bg-blue-600 rounded-lg text-white">
             {getIcon()}

@@ -198,7 +198,7 @@ const TrendLineChart = ({
         <CardTitle className="text-base font-bold uppercase mb-4">{title}</CardTitle>
         
         {/* Module Selection - Dropdown Style */}
-        <div className="flex  justify-between gap-4 items-start mb-4">
+        <div className="flex md:flex-col justify-between gap-4 items-start mb-4">
           
 
           {/* Time Period Toggle */}
@@ -228,7 +228,7 @@ const TrendLineChart = ({
             </div>
           </div>
 
-          <div className="flex-1 max-w-[50%]">
+          <div className="flex-1 max-w-[50%] md:max-w-[100%]">
             <div className="flex flex-wrap justify-end gap-2 mb-3">
               {selectedModules.map(module => (
                 <div 
@@ -249,7 +249,7 @@ const TrendLineChart = ({
             <div className="relative">
               <button
                 onClick={() => setDropdownOpen(!dropdownOpen)}
-                className="w-full sm:w-auto flex items-center justify-between gap-2 border border-gray-300 rounded px-4 py-2 bg-white hover:bg-gray-50"
+                className="w-full sm:w-full flex items-center justify-between gap-2 border border-gray-300 rounded px-4 py-2 bg-white hover:bg-gray-50"
               >
                 <span className="text-sm font-medium">
                   {selectedModules.length} Module{selectedModules.length !== 1 ? 's' : ''} Selected
