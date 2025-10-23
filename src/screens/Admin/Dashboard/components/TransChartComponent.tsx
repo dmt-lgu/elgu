@@ -250,14 +250,15 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
   const labels = processedData.map(item => item.name);
 
   // Pie chart labels and values
-  const allPieLabels = ['Paid (License Issued) ', 'Ongoing', 'Paid with eGovPay', 'Paid with LinkBiz'];
+  const allPieLabels = ['Paid (For Issuance to License Issued) ', 'Ongoing (For verification to For Payment) ','License Issued' ,'Paid with eGovPay', 'Paid with LinkBiz'];
   const allPieValues = [
     processedData.reduce((sum, item) => sum + (item.paid ?? 0), 0),
     processedData.reduce((sum, item) => sum + (item.pending ?? 0), 0),
+    processedData.reduce((sum, item) => sum + (item.paid ?? 0), 0),
     processedData.reduce((sum, item) => sum + (item.paideGov ?? 0), 0),
     processedData.reduce((sum, item) => sum + (item.paidLinkBiz ?? 0), 0),
   ];
-  const allPieColors = ['#0047CC', '#FFD700', '#DC2626', '#38BDF8'];
+  const allPieColors = ['#0047CC', '#FFD700', '#1ec55a','#DC2626', '#38BDF8'];
 
   // Filter pie data based on legend toggles
   const pieLabels = allPieLabels.filter((_, idx) => !hidden[idx]);
@@ -280,7 +281,7 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
     labels,
     datasets: [
       {
-        label: 'Paid (License Issued) ',
+        label: 'Paid',
         data: processedData.map(item => item.paid),
         backgroundColor: '#0047CC',
         borderColor: '#0047CC',
@@ -288,12 +289,20 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
         hidden: hidden[0],
       },
       {
-        label: 'Ongoing',
+        label: 'Ongoing ',
         data: processedData.map(item => item.pending),
         backgroundColor: '#FFD700',
         borderColor: '#FFD700',
         fill: false,
         hidden: hidden[1],
+      },
+      {
+        label: 'License Issued ',
+        data: processedData.map(item => item.paid),
+        backgroundColor: '#1ec55a',
+        borderColor: '#0047CC',
+        fill: false,
+        hidden: hidden[0],
       },
       {
         label: 'Paid with eGovPay',
