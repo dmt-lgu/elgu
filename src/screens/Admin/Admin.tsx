@@ -6,6 +6,7 @@ import {
   Loader2Icon,
 } from "lucide-react";
 import { useLocation } from "react-router-dom";
+import Logo from './../../assets/logo/dict-logo.png'
 import { useEffect, useRef, useState } from "react";
 
 import eLGULogo from "./../../assets/logo/lgu-logo.png";
@@ -1460,13 +1461,13 @@ const totalRegions = locations.length;
           <div className="flex justify-center items-center mt-5 border-border">
             <img src={eLGULogo} className="w-[140px]" alt="" />
           </div>
-          <nav className="flex flex-col mt-10 gap-6 ml-10">
+          <nav className="flex flex-col mt-10  ">
             <Link
               to="/elgu/admin/dashboard"
               className={`flex items-center gap-2 ${
                 location.pathname === "/elgu/admin/dashboard"
-                  ? "text-primary"
-                  : "text-secondary-foreground"
+                  ? "text-white bg-[#282b30] font-medium w-full p-2  pl-10 py-5"
+                  : "text-secondary-foreground w-full p-2  pl-10 py-5"
               }`}
             >
               <LucideLayoutDashboard className="w-5 h-5" />
@@ -1477,14 +1478,20 @@ const totalRegions = locations.length;
               to="/elgu/admin/report"
               className={`flex items-center gap-2 ${
                 location.pathname === "/elgu/admin/report"
-                  ? "text-primary"
-                  : "text-secondary-foreground"
+                  ? "text-white bg-[#282b30] font-medium w-full p-2  pl-10 py-5 "
+                  : "text-secondary-foreground w-full p-2  pl-10 py-5 "
               }`}
             >
               <BarChart3Icon className="w-5 h-5" />
               <span>Reports</span>
             </Link>
           </nav>
+
+           <footer className="mt-auto p-4 border-t border-border text-sm text-secondary-foreground flex flex-col gap-2 font-medium text-start content-center items-center">
+               <p> Developed by:</p> 
+
+               <img src={Logo} className=" w-[140px] object-contain" alt="" />
+              </footer>
         </aside>
 
         {/* Sidebar for mobile */}
