@@ -166,7 +166,7 @@ const ComparisonChartComponent: React.FC<ComparisonChartProps> = ({
       processModuleData(brgyData, brgyRaw, "Barangay Clearance", "Barangay Clearance");
     }
     if (modules.includes("Certificate of Occupancy")) {
-      processModuleData(bpcoData, bpcoRaw, "Certificate of Occupancy", "Certificate of Occupancy");
+      processModuleData(bpcoData, bpcoRaw, "Building Permit & Certificate of Occupancy", "Building Permit & Certificate of Occupancy");
     }
     if (modules.includes("Building Permit")) {
       processModuleData(bpbpData, bpbpRaw, "Building Permit", "Building Permit");
