@@ -24,7 +24,7 @@ const AdminProgressIndicator: React.FC<AdminProgressIndicatorProps> = ({ isLoadi
   const location = useLocation();
 
   // Only render this component when inside admin routes
-  if (!location.pathname.startsWith('/elgu/admin')) return null;
+  if (!location.pathname.startsWith('/elgu/admin/dashboard')) return null;
   const [isMinimized, setIsMinimized] = useState(false);
   const anyModuleLoading = Object.values(moduleLoading || {}).some(Boolean);
   const [isVisible, setIsVisible] = useState<boolean>(() => Boolean(isLoading || anyModuleLoading));
