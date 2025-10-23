@@ -30,7 +30,7 @@ const router = createBrowserRouter([
 
   {
     path: "/elgu/",
-    element: <Navigate to="/elgu/login" />,
+    element: <Navigate to="/elgu/admin" />,
   }
 ,
 

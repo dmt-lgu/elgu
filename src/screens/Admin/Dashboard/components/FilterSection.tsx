@@ -31,7 +31,11 @@ const islandRegionMap: any = {
 
 const dateTypes = ['Day', 'Month', 'Year'];
 
-const FilterSection: React.FC = () => {
+interface FilterSectionProps {
+  onStartProcessing?: () => void;
+}
+
+const FilterSection: React.FC<FilterSectionProps> = ({ onStartProcessing }) => {
   const regions = useSelector(selectRegions);
   const data = useSelector(selectData);
   const isLoading = useSelector(selectLoad);
@@ -400,7 +404,10 @@ const FilterSection: React.FC = () => {
     setIsRegionOpen(false);
     setIsDateOpen(false);
 
-    // Dispatch a custom event that the Admin component can listen to
+    // Notify parent to start processing (show progress indicator)
+    if (onStartProcessing) onStartProcessing();
+
+    // Dispatch a custom event for backwards compatibility
     window.dispatchEvent(new CustomEvent('triggerFilterAPI'));
   };
 

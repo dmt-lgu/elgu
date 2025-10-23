@@ -32,17 +32,19 @@ const DashboardPage = () => {
   const data = useSelector(selectData);
   const transactionData:any = useSelector(selectTransaction);
   const loading = useSelector(selectLoad2);
-    // Loading states for each module
+  
 
   
+
+
+
+  
+
 
 
   // Enhanced filter and group logic
   const filterAndGroupResults = (results: any[], municipalities: any[], provinces: any[], regions: any[] = []) => {
     // 1. If municipalities is not blank, filter by selected municipalities (1 by 1)
-
- 
-
     
     if (municipalities && municipalities?.length > 0) {
       const selected = municipalities.map((m: any) => m.value);
@@ -1481,6 +1483,8 @@ const scrollToStatusChart = () => {
       </div>
 
     
+
+      {/* Progress Indicator is rendered at Admin container level now */}
 
       {/* Non-Binary Statistics - Separate section for special calculation */}
      

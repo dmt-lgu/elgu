@@ -219,7 +219,12 @@ const Reports: React.FC = () => {
       allRegionsSelected: false,
       selectedModules: (uiSelectedModules as string[]) || [],
     };
-    return { ...defaultFilter, ...(bpPersistedAppliedFilter || {}) };
+    // Prefer any persisted per-module applied filter (BP/WP/BC/BLDG/CO) so that
+    // returning to the Reports page restores the last used filter and avoids
+    // restarting network fetches when possible. We fall back to business permit
+    // persisted filter for backward compatibility.
+    const persisted = bpPersistedAppliedFilter || wpPersistedAppliedFilter || bcPersistedAppliedFilter || bldgPersistedAppliedFilter || coPersistedAppliedFilter || null;
+    return { ...defaultFilter, ...(persisted || {}) };
   });
 
   // Do NOT auto-trigger search; require explicit user action.
@@ -228,7 +233,11 @@ const Reports: React.FC = () => {
   // and avoid showing a loading spinner on refresh.
   const initialHasSearched = !!(bpTableData || wpTableData || bcTableData || bldgTableData || coTableData);
   const [hasSearched, setHasSearched] = useState<boolean>(initialHasSearched);
-  const [lastAppliedFilters, setLastAppliedFilters] = useState<any>(null);
+  // Initialize lastAppliedFilters from any persisted applied filter so that
+  // handleSearch won't re-trigger a fetch when navigating back to Reports.
+  const [lastAppliedFilters, setLastAppliedFilters] = useState<any>(() => {
+    return bpPersistedAppliedFilter || wpPersistedAppliedFilter || bcPersistedAppliedFilter || bldgPersistedAppliedFilter || coPersistedAppliedFilter || null;
+  });
   const [cancelled, setCancelled] = useState(false);
   const [hasTableData, setHasTableData] = useState(false);
   const [lguToRegion, setLguToRegion] = useState<Record<string, string>>({});
