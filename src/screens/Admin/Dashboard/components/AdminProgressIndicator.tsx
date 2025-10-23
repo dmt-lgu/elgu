@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { getRegionCode, modules } from '../../Report/utils/mockData';
 import { Loader2, ChevronUp, ChevronDown, CheckCircle2, X } from 'lucide-react';
 import './css/ProgressLoader.css';
@@ -20,6 +21,10 @@ interface AdminProgressIndicatorProps {
 }
 
 const AdminProgressIndicator: React.FC<AdminProgressIndicatorProps> = ({ isLoading, progress, counts = {}, moduleLoading = {}, onModuleClick }) => {
+  const location = useLocation();
+
+  // Only render this component when inside admin routes
+  if (!location.pathname.startsWith('/elgu/admin')) return null;
   const [isMinimized, setIsMinimized] = useState(false);
   const anyModuleLoading = Object.values(moduleLoading || {}).some(Boolean);
   const [isVisible, setIsVisible] = useState<boolean>(() => Boolean(isLoading || anyModuleLoading));
