@@ -1393,7 +1393,7 @@ const scrollToStatusChart = () => {
           />
           <StatisticCard 
             title="New Licenses Issued"
-            value={filteredCard?.totalnewPaid ?? 0}
+            value={(filteredCard?.totalnewPaid  ?? 0)  + (filteredCard?.totalnewPaidViaEgov ?? 0)}
             bpValue={filteredCard?.bpTotalnewPaid ?? 0}
             wpValue={filteredCard?.wpTotalnewPaid ?? 0}
             bpcoValue={filteredCard?.bpcoTotalnewPaid ?? 0}
@@ -1403,7 +1403,7 @@ const scrollToStatusChart = () => {
           />
           <StatisticCard 
             title="Renew Licenses Issued"
-            value={filteredCard?.totalrenewPaid ?? 0}
+            value={(filteredCard?.totalrenewPaid ?? 0) + (filteredCard?.totalrenewPaidViaEgov ?? 0)}
             bpValue={filteredCard?.bpTotalrenewPaid ?? 0}
             wpValue={filteredCard?.wpTotalrenewPaid ?? 0}
             bpcoValue={filteredCard?.bpcoTotalrenewPaid ?? 0}
