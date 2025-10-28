@@ -14,6 +14,7 @@ import loadReducer from './loadSlice';
 import load2Reducer from './loadSlice2';
 import statusReducer from './statusSlice';
 import reportFilterReducer from './reportFilterSlice';
+import reportProgressReducer from './reportProgressSlice';
 import businessPermitTableReducer from './businessPermitSlice';
 import workingPermitTableReducer from './workingPermitTableSlice';
 import brgyClearanceTableReducer from './brgyClearanceTableSlice'; 
@@ -29,6 +30,7 @@ const persistConfig = {
   storage,
   whitelist: [
     'reportFilter',
+    'reportProgress',
     'businessPermitTable', 
     'workingPermitTable',
     'brgyClearanceTable',
@@ -61,6 +63,7 @@ const rootReducer = combineReducers({
   status: statusReducer,
   wp:WpReducer,
   reportFilter: reportFilterReducer,
+  reportProgress: reportProgressReducer,
   businessPermitTable: businessPermitTableReducer,
   workingPermitTable: workingPermitTableReducer,
   brgyClearanceTable: brgyClearanceTableReducer, 

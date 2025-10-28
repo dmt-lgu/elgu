@@ -254,7 +254,7 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
   const allPieValues = [
     processedData.reduce((sum, item) => sum + (item.paid ?? 0), 0),
     processedData.reduce((sum, item) => sum + (item.pending ?? 0), 0),
-    processedData.reduce((sum, item) => sum + (item.paid ?? 0), 0),
+    processedData.reduce((sum, item) => sum + (item.paid ?? 0) + (item.paideGov ?? 0), 0),
     processedData.reduce((sum, item) => sum + (item.paideGov ?? 0), 0),
     processedData.reduce((sum, item) => sum + (item.paidLinkBiz ?? 0), 0),
   ];
@@ -298,11 +298,11 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
       },
       {
         label: 'License Issued ',
-        data: processedData.map(item => item.paid),
+        data: processedData.map(item => item.paid + item.paideGov),
         backgroundColor: '#1ec55a',
         borderColor: '#0047CC',
         fill: false,
-        hidden: hidden[0],
+        hidden: hidden[2],
       },
       {
         label: 'Paid with eGovPay',
@@ -310,7 +310,7 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
         backgroundColor: '#DC2626',
         borderColor: '#DC2626',
         fill: false,
-        hidden: hidden[2],
+        hidden: hidden[3],
       },
       {
         label: 'Paid with LinkBiz',
@@ -318,7 +318,7 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
         backgroundColor: '#38BDF8',
         borderColor: '#38BDF8',
         fill: false,
-        hidden: hidden[3],
+        hidden: hidden[4],
       },
     ],
   };

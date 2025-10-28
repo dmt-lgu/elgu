@@ -133,29 +133,60 @@ const WorkingPermitReport = forwardRef<HTMLDivElement, WorkingPermitProps>(({
           dataToRender.forEach((item: any, itemIdx: number) => {
             const periodLabel = isDayMode ? (item.month ? `(${formatMonthYear(item.month)})` : '') : (lgu.months?.length > 1 ? `(${formatMonthYear(lgu.months[0])} - ${formatMonthYear(lgu.months[lgu.months.length - 1])})` : lgu.months?.length === 1 ? `(${formatMonthYear(lgu.months[0])})` : "");
             
-            // **DESIGN CHANGE**: Padded, aligned, and styled cells
+            // Compute per-row values per requested formula
+            const newPaid = Number(item.newPaid || 0);
+            const newGeo = Number(item.newPaidViaEgov || 0);
+            const newPending = Number(item.newPending || 0);
+            const newLicenseIssued = newPaid + newGeo;
+            const newTotal = newPaid + newGeo + newPending;
+
+            const renewPaid = Number(item.renewPaid || 0);
+            const renewGeo = Number(item.renewPaidViaEgov || 0);
+            const renewPending = Number(item.renewPending || 0);
+            const renewLicenseIssued = renewPaid + renewGeo;
+            const renewTotal = renewPaid + renewGeo + renewPending;
+
+            const malePaid = Number(item.malePaid || 0);
+            const malePending = Number(item.malePending || 0);
+            const maleLicenseIssued = malePaid; // no eGov breakdown for male
+            const maleTotal = malePaid + malePending;
+
+            const femalePaid = Number(item.femalePaid || 0);
+            const femalePending = Number(item.femalePending || 0);
+            const femaleLicenseIssued = femalePaid; // no eGov breakdown for female
+            const femaleTotal = femalePaid + femalePending;
+
+            // Render row with computed License Issued and Totals
             rows.push(
               <TableRow key={`${region}-${lgu.lgu}-${isDayMode ? item.month : 'sum'}-${itemIdx}`} className="hover:bg-blue-50/70 transition-colors duration-200 text-sm">
                 {isFirstRowOfRegion && <TableCell className="p-3 text-center font-bold text-slate-700 align-middle bg-slate-50 border-r text-sm" rowSpan={totalRowsForRegion}>{getRegionCode(region) || region}</TableCell>}
                 <TableCell className="p-3 text-left font-semibold text-slate-800"><div>{lgu.lgu}<span className="text-xs font-medium text-slate-500 ml-1.5">{lgu.province ? `(${lgu.province})` : ""}</span></div><div className="text-[11px] font-semibold text-blue-700 mt-0.5">{periodLabel}</div></TableCell>
-                <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(item.newPaid)}</TableCell>
-                <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(item.newPaid)}</TableCell>
-                <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(item.newPaidViaEgov)}</TableCell>
-                <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(item.newPending)}</TableCell>
-                <TableCell className="p-3 text-right font-bold text-slate-900 bg-slate-100 tabular-nums">{formatNumber((Number(item.newPaid||0))+(Number(item.newPaidViaEgov||0))+(Number(item.newPending||0)))}</TableCell>
-                <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(item.renewPaid)}</TableCell>
-                <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(item.renewPaid)}</TableCell>
-                <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(item.renewPaidViaEgov)}</TableCell>
-                <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(item.renewPending)}</TableCell>
-                <TableCell className="p-3 text-right font-bold text-slate-900 bg-slate-100 tabular-nums">{formatNumber((Number(item.renewPaid||0))+(Number(item.renewPaidViaEgov||0))+(Number(item.renewPending||0)))}</TableCell>
-                <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(item.malePaid)}</TableCell>
-                <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(item.malePaid)}</TableCell>
-                <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(item.malePending)}</TableCell>
-                <TableCell className="p-3 text-right font-bold text-slate-900 bg-slate-100 tabular-nums">{formatNumber((Number(item.malePaid||0))+(Number(item.malePending||0)))}</TableCell>
-                <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(item.femalePaid)}</TableCell>
-                <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(item.femalePaid)}</TableCell>
-                <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(item.femalePending)}</TableCell>
-                <TableCell className="p-3 text-right font-bold text-slate-900 bg-slate-100 tabular-nums">{formatNumber((Number(item.femalePaid||0))+(Number(item.femalePending||0)))}</TableCell>
+
+                {/* New */}
+                <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(newLicenseIssued)}</TableCell>
+                <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(newPaid)}</TableCell>
+                <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(newGeo)}</TableCell>
+                <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(newPending)}</TableCell>
+                <TableCell className="p-3 text-right font-bold text-slate-900 bg-slate-100 tabular-nums">{formatNumber(newTotal)}</TableCell>
+
+                {/* Renewal */}
+                <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(renewLicenseIssued)}</TableCell>
+                <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(renewPaid)}</TableCell>
+                <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(renewGeo)}</TableCell>
+                <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(renewPending)}</TableCell>
+                <TableCell className="p-3 text-right font-bold text-slate-900 bg-slate-100 tabular-nums">{formatNumber(renewTotal)}</TableCell>
+
+                {/* Male */}
+                <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(maleLicenseIssued)}</TableCell>
+                <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(malePaid)}</TableCell>
+                <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(malePending)}</TableCell>
+                <TableCell className="p-3 text-right font-bold text-slate-900 bg-slate-100 tabular-nums">{formatNumber(maleTotal)}</TableCell>
+
+                {/* Female */}
+                <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(femaleLicenseIssued)}</TableCell>
+                <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(femalePaid)}</TableCell>
+                <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(femalePending)}</TableCell>
+                <TableCell className="p-3 text-right font-bold text-slate-900 bg-slate-100 tabular-nums">{formatNumber(femaleTotal)}</TableCell>
               </TableRow>
             );
             isFirstRowOfRegion = false;
@@ -164,8 +195,15 @@ const WorkingPermitReport = forwardRef<HTMLDivElement, WorkingPermitProps>(({
         allRows.push(...rows);
         const regionTotals = lguList.reduce((totals, lgu) => { if (!lgu.hasError && lgu.monthlyResults) { lgu.monthlyResults.forEach((item: any) => { totals.newPaid += Number(item.newPaid||0); totals.newGeoPay += Number(item.newPaidViaEgov||0); totals.newPending += Number(item.newPending||0); totals.renewalPaid += Number(item.renewPaid||0); totals.renewalGeoPay += Number(item.renewPaidViaEgov||0); totals.renewalPending += Number(item.renewPending||0); totals.malePaid += Number(item.malePaid||0); totals.malePending += Number(item.malePending||0); totals.femalePaid += Number(item.femalePaid||0); totals.femalePending += Number(item.femalePending||0); }); } return totals; }, { newPaid:0, newGeoPay:0, newPending:0, renewalPaid:0, renewalGeoPay:0, renewalPending:0, malePaid:0, malePending:0, femalePaid:0, femalePending:0 });
         
-        // **DESIGN CHANGE**: Cleaner sub-total row
-        allRows.push(<TableRow key={`${region}-subtotal`} className="font-bold text-slate-900"><TableCell className="bg-slate-200 p-3 text-left" colSpan={2}><div className="font-extrabold tracking-wider text-xs">SUB-TOTAL ({getRegionCode(region) || region})</div></TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.newPaid)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.newPaid)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.newGeoPay)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.newPending)}</TableCell><TableCell className="bg-slate-300 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.newPaid + regionTotals.newGeoPay + regionTotals.newPending)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.renewalPaid)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.renewalPaid)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.renewalGeoPay)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.renewalPending)}</TableCell><TableCell className="bg-slate-300 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.renewalPaid + regionTotals.renewalGeoPay + regionTotals.renewalPending)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.malePaid)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.malePaid)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.malePending)}</TableCell><TableCell className="bg-slate-300 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.malePaid + regionTotals.malePending)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.femalePaid)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.femalePaid)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.femalePending)}</TableCell><TableCell className="bg-slate-300 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.femalePaid + regionTotals.femalePending)}</TableCell></TableRow>);
+  // **DESIGN CHANGE**: Cleaner sub-total row (computed License Issued)
+  const regionLicenseIssued = (regionTotals.newPaid || 0) + (regionTotals.newGeoPay || 0);
+  const regionNewTotal = (regionTotals.newPaid || 0) + (regionTotals.newGeoPay || 0) + (regionTotals.newPending || 0);
+  const regionRenewLicenseIssued = (regionTotals.renewalPaid || 0) + (regionTotals.renewalGeoPay || 0);
+  const regionRenewTotal = (regionTotals.renewalPaid || 0) + (regionTotals.renewalGeoPay || 0) + (regionTotals.renewalPending || 0);
+  const regionMaleTotal = (regionTotals.malePaid || 0) + (regionTotals.malePending || 0);
+  const regionFemaleTotal = (regionTotals.femalePaid || 0) + (regionTotals.femalePending || 0);
+
+  allRows.push(<TableRow key={`${region}-subtotal`} className="font-bold text-slate-900"><TableCell className="bg-slate-200 p-3 text-left" colSpan={2}><div className="font-extrabold tracking-wider text-xs">SUB-TOTAL ({getRegionCode(region) || region})</div></TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionLicenseIssued)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.newPaid)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.newGeoPay)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.newPending)}</TableCell><TableCell className="bg-slate-300 p-3 text-right tabular-nums text-sm">{formatNumber(regionNewTotal)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionRenewLicenseIssued)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.renewalPaid)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.renewalGeoPay)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.renewalPending)}</TableCell><TableCell className="bg-slate-300 p-3 text-right tabular-nums text-sm">{formatNumber(regionRenewTotal)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.malePaid)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.malePaid)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.malePending)}</TableCell><TableCell className="bg-slate-300 p-3 text-right tabular-nums text-sm">{formatNumber(regionMaleTotal)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.femalePaid)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.femalePaid)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.femalePending)}</TableCell><TableCell className="bg-slate-300 p-3 text-right tabular-nums text-sm">{formatNumber(regionFemaleTotal)}</TableCell></TableRow>);
       }
     });
     return allRows;
@@ -208,21 +246,21 @@ const WorkingPermitReport = forwardRef<HTMLDivElement, WorkingPermitProps>(({
               {/* **DESIGN CHANGE**: Header Row 2 with requested colors */}
               <TableRow>
                 <TableHead className="bg-blue-100 text-black p-2 sticky top-[49px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">License Issued</TableHead>
-                <TableHead className="bg-blue-100 text-black p-2 sticky top-[49px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">PAID <br /><span className='font-normal'>(For Issuance)</span></TableHead>
+                <TableHead className="bg-blue-100 text-black p-2 sticky top-[49px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">PAID <br /><span className='font-normal'>(For Issuance and License Issued)</span></TableHead>
                 <TableHead className="bg-blue-100 text-black p-2 sticky top-[49px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">PAID <br /><span className='font-normal'>(eGOVPay)</span></TableHead>
                 <TableHead className="bg-blue-100 text-black p-2 sticky top-[49px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">ONGOING <br /><span className='font-normal'>(For Payment)</span></TableHead>
                 <TableHead className="bg-blue-200 text-black p-2 sticky top-[49px] z-20 text-center font-bold uppercase text-[10px] border-b border-r border-slate-300">Total</TableHead>
                 <TableHead className="bg-blue-100 text-black p-2 sticky top-[49px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">License Issued</TableHead>
-                <TableHead className="bg-blue-100 text-black p-2 sticky top-[49px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">PAID <br /><span className='font-normal'>(For Issuance)</span></TableHead>
+                <TableHead className="bg-blue-100 text-black p-2 sticky top-[49px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">PAID <br /><span className='font-normal'>(For Issuance and License Issued)</span></TableHead>
                 <TableHead className="bg-blue-100 text-black p-2 sticky top-[49px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">PAID <br /><span className='font-normal'>(eGOVPay)</span></TableHead>
                 <TableHead className="bg-blue-100 text-black p-2 sticky top-[49px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">ONGOING <br /><span className='font-normal'>(For Payment)</span></TableHead>
                 <TableHead className="bg-blue-200 text-black p-2 sticky top-[49px] z-20 text-center font-bold uppercase text-[10px] border-b border-r border-slate-300">Total</TableHead>
                 <TableHead className="bg-blue-100 text-black p-2 sticky top-[49px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">License Issued</TableHead>
-                <TableHead className="bg-blue-100 text-black p-2 sticky top-[49px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">PAID <br /><span className='font-normal'>(For Issuance)</span></TableHead>
+                <TableHead className="bg-blue-100 text-black p-2 sticky top-[49px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">PAID <br /><span className='font-normal'>(For Issuance and License Issued)</span></TableHead>
                 <TableHead className="bg-blue-100 text-black p-2 sticky top-[49px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">ONGOING <br /><span className='font-normal'>(For Payment)</span></TableHead>
                 <TableHead className="bg-blue-200 text-black p-2 sticky top-[49px] z-20 text-center font-bold uppercase text-[10px] border-b border-r border-slate-300">Total</TableHead>
                 <TableHead className="bg-blue-100 text-black p-2 sticky top-[49px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">License Issued</TableHead>
-                <TableHead className="bg-blue-100 text-black p-2 sticky top-[49px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">PAID <br /><span className='font-normal'>(For Issuance)</span></TableHead>
+                <TableHead className="bg-blue-100 text-black p-2 sticky top-[49px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">PAID <br /><span className='font-normal'>(For Issuance and License Issued)</span></TableHead>
                 <TableHead className="bg-blue-100 text-black p-2 sticky top-[49px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">ONGOING <br /><span className='font-normal'>(For Payment)</span></TableHead>
                 <TableHead className="bg-blue-200 text-black p-2 sticky top-[49px] z-20 text-center font-bold uppercase text-[10px] border-b border-r-slate-300">Total</TableHead>
               </TableRow>
@@ -256,16 +294,16 @@ const WorkingPermitReport = forwardRef<HTMLDivElement, WorkingPermitProps>(({
               {/* **DESIGN CHANGE**: Sticky footer with uniform background color */}
               <TableRow className="font-bold border-t-4 border-slate-500">
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-left" colSpan={2}><div className="font-extrabold tracking-wider text-base">GRAND TOTAL</div><div className='text-xs font-medium text-slate-300'>({dateRangeLabel})</div></TableCell>
-                <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base">{formatNumber(grandTotals.newPaid)}</TableCell>
+                <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base">{formatNumber((grandTotals.newPaid || 0) + (grandTotals.newGeoPay || 0))}</TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base">{formatNumber(grandTotals.newPaid)}</TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base">{formatNumber(grandTotals.newGeoPay)}</TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base">{formatNumber(grandTotals.newPending)}</TableCell>
-                <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base font-bold">{formatNumber(grandTotals.newPaid + grandTotals.newGeoPay + grandTotals.newPending)}</TableCell>
-                <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base">{formatNumber(grandTotals.renewalPaid)}</TableCell>
+                <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base font-bold">{formatNumber((grandTotals.newPaid || 0) + (grandTotals.newGeoPay || 0) + (grandTotals.newPending || 0))}</TableCell>
+                <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base">{formatNumber((grandTotals.renewalPaid || 0) + (grandTotals.renewalGeoPay || 0))}</TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base">{formatNumber(grandTotals.renewalPaid)}</TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base">{formatNumber(grandTotals.renewalGeoPay)}</TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base">{formatNumber(grandTotals.renewalPending)}</TableCell>
-                <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base font-bold">{formatNumber(grandTotals.renewalPaid + grandTotals.renewalGeoPay + grandTotals.renewalPending)}</TableCell>
+                <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base font-bold">{formatNumber((grandTotals.renewalPaid || 0) + (grandTotals.renewalGeoPay || 0) + (grandTotals.renewalPending || 0))}</TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base">{formatNumber(grandTotals.malePaid)}</TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base">{formatNumber(grandTotals.malePaid)}</TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base">{formatNumber(grandTotals.malePending)}</TableCell>

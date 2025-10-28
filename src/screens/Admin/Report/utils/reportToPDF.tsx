@@ -204,31 +204,48 @@ const createReportTableHeader = (
         th.style.borderBottom = "1px solid #cbd5e1";
     };
 
-    if (isBC || isCO || isBldg) {
-        const headerRow = document.createElement("tr");
-        const labels = isBC ? ["Region", "LGU", "Total Results"] : ["Region", "LGU", "Paid", "Ongoing"];
-        const widths = isBC ? columnWidths.bc : isCO ? columnWidths.co : columnWidths.bldg;
-        labels.forEach((label, idx) => {
-            const th = document.createElement("th");
-            th.textContent = label;
-            th.style.width = widths[idx];
-            th.style.background = "#9ec6f7";
-            th.style.fontWeight = "bold";
-            th.style.fontSize = "14px";
-            applyCommonStyles(th);
-            headerRow.appendChild(th);
-        });
-        thead.appendChild(headerRow);
+  if (isBC || isCO || isBldg) {
+    const headerRow = document.createElement("tr");
+    if (isBC) {
+      const labels = ["Region", "LGU", "Total Results"];
+      const widths = columnWidths.bc;
+      labels.forEach((label, idx) => {
+        const th = document.createElement("th");
+        th.textContent = label;
+        th.style.width = widths[idx];
+        th.style.background = "#9ec6f7";
+        th.style.fontWeight = "bold";
+        th.style.fontSize = "14px";
+        applyCommonStyles(th);
+        headerRow.appendChild(th);
+      });
     } else {
+      // For Certificate of Occupancy and Building Permit, include License Issued and eGOV columns
+      const labels = ["Region", "LGU", "License Issued", "PAID", "PAID (eGOVPay)", "ONGOING", "Total"];
+      const widths = ["12%", "30%", "10%", "10%", "10%", "14%", "14%"];
+      labels.forEach((label, idx) => {
+        const th = document.createElement("th");
+        th.textContent = label;
+        th.style.width = widths[idx] || "auto";
+        th.style.background = "#9ec6f7";
+        th.style.fontWeight = "bold";
+        th.style.fontSize = "14px";
+        applyCommonStyles(th);
+        headerRow.appendChild(th);
+      });
+    }
+    thead.appendChild(headerRow);
+  } else {
         const headerRow1 = document.createElement("tr");
-        const mainHeaders = [
-            { label: "Region", rowSpan: 2 },
-            { label: "LGU", rowSpan: 2 },
-            { label: "New", colSpan: 4 },
-            { label: "Renewal", colSpan: 4 },
-            { label: "Male", colSpan: 3 },
-            { label: "Female", colSpan: 3 },
-        ];
+    const mainHeaders = [
+      { label: "Region", rowSpan: 2 },
+      { label: "LGU", rowSpan: 2 },
+      // Note: include License Issued as an explicit computed column for New and Renewal (colSpan 5)
+      { label: "New", colSpan: 5 },
+      { label: "Renewal", colSpan: 5 },
+      { label: "Male", colSpan: 3 },
+      { label: "Female", colSpan: 3 },
+    ];
 
         mainHeaders.forEach(header => {
             const th = document.createElement("th");
@@ -249,22 +266,27 @@ const createReportTableHeader = (
         thead.appendChild(headerRow1);
 
         const headerRow2 = document.createElement("tr");
-        const subHeaders = [
-            { label: "PAID", isTotal: false },
-            { label: "PAID <br /> <span style='font-weight:500;'>(eGOVPay)</span>", isTotal: false },
-            { label: "ONGOING", isTotal: false },
-            { label: "Total", isTotal: true },
-            { label: "PAID", isTotal: false },
-            { label: "PAID <br /> <span style='font-weight:500;'>(eGOVPay)</span>", isTotal: false },
-            { label: "ONGOING", isTotal: false },
-            { label: "Total", isTotal: true },
-            { label: "PAID", isTotal: false },
-            { label: "ONGOING", isTotal: false },
-            { label: "Total", isTotal: true },
-            { label: "PAID", isTotal: false },
-            { label: "ONGOING", isTotal: false },
-            { label: "Total", isTotal: true },
-        ];
+    const subHeaders = [
+      // New group: License Issued, PAID (For Issuance), PAID (eGOVPay), ONGOING, Total
+      { label: "License Issued", isTotal: false },
+      { label: "PAID <br /> <span style='font-weight: 500;'>(For Issuance and License Issued)</span>", isTotal: false },
+      { label: "PAID <br /> <span style='font-weight:500;'>(eGOVPay)</span>", isTotal: false },
+      { label: "ONGOING", isTotal: false },
+      { label: "Total", isTotal: true },
+      // Renewal group: same ordering
+      { label: "License Issued", isTotal: false },
+      { label: "PAID <br /> <span style='font-weight: 500;'>(For Issuance and License Issued)</span>", isTotal: false },
+      { label: "PAID <br /> <span style='font-weight:500;'>(eGOVPay)</span>", isTotal: false },
+      { label: "ONGOING", isTotal: false },
+      { label: "Total", isTotal: true },
+      // Male and Female groups unchanged
+      { label: "PAID <br /> <span style='font-weight: 500;'>(For Issuance and License Issued)</span>", isTotal: false },
+      { label: "ONGOING", isTotal: false },
+      { label: "Total", isTotal: true },
+      { label: "PAID <br /> <span style='font-weight: 500;'>(For Issuance and License Issued)</span>", isTotal: false },
+      { label: "ONGOING", isTotal: false },
+      { label: "Total", isTotal: true },
+    ];
 
         subHeaders.forEach(header => {
             const th = document.createElement("th");
@@ -313,55 +335,99 @@ const createReportGrandTotalRow = (
     }, 0);
     totalTr.appendChild(makeTd(total, commonProps));
   } else if (isCO || isBldg) {
-    const pendingKey = isCO ? "coPending" : "buildingPending";
-    const paidKey = isCO ? "coPaid" : "buildingPaid";
-    const totals = filteredResults.reduce((acc, lgu) => {
-        if (isDayMode) {
-            (lgu.monthlyResults || []).forEach((month: any) => {
-                acc.paid += month[paidKey] || 0;
-                acc.pending += month[pendingKey] || 0;
-            });
-        } else {
-            acc.paid += lgu.sum?.[paidKey] || 0;
-            acc.pending += lgu.sum?.[pendingKey] || 0;
-        }
-        return acc;
-    }, { paid: 0, pending: 0 });
-    
-    totalTr.appendChild(makeTd(totals.paid, commonProps));
-    totalTr.appendChild(makeTd(totals.pending, commonProps));
-  } else {
-    const totals = filteredResults.reduce((acc, lgu) => {
-      const dataToSum = isDayMode ? lgu.monthlyResults || [] : lgu.sum ? [lgu.sum] : [];
-      dataToSum.forEach((s: any) => {
-        acc.newPaid += s.newPaid || 0;
-        acc.newGeoPay += s.newPaidViaEgov || 0;
-        acc.newPending += s.newPending || 0;
-        acc.renewalPaid += s.renewPaid || 0;
-        acc.renewalGeoPay += s.renewPaidViaEgov || 0;
-        acc.renewalPending += s.renewPending || 0;
-        acc.malePaid += s.malePaid || 0;
-        acc.malePending += s.malePending || 0;
-        acc.femalePaid += s.femalePaid || 0;
-        acc.femalePending += s.femalePending || 0;
+  const pendingKey = isCO ? "coPending" : "buildingPending";
+  const paidKey = isCO ? "coPaid" : "buildingPaid";
+  const geoKey = isCO ? "coPaidViaEgov" : "buildingPaidViaEgov";
+  const totals = filteredResults.reduce((acc, lgu) => {
+    if (isDayMode) {
+      (lgu.monthlyResults || []).forEach((month: any) => {
+        acc.paid += Number(month[paidKey] || 0);
+        acc.geo += Number(month[geoKey] || 0);
+        acc.pending += Number(month[pendingKey] || 0);
       });
-      return acc;
-    }, { newPaid: 0, newGeoPay: 0, newPending: 0, renewalPaid: 0, renewalGeoPay: 0, renewalPending: 0, malePaid: 0, malePending: 0, femalePaid: 0, femalePending: 0 });
+    } else {
+      acc.paid += Number(lgu.sum?.[paidKey] || 0);
+      acc.geo += Number(lgu.sum?.[geoKey] || 0);
+      acc.pending += Number(lgu.sum?.[pendingKey] || 0);
+    }
+    return acc;
+  }, { paid: 0, geo: 0, pending: 0 });
 
-    totalTr.appendChild(makeTd(totals.newPaid, commonProps));
-    totalTr.appendChild(makeTd(totals.newGeoPay, commonProps));
-    totalTr.appendChild(makeTd(totals.newPending, commonProps));
-    totalTr.appendChild(makeTd(totals.newPaid + totals.newGeoPay + totals.newPending, commonProps));
-    totalTr.appendChild(makeTd(totals.renewalPaid, commonProps));
-    totalTr.appendChild(makeTd(totals.renewalGeoPay, commonProps));
-    totalTr.appendChild(makeTd(totals.renewalPending, commonProps));
-    totalTr.appendChild(makeTd(totals.renewalPaid + totals.renewalGeoPay + totals.renewalPending, commonProps));
-    totalTr.appendChild(makeTd(totals.malePaid, commonProps));
-    totalTr.appendChild(makeTd(totals.malePending, commonProps));
-    totalTr.appendChild(makeTd(totals.malePaid + totals.malePending, commonProps));
-    totalTr.appendChild(makeTd(totals.femalePaid, commonProps));
-    totalTr.appendChild(makeTd(totals.femalePending, commonProps));
-    totalTr.appendChild(makeTd(totals.femalePaid + totals.femalePending, commonProps));
+  const licenseTotal = (totals.paid || 0) + (totals.geo || 0);
+  const overallTotal = licenseTotal + (totals.pending || 0);
+
+  // Output: License Issued, Paid, Paid (eGOV), Ongoing, Total
+  totalTr.appendChild(makeTd(licenseTotal, commonProps));
+  totalTr.appendChild(makeTd(totals.paid, commonProps));
+  totalTr.appendChild(makeTd(totals.geo, commonProps));
+  totalTr.appendChild(makeTd(totals.pending, commonProps));
+  totalTr.appendChild(makeTd(overallTotal, commonProps));
+    } else {
+      // Sum the base totals first. Compute license-issued per-entry (paid + eGOV)
+      // to ensure the grand "License Issued" matches the per-row computed value.
+      const totals = filteredResults.reduce((acc, lgu) => {
+        // Use monthly entries if day mode. Otherwise prefer lgu.sum but fall back
+        // to top-level lgu object (some datasets store aggregated sums on the root LGU).
+        const dataToSum = isDayMode ? (lgu.monthlyResults || []) : (lgu.sum ? [lgu.sum] : [lgu]);
+        dataToSum.forEach((s: any) => {
+          // Defensive access for possible key variations; prefer explicit fields used when rendering rows
+          const nPaid = Number(s.newPaid || s.new_paid || 0);
+          const nGeo = Number(s.newPaidViaEgov || s.newPaidViaEGov || 0);
+          const nPending = Number(s.newPending || s.new_pending || 0);
+
+          const rPaid = Number(s.renewPaid || s.renew_paid || 0);
+          const rGeo = Number(s.renewPaidViaEgov || s.renewPaidViaEGov || 0);
+          const rPending = Number(s.renewPending || s.renew_pending || 0);
+
+          acc.newPaid += nPaid;
+          acc.newGeo += nGeo;
+          acc.newPending += nPending;
+
+          acc.renewalPaid += rPaid;
+          acc.renewalGeo += rGeo;
+          acc.renewalPending += rPending;
+
+          acc.malePaid += Number(s.malePaid || s.male_paid || 0);
+          acc.malePending += Number(s.malePending || s.male_pending || 0);
+          acc.femalePaid += Number(s.femalePaid || s.female_paid || 0);
+          acc.femalePending += Number(s.femalePending || s.female_pending || 0);
+        });
+        return acc;
+      }, {
+        newPaid: 0, newGeo: 0, newPending: 0,
+        renewalPaid: 0, renewalGeo: 0, renewalPending: 0,
+        malePaid: 0, malePending: 0, femalePaid: 0, femalePending: 0,
+      });
+
+      // Now, calculate the derived totals from the aggregated sums
+      const newLicenseTotal = totals.newPaid + totals.newGeo;
+      const newOverallTotal = newLicenseTotal + totals.newPending;
+      const renewalLicenseTotal = totals.renewalPaid + totals.renewalGeo;
+      const renewalOverallTotal = renewalLicenseTotal + totals.renewalPending;
+      const maleTotal = totals.malePaid + totals.malePending;
+      const femaleTotal = totals.femalePaid + totals.femalePending;
+
+      // New group: License Issued, Paid, eGOV, Pending, Total
+      totalTr.appendChild(makeTd(newLicenseTotal, commonProps));
+      totalTr.appendChild(makeTd(totals.newPaid, commonProps));
+      totalTr.appendChild(makeTd(totals.newGeo, commonProps));
+      totalTr.appendChild(makeTd(totals.newPending, commonProps));
+      totalTr.appendChild(makeTd(newOverallTotal, commonProps));
+
+      // Renewal group: License Issued, Paid, eGOV, Pending, Total
+      totalTr.appendChild(makeTd(renewalLicenseTotal, commonProps));
+      totalTr.appendChild(makeTd(totals.renewalPaid, commonProps));
+      totalTr.appendChild(makeTd(totals.renewalGeo, commonProps));
+      totalTr.appendChild(makeTd(totals.renewalPending, commonProps));
+      totalTr.appendChild(makeTd(renewalOverallTotal, commonProps));
+
+      // Male and Female groups
+      totalTr.appendChild(makeTd(totals.malePaid, commonProps));
+      totalTr.appendChild(makeTd(totals.malePending, commonProps));
+      totalTr.appendChild(makeTd(maleTotal, commonProps));
+      totalTr.appendChild(makeTd(totals.femalePaid, commonProps));
+      totalTr.appendChild(makeTd(totals.femalePending, commonProps));
+      totalTr.appendChild(makeTd(femaleTotal, commonProps));
   }
   if (!isLastPage) totalTr.style.visibility = "hidden";
   return totalTr;
@@ -440,26 +506,54 @@ const createPageContent = (
       const src = isDayMode ? row.monthData : (row.lgu?.sum ?? row.lgu ?? {});
       const pendingKey = isCO ? "coPending" : "buildingPending";
       const paidKey = isCO ? "coPaid" : "buildingPaid";
-      tr.appendChild(makeTd(src?.[paidKey] ?? 0, { striped: isStriped, fontSize: "14px", bold: true, color: '#166534' }));
-      tr.appendChild(makeTd(src?.[pendingKey] ?? 0, { striped: isStriped, fontSize: "14px", bold: true, color: '#1d4ed8' }));
+      const geoKey = isCO ? "coPaidViaEgov" : "buildingPaidViaEgov";
+
+      const paid = Number(src?.[paidKey] ?? 0);
+      const geo = Number(src?.[geoKey] ?? 0);
+      const pending = Number(src?.[pendingKey] ?? 0);
+      const license = paid + geo;
+      const total = license + pending;
+
+      tr.appendChild(makeTd(license, { striped: isStriped, fontSize: "14px", bold: true, color: '#0f172a' }));
+      tr.appendChild(makeTd(paid, { striped: isStriped, fontSize: "14px", bold: true, color: '#166534' }));
+      tr.appendChild(makeTd(geo, { striped: isStriped, fontSize: "14px", bold: true, color: '#0ea5a4' }));
+      tr.appendChild(makeTd(pending, { striped: isStriped, fontSize: "14px", bold: true, color: '#1d4ed8' }));
+      tr.appendChild(makeTd(total, { striped: isStriped, fontSize: "14px", bold: true, color: '#0b1220' }));
     } else {
       const data = isDayMode ? row.monthData : (row.lgu?.sum || {});
-      const cellOpts = { striped: isStriped, fontSize: "14px", bold: true };
+        const cellOpts = { striped: isStriped, fontSize: "14px", bold: true };
 
-      tr.appendChild(makeTd(data?.newPaid ?? 0, cellOpts));
-      tr.appendChild(makeTd(data?.newPaidViaEgov ?? 0, cellOpts));
-      tr.appendChild(makeTd(data?.newPending ?? 0, cellOpts));
-      tr.appendChild(makeTd((data?.newPaid ?? 0) + (data?.newPaidViaEgov ?? 0) + (data?.newPending ?? 0), cellOpts));
-      tr.appendChild(makeTd(data?.renewPaid ?? 0, cellOpts));
-      tr.appendChild(makeTd(data?.renewPaidViaEgov ?? 0, cellOpts));
-      tr.appendChild(makeTd(data?.renewPending ?? 0, cellOpts));
-      tr.appendChild(makeTd((data?.renewPaid ?? 0) + (data?.renewPaidViaEgov ?? 0) + (data?.renewPending ?? 0), cellOpts));
-      tr.appendChild(makeTd(data?.malePaid ?? 0, cellOpts));
-      tr.appendChild(makeTd(data?.malePending ?? 0, cellOpts));
-      tr.appendChild(makeTd((data?.malePaid ?? 0) + (data?.malePending ?? 0), cellOpts));
-      tr.appendChild(makeTd(data?.femalePaid ?? 0, cellOpts));
-      tr.appendChild(makeTd(data?.femalePending ?? 0, cellOpts));
-      tr.appendChild(makeTd((data?.femalePaid ?? 0) + (data?.femalePending ?? 0), cellOpts));
+        // Compute License Issued = paid + eGOV for New
+        const newPaid = data?.newPaid ?? 0;
+        const newGeo = data?.newPaidViaEgov ?? 0;
+        const newPending = data?.newPending ?? 0;
+        const newLicenseIssued = newPaid + newGeo;
+        const newTotal = newLicenseIssued + newPending;
+        tr.appendChild(makeTd(newLicenseIssued, cellOpts));
+        tr.appendChild(makeTd(newPaid, cellOpts));
+        tr.appendChild(makeTd(newGeo, cellOpts));
+        tr.appendChild(makeTd(newPending, cellOpts));
+        tr.appendChild(makeTd(newTotal, cellOpts));
+
+        // Renewal: License Issued = renewPaid + renewPaidViaEgov
+        const renewPaid = data?.renewPaid ?? 0;
+        const renewGeo = data?.renewPaidViaEgov ?? 0;
+        const renewPending = data?.renewPending ?? 0;
+        const renewLicenseIssued = renewPaid + renewGeo;
+        const renewTotal = renewLicenseIssued + renewPending;
+        tr.appendChild(makeTd(renewLicenseIssued, cellOpts));
+        tr.appendChild(makeTd(renewPaid, cellOpts));
+        tr.appendChild(makeTd(renewGeo, cellOpts));
+        tr.appendChild(makeTd(renewPending, cellOpts));
+        tr.appendChild(makeTd(renewTotal, cellOpts));
+
+        // Male / Female groups remain the same
+        tr.appendChild(makeTd(data?.malePaid ?? 0, cellOpts));
+        tr.appendChild(makeTd(data?.malePending ?? 0, cellOpts));
+        tr.appendChild(makeTd((data?.malePaid ?? 0) + (data?.malePending ?? 0), cellOpts));
+        tr.appendChild(makeTd(data?.femalePaid ?? 0, cellOpts));
+        tr.appendChild(makeTd(data?.femalePending ?? 0, cellOpts));
+        tr.appendChild(makeTd((data?.femalePaid ?? 0) + (data?.femalePending ?? 0), cellOpts));
     }
     tbodyChunk.appendChild(tr);
   });

@@ -270,10 +270,10 @@ export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal)
                 { content: 'FEMALE', colSpan: 4, styles: commonColSpanStyles }
             ],
             [
-                'License Issued', 'PAID\n(For Issuance)', 'PAID\n(eGOVPay)', 'ONGOING\n(For Payment)', 'Total',
-                'License Issued', 'PAID\n(For Issuance)', 'PAID\n(eGOVPay)', 'ONGOING\n(For Payment)', 'Total',
-                'License Issued', 'PAID\n(For Issuance)', 'ONGOING\n(For Payment)', 'Total',
-                'License Issued', 'PAID\n(For Issuance)', 'ONGOING\n(For Payment)', 'Total'
+                'License Issued', 'PAID\n(For Issuance and License Issued)', 'PAID\n(eGOVPay)', 'ONGOING\n(For Payment)', 'Total',
+                'License Issued', 'PAID\n(For Issuance and License Issued)', 'PAID\n(eGOVPay)', 'ONGOING\n(For Payment)', 'Total',
+                'License Issued', 'PAID\n(For Issuance and License Issued)', 'ONGOING\n(For Payment)', 'Total',
+                'License Issued', 'PAID\n(For Issuance and License Issued)', 'ONGOING\n(For Payment)', 'Total'
             ]
         ];
     } else if (moduleLabel === 'Barangay Clearance') {
@@ -290,7 +290,7 @@ export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal)
                 { content: 'LGU', rowSpan: 2, styles: { ...commonRowSpanStyles, halign: 'left' } },
                 { content: title, colSpan: 4, styles: commonColSpanStyles },
             ],
-            ['License Issued', 'PAID\n(For Issuance)', 'ONGOING\n(For Payment)', 'Total']
+            ['License Issued', 'PAID\n(For Issuance and License Issued)', 'ONGOING\n(For Payment)', 'Total']
         ];
     }
 
@@ -333,9 +333,10 @@ export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal)
 
     let grandTotalRow: any[] | null = null;
     if (allRows.length > 0) {
-        if (isComplex) {
-            const licenseIssuedNewTotal = moduleLabel === 'Business Permit' ? totals.newPaid : totals.newIssued;
-            const licenseIssuedRenewalTotal = moduleLabel === 'Business Permit' ? totals.renewalPaid : totals.renewalIssued;
+    if (isComplex) {
+      // License Issued should always be paid + eGOV (newIssued / renewalIssued)
+      const licenseIssuedNewTotal = totals.newIssued;
+      const licenseIssuedRenewalTotal = totals.renewalIssued;
             grandTotalRow = [ { content: `GRAND TOTAL\n(${dateRangeLabel})`, colSpan: 2 },
                 formatNumberForDisplay(licenseIssuedNewTotal), formatNumberForDisplay(totals.newPaid), formatNumberForDisplay(totals.newGeoPay), formatNumberForDisplay(totals.newPending), formatNumberForDisplay(totals.newPaid + totals.newGeoPay + totals.newPending),
                 formatNumberForDisplay(licenseIssuedRenewalTotal), formatNumberForDisplay(totals.renewalPaid), formatNumberForDisplay(totals.renewalGeoPay), formatNumberForDisplay(totals.renewalPending), formatNumberForDisplay(totals.renewalPaid + totals.renewalGeoPay + totals.renewalPending),
@@ -368,10 +369,11 @@ export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal)
             headStyles: { fontStyle: 'bold', fillColor: '#9ec6f7', textColor: '#000000', lineWidth: 0.5, lineColor: '#a5b4fc', halign: 'center', valign: 'middle', fontSize: 7.5 },
             bodyStyles: { fillColor: '#FFFFFF', textColor: '#111827' },
             alternateRowStyles: { fillColor: '#f8fafc' },
-            columnStyles: {
-                0: { cellWidth: 60, halign: 'center' },
-                1: { fontStyle: 'bold' },
-            },
+      columnStyles: {
+    // Keep REGION narrow and give LGU more room for complex modules (Business/Working Permit)
+    0: { cellWidth: 60, halign: 'center' },
+    1: isComplex ? { cellWidth: 115, halign: 'left', fontStyle: 'bold' } : { fontStyle: 'bold' },
+      },
             didParseCell: (data: any) => {
                 const isGrandTotalRow = data.row?.raw?.[0]?.content?.startsWith('GRAND TOTAL');
                 if (data.section === 'head') {
@@ -485,7 +487,7 @@ export const exportReportToExcel = (params: ExcelParams, signal?: AbortSignal) =
     if (isComplex) {
         headers = [
             ['Region', 'LGU', 'New', null, null, null, null, 'Renewal', null, null, null, null, 'Male', null, null, null, 'Female', null, null, null],
-            [null, null, 'License Issued', 'PAID\n(For Issuance to License Issued)', 'PAID (eGOVPay)\n(For Issuance to License Issued)', 'ONGOING\n(For verification to For Payment)', 'Total', 'License Issued', 'PAID\n(For Issuance to License Issued)', 'PAID (eGOVPay)\n(For Issuance to License Issued)', 'ONGOING\n(For verification to For Payment)', 'Total', 'License Issued', 'PAID\n(For Issuance to License Issued)', 'ONGOING\n(For verification to For Payment)', 'Total', 'License Issued', 'PAID\n(For Issuance to License Issued)', 'ONGOING\n(For verification to For Payment)', 'Total']
+            [null, null, 'License Issued', 'PAID\n(For Issuance to License Issued)', 'PAID (eGOVPay)\n', 'ONGOING\n(For verification to For Payment)', 'Total', 'License Issued', 'PAID\n(For Issuance to License Issued)', 'PAID (eGOVPay)\n', 'ONGOING\n(For verification to For Payment)', 'Total', 'License Issued', 'PAID\n(For Issuance to License Issued)', 'ONGOING\n(For verification to For Payment)', 'Total', 'License Issued', 'PAID\n(For Issuance to License Issued)', 'ONGOING\n(For verification to For Payment)', 'Total']
         ];
     } else {
         headers = [
@@ -545,9 +547,10 @@ export const exportReportToExcel = (params: ExcelParams, signal?: AbortSignal) =
 
     if (allRows.length > 0) {
         let totalRow: any[];
-        if (isComplex) {
-            const licenseIssuedNewTotal = moduleLabel === 'Business Permit' ? totals.newPaid : totals.newIssued;
-            const licenseIssuedRenewalTotal = moduleLabel === 'Business Permit' ? totals.renewalPaid : totals.renewalIssued;
+    if (isComplex) {
+      // Use the computed 'Issued' totals (paid + eGOV) for grand totals
+      const licenseIssuedNewTotal = totals.newIssued;
+      const licenseIssuedRenewalTotal = totals.renewalIssued;
             totalRow = [ 'GRAND TOTAL', null, licenseIssuedNewTotal, totals.newPaid, totals.newGeoPay, totals.newPending, (totals.newPaid + totals.newGeoPay + totals.newPending), licenseIssuedRenewalTotal, totals.renewalPaid, totals.renewalGeoPay, totals.renewalPending, (totals.renewalPaid + totals.renewalGeoPay + totals.renewalPending), totals.maleIssued, totals.malePaid, totals.malePending, (totals.malePaid + totals.malePending), totals.femaleIssued, totals.femalePaid, totals.femalePending, (totals.femalePaid + totals.femalePending) ];
             merges.push({ s: { r: currentRowIndex, c: 0 }, e: { r: currentRowIndex, c: 1 } });
         } else {
@@ -569,7 +572,8 @@ export const exportReportToExcel = (params: ExcelParams, signal?: AbortSignal) =
     }
     ws['!merges'] = merges;
     const lastHeaderRow = headers[headers.length - 1];
-    ws['!cols'] = lastHeaderRow.map((_c: any, idx: number) => ({ wch: idx <= 1 ? 22 : 24 }));
+  // Make LGU column wider in Excel output only for complex modules (Business/Working Permit)
+  ws['!cols'] = lastHeaderRow.map((_c: any, idx: number) => ({ wch: idx === 0 ? 22 : idx === 1 ? (isComplex ? 40 : 24) : 24 }));
 
     const wb = xlsx.utils.book_new();
     xlsx.utils.book_append_sheet(wb, ws, 'Report');

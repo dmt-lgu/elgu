@@ -26,8 +26,6 @@ import { setWp, selectWp } from '@/redux/wpSlice';
 import { setBrgy, selectBrgy } from '@/redux/brgySlice';
 import { setStatus } from '@/redux/statusSlice';
 import axios2 from "./../../plugin/axios2";
-import AdminProgressIndicator from './Dashboard/components/AdminProgressIndicator';
-import './Dashboard/components/css/ProgressLoader.css';
 
 const regionMapping = [
   { id: "region1", text: "I", municipalities: [] },
@@ -525,22 +523,6 @@ function Admin() {
   const brgy = useSelector(selectBrgy);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Admin-level progress state (persist while Admin is mounted)
-  const [adminProgress, setAdminProgress] = useState<{[key: string]: { currentRegion: string; currentIndex: number; totalRegions: number } | null}>({});
-  const [adminModuleCounts, setAdminModuleCounts] = useState<{[key: string]: number}>({
-    BuildingPermit: 0,
-    BusinessPermit: 0,
-    BrgyClearance: 0,
-    CertificateOfOccupancy: 0,
-    WorkingPermit: 0,
-  });
-  const [adminModuleLoading, setAdminModuleLoading] = useState<{[key: string]: boolean}>({});
-
-  // Report-level progress (persist while Admin is mounted so Reports indicator survives navigation)
-  const [reportProgress, setReportProgress] = useState<{[key: string]: { currentRegion: string; currentIndex: number; totalRegions: number } | null}>({});
-  const [reportModuleCounts, setReportModuleCounts] = useState<{[key: string]: number}>({});
-  const [reportModuleLoading, setReportModuleLoading] = useState<{[key: string]: boolean}>({});
-
   const controllerRef = useRef<AbortController | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -559,7 +541,7 @@ function Admin() {
   // Make resetFirstRun available globally for testing
   (window as any).resetFirstRun = resetFirstRun;
 
-  const [regionStats, setRegionStats] = useState<any[]>([0,17]);
+  const [regionStats, setRegionStats] = useState<any[]>([]);
 
   function fetchRegions() {
     dispatch(setLoad(true));
@@ -1076,14 +1058,6 @@ function Admin() {
     let allBRGYResults: any[] = [];
     let totalLguCount = 0;
     let processedRegions = 0;
-    // Track processed count per module for progress updates
-    const processedCounts: { [key: string]: number } = {
-      bp: 0,
-      wp: 0,
-      bpco: 0,
-      bpbp: 0,
-      brgy: 0,
-    };
 
     const processBatch = async (batch: string[], batchIndex: number) => {
       try {
@@ -1217,38 +1191,6 @@ function Admin() {
         
         // Update processed regions count
         processedRegions += batch.length;
-
-        // Update per-module processedCounts and emit progress events
-        responses.forEach(response => {
-          const type = response.type;
-          if (!processedCounts[type]) processedCounts[type] = 0;
-          processedCounts[type] += batch.length;
-
-          // Map API response type to dashboard progress key
-          const typeToKey: { [k: string]: string } = {
-            bp: 'BusinessPermit',
-            wp: 'WorkingPermit',
-            bpco: 'CertificateOfOccupancy',
-            bpbp: 'BuildingPermit',
-            brgy: 'BrgyClearance',
-          };
-
-          const moduleKey = typeToKey[type] || type;
-          try {
-            // Determine LGU count per module
-            const lguCounts: any = {
-              bp: allBPResults.length,
-              wp: allWPResults.length,
-              bpco: allBPCOResults.length,
-              bpbp: allBPBPResults.length,
-              brgy: allBRGYResults.length,
-            };
-            const progressEvent = new CustomEvent('admin-progress', { detail: { moduleKey, currentRegion: batch[0], currentIndex: processedCounts[type], totalRegions, lguCount: lguCounts[type] || 0 } });
-            window.dispatchEvent(progressEvent);
-          } catch (e) {
-            // ignore
-          }
-        });
 
         // Merge results from all modules by LGU
         const mergedResults = mergeModuleResults(allBPResults, allWPResults, allBPCOResults, allBPBPResults, allBRGYResults);
@@ -1444,14 +1386,9 @@ function Admin() {
   }
 
   useEffect(() => {
-    // Progress state for AdminProgressIndicator (persist at Admin level)
-    // Initialize here so it persists across child routes
     // Event listener for manual filter trigger
     const handleFilterTrigger = () => {
       if (data.locationName.length !== 0 && data.startDate && data.endDate) {
-        // Reset module counts to 0 when user triggers a new run
-        const resetEvent = new CustomEvent('admin-reset-progress');
-        window.dispatchEvent(resetEvent);
         GetTransaction();
       }
     };
@@ -1467,9 +1404,9 @@ function Admin() {
       console.log("Request canceled by user");
     };
 
-  // Add event listeners
-  window.addEventListener('triggerFilterAPI', handleFilterTrigger);
-  window.addEventListener('cancelFilterAPI', handleCancelRequest);
+    // Add event listeners
+    window.addEventListener('triggerFilterAPI', handleFilterTrigger);
+    window.addEventListener('cancelFilterAPI', handleCancelRequest);
 
     // Auto-trigger on first run if data is ready
     const isFirstRun = localStorage.getItem('elgu_first_run');
@@ -1490,64 +1427,6 @@ function Admin() {
     };
   }, [data.startDate, data.endDate, data.modules, data.locationName]); // Added data.locationName back to dependencies for auto-trigger
 
-  // Listen to admin-progress updates and reset events to maintain admin-level progress
-  useEffect(() => {
-    const progressHandler = (e: Event) => {
-      const detail: any = (e as CustomEvent).detail || {};
-      if (!detail.moduleKey) return;
-      const key = detail.moduleKey.replace(/\s+/g, '');
-      setAdminProgress(prev => ({
-        ...prev,
-        [key]: {
-          currentRegion: detail.currentRegion || '',
-          currentIndex: detail.currentIndex || 0,
-          totalRegions: detail.totalRegions || (prev[key]?.totalRegions || 17),
-        }
-      }));
-      setAdminModuleLoading(prev => ({ ...prev, [key]: (detail.currentIndex || 0) < (detail.totalRegions || ((prev as any)[key]?.totalRegions || 17)) }));
-      if (typeof detail.lguCount === 'number') setAdminModuleCounts(prev => ({ ...prev, [key]: detail.lguCount }));
-    };
-
-    const reportProgressHandler = (e: Event) => {
-      const detail: any = (e as CustomEvent).detail || {};
-      if (!detail.moduleKey) return;
-      const key = detail.moduleKey.replace(/\s+/g, '');
-      setReportProgress(prev => ({
-        ...prev,
-        [key]: {
-          currentRegion: detail.currentRegion || '',
-          currentIndex: detail.currentIndex || 0,
-          totalRegions: detail.totalRegions || (prev[key]?.totalRegions || 17),
-        }
-      }));
-      setReportModuleLoading(prev => ({ ...prev, [key]: (detail.currentIndex || 0) < (detail.totalRegions || ((prev as any)[key]?.totalRegions || 17)) }));
-      if (typeof detail.lguCount === 'number') setReportModuleCounts(prev => ({ ...prev, [key]: detail.lguCount }));
-    };
-
-    const resetHandler = () => {
-      setAdminModuleCounts({ BuildingPermit:0, BusinessPermit:0, BrgyClearance:0, CertificateOfOccupancy:0, WorkingPermit:0 });
-      setAdminProgress({});
-      setAdminModuleLoading({});
-    };
-
-    const reportResetHandler = () => {
-      setReportModuleCounts({});
-      setReportProgress({});
-      setReportModuleLoading({});
-    };
-
-    window.addEventListener('admin-progress', progressHandler as EventListener);
-    window.addEventListener('admin-reset-progress', resetHandler as EventListener);
-    window.addEventListener('report-progress', reportProgressHandler as EventListener);
-    window.addEventListener('report-reset-progress', reportResetHandler as EventListener);
-    return () => {
-      window.removeEventListener('admin-progress', progressHandler as EventListener);
-      window.removeEventListener('admin-reset-progress', resetHandler as EventListener);
-      window.removeEventListener('report-progress', reportProgressHandler as EventListener);
-      window.removeEventListener('report-reset-progress', reportResetHandler as EventListener);
-    };
-  }, []);
-
   useEffect(() => {
     // Clear storage if needed to prevent quota errors
     clearStorageIfNeeded();
@@ -1567,6 +1446,13 @@ function Admin() {
     }
   }, []);
 
+  useEffect(() => {
+    // Sequential loading with delay to optimize resource usage
+    loadModulesSequentially();
+  }, []);
+  
+ const locations: string[] = Array.isArray(data.real) ? data.real : [data.real];
+const totalRegions = locations.length;
   return (
     <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme">
       <div className="flex h-screen">
@@ -1673,31 +1559,6 @@ function Admin() {
             <Outlet />
           </div>
         </div>
-          {/* Admin-level Progress Indicator (only on dashboard route) */}
-          {location.pathname === "/elgu/admin/dashboard" && (
-            <AdminProgressIndicator
-              isLoading={isLoading}
-              progress={adminProgress}
-              counts={adminModuleCounts}
-              moduleLoading={adminModuleLoading}
-              onModuleClick={(moduleKey) => {
-                const el = document.getElementById(moduleKey);
-                if (el) el.scrollIntoView({ behavior: 'smooth' });
-              }}
-            />
-          )}
-          {location.pathname === "/elgu/admin/report" && (
-            <AdminProgressIndicator
-              isLoading={isLoading}
-              progress={reportProgress}
-              counts={reportModuleCounts}
-              moduleLoading={reportModuleLoading}
-              onModuleClick={(moduleKey) => {
-                const el = document.getElementById(moduleKey);
-                if (el) el.scrollIntoView({ behavior: 'smooth' });
-              }}
-            />
-          )}
       </div>
 
   {/* Floating Cancel Button (Dashboard only) */}
@@ -1722,7 +1583,7 @@ function Admin() {
           }}
           className="fixed bottom-4 text-xs right-4 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-full shadow-lg z-50"
         >
-          Cancel Request ({regionStats[0]} / {regionStats[1]})  <Loader2Icon className="inline w-4 h-4 animate-spin ml-2" />
+          Cancel Request ({regionStats[0] ? regionStats[0] : 0} / {totalRegions})  <Loader2Icon className="inline w-4 h-4 animate-spin ml-2" />
         </button>
       )}
     </ThemeProvider>
