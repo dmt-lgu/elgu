@@ -4,9 +4,6 @@ declare global {
   interface Window {
     google: {
       accounts: {
-        id: {
-          initialize: (config: any) => void;
-        };
         oauth2: {
           initTokenClient: (config: any) => { requestAccessToken: () => void };
         };
@@ -15,7 +12,7 @@ declare global {
   }
 }
 
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || 'YOUR_CLIENT_ID_HERE';
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 const GOOGLE_API_SCOPE = 'https://www.googleapis.com/auth/spreadsheets.readonly';
 
 axios.defaults.baseURL = `https://sheets.googleapis.com/v4/spreadsheets/`;
@@ -25,77 +22,82 @@ axios.defaults.headers.post['Content-Type'] = 'application/json';
 // Add access token to all requests
 axios.interceptors.request.use((config) => {
   const token = localStorage.getItem('google_access_token');
+  
+  console.log('Axios Request:', {
+    url: config.url,
+    hasToken: !!token,
+  });
+  
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
 
-// Handle 401 errors - token might be expired
+// Handle errors
 axios.interceptors.response.use(
   (response) => response,
-  async (error) => {
-    const originalRequest = error.config;
-    
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
-      try {
-        // Try to get a new token
-        await loginWithGoogle();
-        const token = localStorage.getItem('google_access_token');
-        if (token) {
-          originalRequest.headers.Authorization = `Bearer ${token}`;
-          return axios(originalRequest);
-        }
-      } catch (err) {
-        console.error('Failed to refresh token:', err);
-      }
-    }
+  (error) => {
+    console.error('Axios Response Error:', {
+      status: error.response?.status,
+      message: error.response?.data?.error?.message,
+      code: error.response?.data?.error?.code,
+      url: error.response?.config?.url
+    });
     return Promise.reject(error);
   }
 );
 
 // Initialize Google API
 export const initializeGoogleAuth = (): Promise<void> => {
-  return new Promise<void>((resolve, reject) => {
-    if (window.google?.accounts?.id) {
-      resolve();
-    } else {
-      const script = document.createElement('script');
-      script.src = 'https://accounts.google.com/gsi/client';
-      script.async = true;
-      script.defer = true;
-      script.onload = () => resolve();
-      script.onerror = () => reject(new Error('Failed to load Google Sign-In'));
-      document.head.appendChild(script);
-    }
+  return new Promise<void>((resolve) => {
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    script.onload = () => resolve();
+    document.head.appendChild(script);
   });
 };
 
 // Login with Google
 export const loginWithGoogle = (): Promise<string> => {
   return new Promise<string>((resolve, reject) => {
-    window.google?.accounts?.oauth2?.initTokenClient({
+    console.log('Attempting to login with Google...');
+    
+    if (!window.google?.accounts?.oauth2) {
+      reject(new Error('Google API not loaded'));
+      return;
+    }
+
+    const tokenClient = window.google.accounts.oauth2.initTokenClient({
       client_id: GOOGLE_CLIENT_ID,
       scope: GOOGLE_API_SCOPE,
       callback: (response: any) => {
+        console.log('Google OAuth Callback:', {
+          hasAccessToken: !!response.access_token,
+          error: response.error
+        });
+        
         if (response.access_token) {
           localStorage.setItem('google_access_token', response.access_token);
+          console.log('✓ Access token saved successfully:', response.access_token.substring(0, 20) + '...');
           resolve(response.access_token);
         } else {
-          reject(new Error('Failed to get access token'));
+          console.error('No access token in response:', response);
+          reject(new Error('Failed to get access token: ' + (response.error || 'Unknown error')));
         }
       },
       error_callback: (error: any) => {
+        console.error('✗ Google OAuth Error:', error);
         reject(error);
       }
-    }).requestAccessToken();
-  });
-};
+    });
 
-// Logout
-export const logoutGoogle = (): void => {
-  localStorage.removeItem('google_access_token');
+    // Request access token with immediate prompt
+    // Using 'consent' to always show the popup, even if already logged in
+    tokenClient.requestAccessToken({ prompt: 'consent' });
+  });
 };
 
 // Check if user is authenticated
