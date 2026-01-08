@@ -25,7 +25,7 @@ import { setLoad2 } from '@/redux/loadSlice2';
 import { setWp, selectWp } from '@/redux/wpSlice';
 import { setBrgy, selectBrgy } from '@/redux/brgySlice';
 import { setStatus } from '@/redux/statusSlice';
-import axios2 from "./../../plugin/axios2";
+import axios2, { initializeGoogleAuth, loginWithGoogle, isGoogleAuthenticated } from "./../../plugin/axios2";
 
 const regionMapping = [
   { id: "region1", text: "I", municipalities: [] },
@@ -1428,10 +1428,31 @@ function Admin() {
   }, [data.startDate, data.endDate, data.modules, data.locationName]); // Added data.locationName back to dependencies for auto-trigger
 
   useEffect(() => {
+    // Initialize Google Auth and check authentication
+    const setupGoogleAuth = async () => {
+      try {
+        await initializeGoogleAuth();
+        
+        // Check if user is authenticated
+        if (!isGoogleAuthenticated()) {
+          console.log("User not authenticated with Google, showing login prompt");
+          // Trigger login
+          await loginWithGoogle();
+          console.log("Successfully logged in to Google");
+        }
+      } catch (error) {
+        console.error("Google Auth initialization error:", error);
+        // Show warning but don't block the app
+      }
+    };
+
     // Clear storage if needed to prevent quota errors
     clearStorageIfNeeded();
     
-    fetchRegions();
+    // Setup Google Auth first, then fetch regions
+    setupGoogleAuth().then(() => {
+      fetchRegions();
+    });
     
     // Check if this is the first run
     const isFirstRun = localStorage.getItem('elgu_first_run');
