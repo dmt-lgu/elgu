@@ -25,7 +25,7 @@ import { setLoad2 } from '@/redux/loadSlice2';
 import { setWp, selectWp } from '@/redux/wpSlice';
 import { setBrgy, selectBrgy } from '@/redux/brgySlice';
 import { setStatus } from '@/redux/statusSlice';
-import axios2 from "./../../plugin/axios2";
+import axios2, { initializeGoogleAuth, loginWithGoogle, isGoogleAuthenticated } from "./../../plugin/axios2";
 
 const regionMapping = [
   { id: "region1", text: "I", municipalities: [] },
@@ -542,6 +542,7 @@ function Admin() {
   (window as any).resetFirstRun = resetFirstRun;
 
   const [regionStats, setRegionStats] = useState<any[]>([]);
+  const [isGoogleLoggedIn, setIsGoogleLoggedIn] = useState(isGoogleAuthenticated());
 
   function fetchRegions() {
     dispatch(setLoad(true));
@@ -1428,21 +1429,23 @@ function Admin() {
   }, [data.startDate, data.endDate, data.modules, data.locationName]); // Added data.locationName back to dependencies for auto-trigger
 
   useEffect(() => {
-    // Clear storage if needed to prevent quota errors
+    // Initialize Google Auth first
+    const setupGoogleAuth = async () => {
+      try {
+        await initializeGoogleAuth();
+        setIsGoogleLoggedIn(isGoogleAuthenticated());
+      } catch (error) {
+        console.error("Google Auth initialization error:", error);
+      }
+    };
+
     clearStorageIfNeeded();
-    
+    setupGoogleAuth();
     fetchRegions();
     
-    // Check if this is the first run
     const isFirstRun = localStorage.getItem('elgu_first_run');
-    
     if (isFirstRun === null) {
-      // Very first visit - localStorage doesn't exist yet
-      
-      localStorage.setItem('elgu_first_run', '0'); // Set to 0 to indicate first run pending
-    } else if (isFirstRun === '0') {
-      // Previously detected first run that hasn't completed yet
-     
+      localStorage.setItem('elgu_first_run', '0');
     }
   }, []);
 
@@ -1552,7 +1555,30 @@ const totalRegions = locations.length;
               >
                 <MenuIcon className="w-6 h-6" />
               </button>
-              <div className="flex-1 flex justify-end">{/* Right items */}</div>
+              <div className="flex-1 flex justify-end items-center gap-3">
+                {!isGoogleLoggedIn && (
+                  <button
+                    onClick={async () => {
+                      try {
+                        await loginWithGoogle();
+                        setIsGoogleLoggedIn(true);
+                        console.log("✓ Successfully logged in to Google");
+                      } catch (error) {
+                        console.error("Login failed:", error);
+                      }
+                    }}
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded text-sm"
+                  >
+                    Login with Google
+                  </button>
+                )}
+                {isGoogleLoggedIn && (
+                  <div className="flex items-center gap-2 text-sm text-green-600 font-medium">
+                    <div className="w-2 h-2 bg-green-600 rounded-full"></div>
+                    Google Authenticated
+                  </div>
+                )}
+              </div>
             </div>
           </header>
           <div className="flex-1 overflow-y-auto bg-background">
