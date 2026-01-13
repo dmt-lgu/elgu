@@ -304,6 +304,19 @@ const createReportTableHeader = (
             }
             headerRow2.appendChild(th);
         });
+          // Add final Total Licensed Issued column (rowSpan = 2) to align with UI
+          const finalTh = document.createElement("th");
+          finalTh.textContent = "Total Licensed Issued";
+          finalTh.style.background = "#9ec6f7";
+          finalTh.style.fontWeight = "bold";
+          finalTh.style.textTransform = "uppercase";
+          finalTh.style.letterSpacing = "0.05em";
+          finalTh.style.fontSize = "14px";
+          finalTh.style.padding = "8px";
+          finalTh.style.textAlign = "center";
+          applyCommonStyles(finalTh);
+          finalTh.rowSpan = 2;
+          headerRow1.appendChild(finalTh);
         thead.appendChild(headerRow2);
     }
     return thead;
@@ -428,6 +441,8 @@ const createReportGrandTotalRow = (
       totalTr.appendChild(makeTd(totals.femalePaid, commonProps));
       totalTr.appendChild(makeTd(totals.femalePending, commonProps));
       totalTr.appendChild(makeTd(femaleTotal, commonProps));
+        // Append GRAND TOTAL for Total Licensed Issued (newLicenseTotal + renewalLicenseTotal)
+        totalTr.appendChild(makeTd(newLicenseTotal + renewalLicenseTotal, commonProps));
   }
   if (!isLastPage) totalTr.style.visibility = "hidden";
   return totalTr;
@@ -459,7 +474,9 @@ const createPageContent = (
   const thead = createReportTableHeader(moduleLabel, isCO, isBldg, isBC);
   const tbodyChunk = document.createElement("tbody");
 
-  if (isSimpleReport && !isLastPage) {
+  // Apply the same fixed layout for simple reports on every page
+  // so the last page design matches the earlier pages.
+  if (isSimpleReport) {
     wrapperDiv.style.height = isLandscape ? '720px' : '1050px';
     wrapperDiv.style.display = 'flex';
     wrapperDiv.style.flexDirection = 'column';
@@ -554,6 +571,8 @@ const createPageContent = (
         tr.appendChild(makeTd(data?.femalePaid ?? 0, cellOpts));
         tr.appendChild(makeTd(data?.femalePending ?? 0, cellOpts));
         tr.appendChild(makeTd((data?.femalePaid ?? 0) + (data?.femalePending ?? 0), cellOpts));
+        // Append Total Licensed Issued (New License Issued + Renewal License Issued)
+        tr.appendChild(makeTd(newLicenseIssued + renewLicenseIssued, cellOpts));
     }
     tbodyChunk.appendChild(tr);
   });
@@ -570,6 +589,8 @@ const createPageContent = (
 export async function exportTableReportToPDF(params: ExportTableReportToPDFParams): Promise<void> {
   const { filteredResults, lguToRegion, fileLabel = "report", moduleLabel, selectedDateType } = params;
   const generatedAt = new Date();
+  const dateRangeLabelForName = params.dateRangeLabel || '';
+  const sanitizeForFilename = (s: string) => s ? String(s).replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').trim() : s;
   const isBC = moduleLabel === "Barangay Clearance";
   const isCO = moduleLabel === "Certificate of Occupancy";
   const isBldg = moduleLabel === "Building Permit";
@@ -759,7 +780,12 @@ export async function exportTableReportToPDF(params: ExportTableReportToPDFParam
             progressLabel.textContent = `100%`;
             await flushFrame();
           }
-          pdf.save(`${fileLabel}.pdf`);
+          // Build filename like: "business-permit-report(January 01, 2025 - January 31, 2025).pdf"
+          const moduleSlug = moduleLabel ? `${moduleLabel.toLowerCase().replace(/\s+/g, '-')}-report` : (fileLabel || 'report');
+          const datePart = dateRangeLabelForName ? `(${dateRangeLabelForName})` : '';
+          const rawFilename = `${moduleSlug}${datePart}`;
+          const safeFilename = sanitizeForFilename(rawFilename) || (fileLabel || 'report');
+          pdf.save(`${safeFilename}.pdf`);
         } catch (err) {
           console.error("Failed to generate PDF:", err);
           await Swal.fire({ icon: "error", title: "PDF Generation Failed", text: "Please try again or adjust your filters.", timer: 2000, showConfirmButton: false });
