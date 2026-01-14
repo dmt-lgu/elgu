@@ -295,8 +295,10 @@ export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal)
                 { content: 'NEW', colSpan: 5, styles: commonColSpanStyles },
                 { content: 'RENEWAL', colSpan: 5, styles: commonColSpanStyles },
                 { content: 'MALE', colSpan: 4, styles: commonColSpanStyles },
-          { content: 'FEMALE', colSpan: 4, styles: commonColSpanStyles },
-          { content: 'TOTAL LICENSED ISSUED', rowSpan: 2, styles: commonRowSpanStyles }
+                { content: 'FEMALE', colSpan: 4, styles: commonColSpanStyles },
+                /* Commented out: Total Licensed Issued column requested to be removed from PDF
+                { content: 'TOTAL LICENSED ISSUED', rowSpan: 2, styles: commonRowSpanStyles }
+                */
             ],
             [
                 'License Issued', 'PAID\n(For Issuance and License Issued)', 'PAID\n(eGOVPay)', 'ONGOING\n(For Payment)', 'Total',
@@ -367,7 +369,8 @@ export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal)
             dataCells.push(formatNumberForDisplay(maleLicenseIssued), formatNumberForDisplay(malePaidTotal), formatNumberForDisplay(itemToDisplay.malePending || 0), { content: formatNumberForDisplay(maleTotal), styles: { fontStyle: 'bold', fillColor: '#f1f5f9' } });
             dataCells.push(formatNumberForDisplay(femaleLicenseIssued), formatNumberForDisplay(femalePaidTotal), formatNumberForDisplay(itemToDisplay.femalePending || 0), { content: formatNumberForDisplay(femaleTotal), styles: { fontStyle: 'bold', fillColor: '#f1f5f9' } });
             // Append Total Licensed Issued (New + Renewal)
-            dataCells.push({ content: formatNumberForDisplay(newLicenseIssued + renewLicenseIssued), styles: { fontStyle: 'bold', fillColor: '#f1f5f9' } });
+            // Commented out as requested — exclude the "Total Licensed Issued" column from PDF output
+            // dataCells.push({ content: formatNumberForDisplay(newLicenseIssued + renewLicenseIssued), styles: { fontStyle: 'bold', fillColor: '#f1f5f9' } });
         } else if (moduleLabel === 'Barangay Clearance') {
             dataCells.push(formatNumberForDisplay(itemToDisplay.totalCount));
         } else {
@@ -414,7 +417,8 @@ export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal)
                 formatNumberForDisplay(femaleLicenseIssuedTotal), formatNumberForDisplay(femalePaidOnlyTotal), formatNumberForDisplay(totals.femalePending), formatNumberForDisplay(femaleTotalDisplay)
             ];
             // Append GRAND TOTAL for Total Licensed Issued (New + Renewal)
-            grandTotalRow.push(formatNumberForDisplay(newLicenseIssuedTotal + renewLicenseIssuedTotal));
+            // Commented out as requested — exclude the "Total Licensed Issued" column from PDF grand total
+            // grandTotalRow.push(formatNumberForDisplay(newLicenseIssuedTotal + renewLicenseIssuedTotal));
         } else if (moduleLabel === 'Barangay Clearance') {
             grandTotalRow = [{ content: `GRAND TOTAL\n(${dateRangeLabel})`, colSpan: 2 }, formatNumberForDisplay(totals.totalCount)];
         } else {
@@ -562,8 +566,8 @@ export const exportReportToExcel = (params: ExcelParams, signal?: AbortSignal) =
 
     if (isComplex) {
         headers = [
-        ['Region', 'LGU', 'New', null, null, null, null, 'Renewal', null, null, null, null, 'Male', null, null, null, 'Female', null, null, null, 'Total Licensed Issued'],
-        [null, null, 'License Issued', 'PAID\n(For Issuance to License Issued)', 'PAID (eGOVPay)\n', 'ONGOING\n(For verification to For Payment)', 'Total', 'License Issued', 'PAID\n(For Issuance to License Issued)', 'PAID (eGOVPay)\n', 'ONGOING\n(For verification to For Payment)', 'Total', 'License Issued', 'PAID\n(For Issuance to License Issued)', 'ONGOING\n(For verification to For Payment)', 'Total', 'License Issued', 'PAID\n(For Issuance to License Issued)', 'ONGOING\n(For verification to For Payment)', 'Total', null]
+        ['Region', 'LGU', 'New', null, null, null, null, 'Renewal', null, null, null, null, 'Male', null, null, null, 'Female', null, null, null/*, 'Total Licensed Issued'*/],
+        [null, null, 'License Issued', 'PAID\n(For Issuance to License Issued)', 'PAID (eGOVPay)\n', 'ONGOING\n(For verification to For Payment)', 'Total', 'License Issued', 'PAID\n(For Issuance to License Issued)', 'PAID (eGOVPay)\n', 'ONGOING\n(For verification to For Payment)', 'Total', 'License Issued', 'PAID\n(For Issuance to License Issued)', 'ONGOING\n(For verification to For Payment)', 'Total', 'License Issued', 'PAID\n(For Issuance to License Issued)', 'ONGOING\n(For verification to For Payment)', 'Total'/*, null*/]
         ];
     } else {
         headers = [
@@ -618,7 +622,8 @@ export const exportReportToExcel = (params: ExcelParams, signal?: AbortSignal) =
             row.push(formatNumberForExcel(maleLicenseIssued), formatNumberForExcel(malePaidTotal), formatNumberForExcel(itemToDisplay.malePending || 0), maleTotal);
             row.push(formatNumberForExcel(femaleLicenseIssued), formatNumberForExcel(femalePaidTotal), formatNumberForExcel(itemToDisplay.femalePending || 0), femaleTotal);
             // Append Total Licensed Issued (New + Renewal)
-            row.push(newLicenseIssued + renewLicenseIssued);
+            // Commented out as requested — exclude the "Total Licensed Issued" column from Excel output
+            // row.push(newLicenseIssued + renewLicenseIssued);
         } else if (moduleLabel === 'Barangay Clearance') {
             row.push(formatNumberForExcel(itemToDisplay.totalCount));
         } else if (moduleLabel === 'Building Permit' || moduleLabel === 'Certificate of Occupancy') {
@@ -667,7 +672,8 @@ export const exportReportToExcel = (params: ExcelParams, signal?: AbortSignal) =
              maleLicenseIssuedTotal, malePaidOnlyTotal, totals.malePending, maleTotalDisplay,
              femaleLicenseIssuedTotal, femalePaidOnlyTotal, totals.femalePending, femaleTotalDisplay ];
         // Append GRAND TOTAL for Total Licensed Issued (New + Renewal)
-        totalRow.push(newLicenseIssuedTotal + renewLicenseIssuedTotal);
+        // Commented out as requested — exclude the "Total Licensed Issued" column from Excel grand total
+        // totalRow.push(newLicenseIssuedTotal + renewLicenseIssuedTotal);
         merges.push({ s: { r: currentRowIndex, c: 0 }, e: { r: currentRowIndex, c: 1 } });
         } else {
             if (moduleLabel === 'Barangay Clearance') {
@@ -683,15 +689,16 @@ export const exportReportToExcel = (params: ExcelParams, signal?: AbortSignal) =
     }
 
     const ws = xlsx.utils.aoa_to_sheet([...headers, ...body]);
-    if (isComplex) {
+        if (isComplex) {
       merges.push(
         { s: { r: 0, c: 0 }, e: { r: 1, c: 0 } },
         { s: { r: 0, c: 1 }, e: { r: 1, c: 1 } },
         { s: { r: 0, c: 2 }, e: { r: 0, c: 6 } },
         { s: { r: 0, c: 7 }, e: { r: 0, c: 11 } },
         { s: { r: 0, c: 12 }, e: { r: 0, c: 15 } },
-        { s: { r: 0, c: 16 }, e: { r: 0, c: 19 } },
-        { s: { r: 0, c: 20 }, e: { r: 1, c: 20 } }
+        { s: { r: 0, c: 16 }, e: { r: 0, c: 19 } }
+        // Commented out merge for last 'Total Licensed Issued' column (removed)
+        // { s: { r: 0, c: 20 }, e: { r: 1, c: 20 } }
       );
     }
     ws['!merges'] = merges;

@@ -200,31 +200,32 @@ const BusinessPermitReport = forwardRef<HTMLDivElement, BusinessPermitProps>(({
             const periodLabel = isDayMode ? (item.month ? `(${formatMonthYear(item.month)})` : '') : (lgu.months?.length > 1 ? `(${formatMonthYear(lgu.months[0])} - ${formatMonthYear(lgu.months[lgu.months.length - 1])})` : lgu.months?.length === 1 ? `(${formatMonthYear(lgu.months[0])})` : "");
 
             // Computed values:
-            // `paidTotal` now represents License Issued + For Issuance + eGOV
-            // `licenseIssued` should represent only License Issued if API provides that field; otherwise fall back to `newPaid` value.
+            // PAID should represent For Issuance + eGOV only (License Issued displayed separately)
             const newPaid = Number(item.newPaid || 0);
             const newGeo = Number(item.newPaidViaEgov || 0);
             const newPending = Number(item.newPending || 0);
             const newLicenseIssued = Number(item.newLicenseIssued ?? item.newIssued ?? newPaid ?? 0);
-            const newPaidTotal = newLicenseIssued + newPaid + newGeo;
-            const newTotal = newPaidTotal + newPending;
+            const newPaidOnly = newPaid + newGeo; // exclude licenseIssued
+            const newTotal = newPaidOnly + newPending;
 
             const renewPaid = Number(item.renewPaid || 0);
             const renewGeo = Number(item.renewPaidViaEgov || 0);
             const renewPending = Number(item.renewPending || 0);
             const renewLicenseIssued = Number(item.renewLicenseIssued ?? item.renewIssued ?? renewPaid ?? 0);
-            const renewPaidTotal = renewLicenseIssued + renewPaid + renewGeo;
-            const renewTotal = renewPaidTotal + renewPending;
+            const renewPaidOnly = renewPaid + renewGeo; // exclude licenseIssued
+            const renewTotal = renewPaidOnly + renewPending;
 
             const malePaid = Number(item.malePaid || 0);
             const malePending = Number(item.malePending || 0);
-            const maleLicenseIssued = malePaid; // no eGOV breakdown for male in data
-            const maleTotal = malePaid + malePending;
+            const maleLicenseIssued = Number(item.maleLicenseIssued ?? malePaid ?? 0);
+            const malePaidOnly = malePaid; // no separate eGOV breakdown for male
+            const maleTotal = malePaidOnly + malePending;
 
             const femalePaid = Number(item.femalePaid || 0);
             const femalePending = Number(item.femalePending || 0);
-            const femaleLicenseIssued = femalePaid; // no eGOV breakdown for female in data
-            const femaleTotal = femalePaid + femalePending;
+            const femaleLicenseIssued = Number(item.femaleLicenseIssued ?? femalePaid ?? 0);
+            const femalePaidOnly = femalePaid; // no separate eGOV breakdown for female
+            const femaleTotal = femalePaidOnly + femalePending;
 
             rows.push(
               <TableRow key={`${region}-${lgu.lgu}-${isDayMode ? item.month : 'sum'}-${itemIdx}`} className="hover:bg-blue-50/70 transition-colors duration-200 text-sm">
@@ -236,14 +237,14 @@ const BusinessPermitReport = forwardRef<HTMLDivElement, BusinessPermitProps>(({
 
                 {/* New */}
                 <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(newLicenseIssued)}</TableCell>
-                <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(newPaidTotal)}</TableCell>
+                <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(newPaidOnly)}</TableCell>
                 <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(newGeo)}</TableCell>
                 <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(newPending)}</TableCell>
                 <TableCell className="p-3 text-right font-bold text-slate-900 bg-slate-100 tabular-nums">{formatNumber(newTotal)}</TableCell>
 
                 {/* Renewal */}
                 <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(renewLicenseIssued)}</TableCell>
-                <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(renewPaidTotal)}</TableCell>
+                <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(renewPaidOnly)}</TableCell>
                 <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(renewGeo)}</TableCell>
                 <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(renewPending)}</TableCell>
                 <TableCell className="p-3 text-right font-bold text-slate-900 bg-slate-100 tabular-nums">{formatNumber(renewTotal)}</TableCell>
@@ -252,13 +253,13 @@ const BusinessPermitReport = forwardRef<HTMLDivElement, BusinessPermitProps>(({
 
                 {/* Male */}
                 <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(maleLicenseIssued)}</TableCell>
-                <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(malePaid)}</TableCell>
+                <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(malePaidOnly)}</TableCell>
                 <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(malePending)}</TableCell>
                 <TableCell className="p-3 text-right font-bold text-slate-900 bg-slate-100 tabular-nums">{formatNumber(maleTotal)}</TableCell>
 
                 {/* Female */}
                 <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(femaleLicenseIssued)}</TableCell>
-                <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(femalePaid)}</TableCell>
+                <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(femalePaidOnly)}</TableCell>
                 <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(femalePending)}</TableCell>
                 <TableCell className="p-3 text-right font-bold text-slate-900 bg-slate-100 tabular-nums">{formatNumber(femaleTotal)}</TableCell>
                 {/* Total Licensed Issued (New + Renewal) - moved to end of row */}
