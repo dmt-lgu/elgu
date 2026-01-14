@@ -5,7 +5,7 @@ declare global {
     google: {
       accounts: {
         oauth2: {
-          initTokenClient: (config: any) => { requestAccessToken: () => void };
+          initTokenClient: (config: any) => { requestAccessToken: (options?: { prompt?: string }) => void };
         };
       };
     };

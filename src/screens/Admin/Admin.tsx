@@ -1141,12 +1141,27 @@ function Admin() {
         // Process responses
         responses.forEach(response => {
           if (response.type === 'bp') {
-            allBPResults = allBPResults.concat(response.data.results || []);
+            // Filter out results with errors
+            const validResults = (response.data.results || []).filter((result: any) => !result.error);
+            if (validResults.length < (response.data.results || []).length) {
+              console.warn(`BP: Filtered out ${(response.data.results || []).length - validResults.length} results with errors`);
+            }
+            allBPResults = allBPResults.concat(validResults);
           } else if (response.type === 'wp') {
-            allWPResults = allWPResults.concat(response.data.results || []);
+            // Filter out results with errors
+            const validResults = (response.data.results || []).filter((result: any) => !result.error);
+            if (validResults.length < (response.data.results || []).length) {
+              console.warn(`WP: Filtered out ${(response.data.results || []).length - validResults.length} results with errors`);
+            }
+            allWPResults = allWPResults.concat(validResults);
           } else if (response.type === 'bpco') {
+            // Filter out results with errors first
+            const validResults = (response.data.results || []).filter((result: any) => !result.error);
+            if (validResults.length < (response.data.results || []).length) {
+              console.warn(`BPCO: Filtered out ${(response.data.results || []).length - validResults.length} results with errors`);
+            }
             // Map coPaid → newPaid, coPending → newPending for BPCO
-            const mappedResults = (response.data.results || []).map((result: any) => ({
+            const mappedResults = validResults.map((result: any) => ({
               ...result,
               monthlyResults: result.monthlyResults?.map((month: any) => ({
                 ...month,
@@ -1159,8 +1174,13 @@ function Admin() {
             }));
             allBPCOResults = allBPCOResults.concat(mappedResults);
           } else if (response.type === 'bpbp') {
+            // Filter out results with errors first
+            const validResults = (response.data.results || []).filter((result: any) => !result.error);
+            if (validResults.length < (response.data.results || []).length) {
+              console.warn(`BPBP: Filtered out ${(response.data.results || []).length - validResults.length} results with errors`);
+            }
             // Map buildingPaid → newPaid, buildingPending → newPending for BPBP
-            const mappedResults = (response.data.results || []).map((result: any) => ({
+            const mappedResults = validResults.map((result: any) => ({
               ...result,
               monthlyResults: result.monthlyResults?.map((month: any) => ({
                 ...month,
@@ -1181,8 +1201,13 @@ function Admin() {
             }));
             allBPBPResults = allBPBPResults.concat(mappedResults);
           } else if (response.type === 'brgy') {
+            // Filter out results with errors
+            const validResults = (response.data.results || []).filter((result: any) => !result.error);
+            if (validResults.length < (response.data.results || []).length) {
+              console.warn(`BRGY: Filtered out ${(response.data.results || []).length - validResults.length} results with errors`);
+            }
             // Process Barangay Clearance data - use as-is since it should already have the correct structure
-            allBRGYResults = allBRGYResults.concat(response.data.results || []);
+            allBRGYResults = allBRGYResults.concat(validResults);
           }
           
           if (response.data.lguCount && response.data.lguCount > totalLguCount) {

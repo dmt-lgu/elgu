@@ -1,4 +1,4 @@
-import { useMemo, useEffect } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import FilterSection from './components/FilterSection';
 import ModuleFilter from './components/ModuleFilter';
 import StatisticCard from './components/StatisticCard';
@@ -33,6 +33,13 @@ const DashboardPage = () => {
   const transactionData:any = useSelector(selectTransaction);
   const loading = useSelector(selectLoad2);
   
+  // Toggle states for visibility
+  const [showStatisticCards, setShowStatisticCards] = useState(true);
+  const [showStatusChart, setShowStatusChart] = useState(true);
+  const [showComparisonChart, setShowComparisonChart] = useState(true);
+  const [showTransactionAnalyticsByRegion, setShowTransactionAnalyticsByRegion] = useState(true);
+  const [showTransactionAnalyticsByGender, setShowTransactionAnalyticsByGender] = useState(true);
+  const [showTrendLineChart, setShowTrendLineChart] = useState(true);
 
   
 
@@ -1312,11 +1319,87 @@ const scrollToStatusChart = () => {
     <div className="p-6 sm:p-2 md:p-4 max-w-[1200px] mx-auto  bg-background ">
       <FilterSection />
       
+      {/* Toggle Controls Section */}
+      <div className="flex flex-wrap gap-2 items-center mb-6">
+        {/* Statistic Cards Toggle */}
+        <button
+          onClick={() => setShowStatisticCards(!showStatisticCards)}
+          className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all ${
+            showStatisticCards
+              ? 'bg-primary text-primary-foreground shadow-sm'
+              : 'bg-muted text-muted-foreground border border-border hover:bg-muted/80'
+          }`}
+        >
+          {showStatisticCards ? '✓' : '○'} Statistics
+        </button>
+
+        {/* Status Chart Toggle */}
+        <button
+          onClick={() => setShowStatusChart(!showStatusChart)}
+          className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all ${
+            showStatusChart
+              ? 'bg-primary text-primary-foreground shadow-sm'
+              : 'bg-muted text-muted-foreground border border-border hover:bg-muted/80'
+          }`}
+        >
+          {showStatusChart ? '✓' : '○'} LGU Status
+        </button>
+
+        {/* Comparison Chart Toggle */}
+        <button
+          onClick={() => setShowComparisonChart(!showComparisonChart)}
+          className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all ${
+            showComparisonChart
+              ? 'bg-primary text-primary-foreground shadow-sm'
+              : 'bg-muted text-muted-foreground border border-border hover:bg-muted/80'
+          }`}
+        >
+          {showComparisonChart ? '✓' : '○'} Comparison
+        </button>
+
+        {/* Transaction by Region Toggle */}
+        <button
+          onClick={() => setShowTransactionAnalyticsByRegion(!showTransactionAnalyticsByRegion)}
+          className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all ${
+            showTransactionAnalyticsByRegion
+              ? 'bg-primary text-primary-foreground shadow-sm'
+              : 'bg-muted text-muted-foreground border border-border hover:bg-muted/80'
+          }`}
+        >
+          {showTransactionAnalyticsByRegion ? '✓' : '○'} Region Analysis
+        </button>
+
+        {/* Transaction by Gender Toggle */}
+        <button
+          onClick={() => setShowTransactionAnalyticsByGender(!showTransactionAnalyticsByGender)}
+          className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all ${
+            showTransactionAnalyticsByGender
+              ? 'bg-primary text-primary-foreground shadow-sm'
+              : 'bg-muted text-muted-foreground border border-border hover:bg-muted/80'
+          }`}
+        >
+          {showTransactionAnalyticsByGender ? '✓' : '○'} Gender Analysis
+        </button>
+
+        {/* Trend Line Chart Toggle */}
+        <button
+          onClick={() => setShowTrendLineChart(!showTrendLineChart)}
+          className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all ${
+            showTrendLineChart
+              ? 'bg-primary text-primary-foreground shadow-sm'
+              : 'bg-muted text-muted-foreground border border-border hover:bg-muted/80'
+          }`}
+        >
+          {showTrendLineChart ? '✓' : '○'} Trends
+        </button>
+      </div>
+      
       {/* Module Filter Section */}
   
       
       {/* Loading indicator for dashboard */}
     {/* LGU Status Statistics */}
+      {showStatisticCards && (
       <div className="mb-6">
       
         <div className="grid grid-cols-3 lg:grid-cols-2 sm:grid-cols-1 gap-4">
@@ -1340,10 +1423,10 @@ const scrollToStatusChart = () => {
           />
         </div>
       </div>
+      )}
 
-    
-      
       {/* Transaction Statistics Section */}
+      {showStatisticCards && (
       <div className="mb-6">
        
           
@@ -1481,6 +1564,7 @@ const scrollToStatusChart = () => {
           />
         </div>
       </div>
+      )}
 
     
 
@@ -1493,6 +1577,7 @@ const scrollToStatusChart = () => {
 
      
       {/* Combined Status Chart for all modules */}
+      {showStatusChart && (
       <div id="status-chart-section">
       {(data.modules?.includes("Business Permit") || 
         data.modules?.includes("Working Permit") || 
@@ -1518,6 +1603,7 @@ const scrollToStatusChart = () => {
         />
       )}
       </div>
+      )}
 
     
 
@@ -1525,19 +1611,16 @@ const scrollToStatusChart = () => {
 
       {/* Charts Section */}
       <div className="mb-6">
-  
+
+            {/* Date Range Comparison Chart */}
+      <div className="mb-6">
+      {showComparisonChart && (
+        <>
           <ModuleFilter 
             title="Chart Analytics" 
             filterType="chart" 
             className=""
           />
-
-            {/* Date Range Comparison Chart */}
-      <div className="mb-6">
-      {(data.modules?.includes("Business Permit") || 
-        data.modules?.includes("Working Permit") || 
-        data.modules?.includes("Barangay Clearance") ||
-        data.modules?.includes("Building Permit") || data.modules?.includes("Certificate of Occupancy")) && (
         <ComparisonChartComponent 
           bpData={bpChartData?.current || []}
           wpData={wpChartData?.current || []}
@@ -1554,21 +1637,27 @@ const scrollToStatusChart = () => {
           startDate={data.startDate}
           endDate={data.endDate}
         />
+        </>
       )}
       </div>     
         
         <div className="space-y-6">
+          {showTransactionAnalyticsByRegion && (
           <TransactionChart
             data={chartData3}
             title="TRANSACTION ANALYTICS BY REGION"
             period={`${data.startDate} - ${data.endDate}`}
           />
+          )}
+          {showTransactionAnalyticsByGender && (
           <TransactionChart2
             data={chartData}
             title="TRANSACTION ANALYTICS BY GENDER"
             period={`${data.startDate} - ${data.endDate}`}
           />
+          )}
 
+            {showTrendLineChart && (
             <TrendLineChart
   bpResults={transactionData?.bpResults || []}
   wpResults={transactionData?.wpResults || []}
@@ -1580,6 +1669,7 @@ const scrollToStatusChart = () => {
   availableModules={data.modules || []}
   title="Transaction Trend Analysis"
 />
+            )}
         </div>
       </div>
     
