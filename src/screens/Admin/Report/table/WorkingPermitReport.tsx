@@ -99,7 +99,40 @@ const WorkingPermitReport = forwardRef<HTMLDivElement, WorkingPermitProps>(({
   const filteredResults = useMemo(() => { return filterTableResults({ apiData, selectedRegions, selectedProvinces, selectedCities, selectedDateType, selectedIslands, lguToRegion: completeLguToRegion, dateRange, }); }, [apiData, selectedRegions, selectedProvinces, selectedCities, selectedDateType, selectedIslands, completeLguToRegion, dateRange]);
   const normalizedResults = useMemo(() => { type MonthRec = { month: string; [k: string]: any; }; const byLgu = new Map<string, { base: any; monthsMap: Map<string, MonthRec>; hasError?: boolean }>(); for (const entry of filteredResults as any[]) { const key = entry?.lgu || ''; if (!key) continue; if (!byLgu.has(key)) { byLgu.set(key, { base: { ...entry, monthlyResults: [] }, monthsMap: new Map(), hasError: entry?.hasError, }); } const bucket = byLgu.get(key)!; if (entry?.hasError) bucket.hasError = true; const monthsArr = Array.isArray(entry?.monthlyResults) ? entry.monthlyResults : []; for (const m of monthsArr) { const mKey: string | undefined = m?.month; if (!mKey) continue; const existing = bucket.monthsMap.get(mKey) || { month: mKey }; Object.keys(m).forEach(field => { const val = m[field]; if (field === 'month') return; if (typeof val === 'number') { existing[field] = Math.max(Number(existing[field] || 0), Number(val)); } else if (existing[field] === undefined) { existing[field] = val; } }); bucket.monthsMap.set(mKey, existing); } } const out: any[] = []; byLgu.forEach(({ base, monthsMap, hasError }) => { const monthlyResults = Array.from(monthsMap.values()).sort((a, b) => String(a.month).localeCompare(String(b.month))); const months = monthlyResults.map(m => m.month); out.push({ ...base, hasError: !!hasError, monthlyResults, months }); }); return out; }, [filteredResults]);
   const regionMappingGrouped = useMemo(() => groupResultsByRegion(normalizedResults, completeLguToRegion), [normalizedResults, completeLguToRegion]);
-  const grandTotals = useMemo(() => { const totals = { newPaid: 0, newGeoPay: 0, newPending: 0, renewalPaid: 0, renewalGeoPay: 0, renewalPending: 0, malePaid: 0, malePending: 0, femalePaid: 0, femalePending: 0, }; normalizedResults.forEach((lgu: any) => { if (!lgu.hasError && Array.isArray(lgu.monthlyResults)) { lgu.monthlyResults.forEach((item: any) => { totals.newPaid += Number(item.newPaid || 0); totals.newGeoPay += Number(item.newPaidViaEgov || 0); totals.newPending += Number(item.newPending || 0); totals.renewalPaid += Number(item.renewPaid || 0); totals.renewalGeoPay += Number(item.renewPaidViaEgov || 0); totals.renewalPending += Number(item.renewPending || 0); totals.malePaid += Number(item.malePaid || 0); totals.malePending += Number(item.malePending || 0); totals.femalePaid += Number(item.femalePaid || 0); totals.femalePending += Number(item.femalePending || 0); }); } }); return totals; }, [normalizedResults]);
+  const grandTotals = useMemo(() => {
+    const totals: any = { newPaid: 0, newGeoPay: 0, newPending: 0, newLicenseIssued: 0, renewalPaid: 0, renewalGeoPay: 0, renewalPending: 0, renewalLicenseIssued: 0, malePaid: 0, malePending: 0, femalePaid: 0, femalePending: 0 };
+    normalizedResults.forEach((lgu: any) => {
+      if (!lgu.hasError && Array.isArray(lgu.monthlyResults)) {
+        lgu.monthlyResults.forEach((item: any) => {
+          const itemNewPaid = Number(item.newPaid || 0);
+          const itemNewGeo = Number(item.newPaidViaEgov || 0);
+          const itemNewPending = Number(item.newPending || 0);
+          const itemNewLicenseIssued = Number(item.newLicenseIssued ?? item.newIssued ?? itemNewPaid ?? 0);
+
+          totals.newPaid += itemNewPaid;
+          totals.newGeoPay += itemNewGeo;
+          totals.newPending += itemNewPending;
+          totals.newLicenseIssued += itemNewLicenseIssued;
+
+          const itemRenewPaid = Number(item.renewPaid || 0);
+          const itemRenewGeo = Number(item.renewPaidViaEgov || 0);
+          const itemRenewPending = Number(item.renewPending || 0);
+          const itemRenewLicenseIssued = Number(item.renewLicenseIssued ?? item.renewIssued ?? itemRenewPaid ?? 0);
+
+          totals.renewalPaid += itemRenewPaid;
+          totals.renewalGeoPay += itemRenewGeo;
+          totals.renewalPending += itemRenewPending;
+          totals.renewalLicenseIssued += itemRenewLicenseIssued;
+
+          totals.malePaid += Number(item.malePaid || 0);
+          totals.malePending += Number(item.malePending || 0);
+          totals.femalePaid += Number(item.femalePaid || 0);
+          totals.femalePending += Number(item.femalePending || 0);
+        });
+      }
+    });
+    return totals;
+  }, [normalizedResults]);
 
   useEffect(() => { onTableDataChange?.(normalizedResults.length > 0); }, [normalizedResults.length, onTableDataChange]);
 
@@ -133,18 +166,21 @@ const WorkingPermitReport = forwardRef<HTMLDivElement, WorkingPermitProps>(({
           dataToRender.forEach((item: any, itemIdx: number) => {
             const periodLabel = isDayMode ? (item.month ? `(${formatMonthYear(item.month)})` : '') : (lgu.months?.length > 1 ? `(${formatMonthYear(lgu.months[0])} - ${formatMonthYear(lgu.months[lgu.months.length - 1])})` : lgu.months?.length === 1 ? `(${formatMonthYear(lgu.months[0])})` : "");
             
-            // Compute per-row values per requested formula
+            // Compute per-row values:
+            // `paidTotal` is For Issuance (paid) + eGOVPay, while `licenseIssued` is explicit when provided.
             const newPaid = Number(item.newPaid || 0);
             const newGeo = Number(item.newPaidViaEgov || 0);
             const newPending = Number(item.newPending || 0);
-            const newLicenseIssued = newPaid + newGeo;
-            const newTotal = newPaid + newGeo + newPending;
+            const newPaidTotal = newPaid + newGeo;
+            const newLicenseIssued = Number(item.newLicenseIssued ?? item.newIssued ?? newPaid ?? 0);
+            const newTotal = newPaidTotal + newPending;
 
             const renewPaid = Number(item.renewPaid || 0);
             const renewGeo = Number(item.renewPaidViaEgov || 0);
             const renewPending = Number(item.renewPending || 0);
-            const renewLicenseIssued = renewPaid + renewGeo;
-            const renewTotal = renewPaid + renewGeo + renewPending;
+            const renewPaidTotal = renewPaid + renewGeo;
+            const renewLicenseIssued = Number(item.renewLicenseIssued ?? item.renewIssued ?? renewPaid ?? 0);
+            const renewTotal = renewPaidTotal + renewPending;
 
             const malePaid = Number(item.malePaid || 0);
             const malePending = Number(item.malePending || 0);
@@ -164,14 +200,14 @@ const WorkingPermitReport = forwardRef<HTMLDivElement, WorkingPermitProps>(({
 
                 {/* New */}
                 <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(newLicenseIssued)}</TableCell>
-                <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(newPaid)}</TableCell>
+                <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(newPaidTotal)}</TableCell>
                 <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(newGeo)}</TableCell>
                 <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(newPending)}</TableCell>
                 <TableCell className="p-3 text-right font-bold text-slate-900 bg-slate-100 tabular-nums">{formatNumber(newTotal)}</TableCell>
 
                 {/* Renewal */}
                 <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(renewLicenseIssued)}</TableCell>
-                <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(renewPaid)}</TableCell>
+                <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(renewPaidTotal)}</TableCell>
                 <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(renewGeo)}</TableCell>
                 <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(renewPending)}</TableCell>
                 <TableCell className="p-3 text-right font-bold text-slate-900 bg-slate-100 tabular-nums">{formatNumber(renewTotal)}</TableCell>
@@ -193,12 +229,42 @@ const WorkingPermitReport = forwardRef<HTMLDivElement, WorkingPermitProps>(({
           });
         });
         allRows.push(...rows);
-        const regionTotals = lguList.reduce((totals, lgu) => { if (!lgu.hasError && lgu.monthlyResults) { lgu.monthlyResults.forEach((item: any) => { totals.newPaid += Number(item.newPaid||0); totals.newGeoPay += Number(item.newPaidViaEgov||0); totals.newPending += Number(item.newPending||0); totals.renewalPaid += Number(item.renewPaid||0); totals.renewalGeoPay += Number(item.renewPaidViaEgov||0); totals.renewalPending += Number(item.renewPending||0); totals.malePaid += Number(item.malePaid||0); totals.malePending += Number(item.malePending||0); totals.femalePaid += Number(item.femalePaid||0); totals.femalePending += Number(item.femalePending||0); }); } return totals; }, { newPaid:0, newGeoPay:0, newPending:0, renewalPaid:0, renewalGeoPay:0, renewalPending:0, malePaid:0, malePending:0, femalePaid:0, femalePending:0 });
-        
+        const regionTotals = lguList.reduce((totals, lgu) => {
+          if (!lgu.hasError && lgu.monthlyResults) {
+            lgu.monthlyResults.forEach((item: any) => {
+              const itemNewPaid = Number(item.newPaid || 0);
+              const itemNewGeo = Number(item.newPaidViaEgov || 0);
+              const itemNewPending = Number(item.newPending || 0);
+              const itemNewLicenseIssued = Number(item.newLicenseIssued ?? item.newIssued ?? itemNewPaid ?? 0);
+
+              totals.newPaid += itemNewPaid;
+              totals.newGeoPay += itemNewGeo;
+              totals.newPending += itemNewPending;
+              totals.newLicenseIssued += itemNewLicenseIssued;
+
+              const itemRenewPaid = Number(item.renewPaid || 0);
+              const itemRenewGeo = Number(item.renewPaidViaEgov || 0);
+              const itemRenewPending = Number(item.renewPending || 0);
+              const itemRenewLicenseIssued = Number(item.renewLicenseIssued ?? item.renewIssued ?? itemRenewPaid ?? 0);
+
+              totals.renewalPaid += itemRenewPaid;
+              totals.renewalGeoPay += itemRenewGeo;
+              totals.renewalPending += itemRenewPending;
+              totals.renewalLicenseIssued += itemRenewLicenseIssued;
+
+              totals.malePaid += Number(item.malePaid || 0);
+              totals.malePending += Number(item.malePending || 0);
+              totals.femalePaid += Number(item.femalePaid || 0);
+              totals.femalePending += Number(item.femalePending || 0);
+            });
+          }
+          return totals;
+        }, { newPaid:0, newGeoPay:0, newPending:0, newLicenseIssued:0, renewalPaid:0, renewalGeoPay:0, renewalPending:0, renewalLicenseIssued:0, malePaid:0, malePending:0, femalePaid:0, femalePending:0 });
+
   // **DESIGN CHANGE**: Cleaner sub-total row (computed License Issued)
-  const regionLicenseIssued = (regionTotals.newPaid || 0) + (regionTotals.newGeoPay || 0);
+  const regionLicenseIssued = (regionTotals.newLicenseIssued || 0);
   const regionNewTotal = (regionTotals.newPaid || 0) + (regionTotals.newGeoPay || 0) + (regionTotals.newPending || 0);
-  const regionRenewLicenseIssued = (regionTotals.renewalPaid || 0) + (regionTotals.renewalGeoPay || 0);
+  const regionRenewLicenseIssued = (regionTotals.renewalLicenseIssued || 0);
   const regionRenewTotal = (regionTotals.renewalPaid || 0) + (regionTotals.renewalGeoPay || 0) + (regionTotals.renewalPending || 0);
   const regionMaleTotal = (regionTotals.malePaid || 0) + (regionTotals.malePending || 0);
   const regionFemaleTotal = (regionTotals.femalePaid || 0) + (regionTotals.femalePending || 0);
@@ -294,13 +360,15 @@ const WorkingPermitReport = forwardRef<HTMLDivElement, WorkingPermitProps>(({
               {/* **DESIGN CHANGE**: Sticky footer with uniform background color */}
               <TableRow className="font-bold border-t-4 border-slate-500">
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-left" colSpan={2}><div className="font-extrabold tracking-wider text-base">GRAND TOTAL</div><div className='text-xs font-medium text-slate-300'>({dateRangeLabel})</div></TableCell>
+                {/* New */}
+                <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base">{formatNumber(grandTotals.newLicenseIssued)}</TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base">{formatNumber((grandTotals.newPaid || 0) + (grandTotals.newGeoPay || 0))}</TableCell>
-                <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base">{formatNumber(grandTotals.newPaid)}</TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base">{formatNumber(grandTotals.newGeoPay)}</TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base">{formatNumber(grandTotals.newPending)}</TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base font-bold">{formatNumber((grandTotals.newPaid || 0) + (grandTotals.newGeoPay || 0) + (grandTotals.newPending || 0))}</TableCell>
+                {/* Renewal */}
+                <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base">{formatNumber(grandTotals.renewalLicenseIssued)}</TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base">{formatNumber((grandTotals.renewalPaid || 0) + (grandTotals.renewalGeoPay || 0))}</TableCell>
-                <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base">{formatNumber(grandTotals.renewalPaid)}</TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base">{formatNumber(grandTotals.renewalGeoPay)}</TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base">{formatNumber(grandTotals.renewalPending)}</TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base font-bold">{formatNumber((grandTotals.renewalPaid || 0) + (grandTotals.renewalGeoPay || 0) + (grandTotals.renewalPending || 0))}</TableCell>

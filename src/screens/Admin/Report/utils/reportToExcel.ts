@@ -95,11 +95,16 @@ function _generateBuildingPermitSheet(data: any[], moduleLabel: string, isDayMod
         const paid = Number(month[paidKey] || 0);
         const geo = Number(month[geoKey] || 0);
         const pending = Number(month[pendingKey] || 0);
-        const license = paid + geo;
-        const total = license + pending;
+        // prefer explicit license-issued field if available
+        const licenseIssuedField = Number(month?.newLicenseIssued ?? month?.newIssued ?? month?.licenseIssued ?? (paid + geo));
+        const forIssuance = Number(month[paidKey] || month?.newPaid || 0);
+        const paidCol = licenseIssuedField + forIssuance; // PAID column should show License Issued + For Issuance
+        const total = paidCol + geo + pending;
+        // Swap data: put PAID aggregate under the "License Issued" header, and explicit
+        // License Issued value under the "PAID" header (headers remain unchanged).
         return [
           lgu.region, lgu.lgu, lgu.province || '', formatMonthYear(month.month),
-          formatNumber(license), formatNumber(paid), formatNumber(geo), formatNumber(pending), formatNumber(total)
+          formatNumber(paidCol), formatNumber(licenseIssuedField), formatNumber(geo), formatNumber(pending), formatNumber(total)
         ];
       });
     } else {
@@ -113,14 +118,16 @@ function _generateBuildingPermitSheet(data: any[], moduleLabel: string, isDayMod
         return acc;
       }, { paid: 0, geo: 0, pending: 0 });
 
-      const license = lguTotals.paid + lguTotals.geo;
+      const licenseIssuedField = Number(lguTotals.newLicenseIssued ?? lguTotals.newIssued ?? lguTotals.licenseIssued ?? (lguTotals.paid + lguTotals.geo));
+      const forIssuance = Number(lguTotals.paid || 0);
+      const paidCol = licenseIssuedField + forIssuance;
       const period = lgu.months?.length > 1
         ? `${formatMonthYear(lgu.months[0])} - ${formatMonthYear(lgu.months[lgu.months.length - 1])}`
         : lgu.months?.length === 1 ? formatMonthYear(lgu.months[0]) : "";
 
       return [[
         lgu.region, lgu.lgu, lgu.province || '', period,
-        formatNumber(license), formatNumber(lguTotals.paid), formatNumber(lguTotals.geo), formatNumber(lguTotals.pending), formatNumber(license + lguTotals.pending)
+        formatNumber(paidCol), formatNumber(licenseIssuedField), formatNumber(lguTotals.geo), formatNumber(lguTotals.pending), formatNumber(paidCol + lguTotals.geo + lguTotals.pending)
       ]];
     }
   });
