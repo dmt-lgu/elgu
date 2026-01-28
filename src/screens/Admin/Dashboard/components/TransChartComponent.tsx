@@ -55,7 +55,6 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
 }) => {
 
 
-  console.log(data);
   const [chartType, setChartType] = useState<'bar' | 'line' | 'pie'>('bar');
   const [hidden, setHidden] = useState<boolean[]>([false, false, false, false]);
   const [txnType, setTxnType] = useState<'overall' | 'new' | 'renew'>('overall');

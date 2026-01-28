@@ -81,7 +81,15 @@ const router = createBrowserRouter([
       },
     ],
   },
-]);
+], {
+  future: {
+    v7_relativeSplatPath: true,
+    v7_fetcherPersist: true,
+    v7_normalizeFormMethod: true,
+    v7_partialHydration: true,
+    v7_skipActionErrorRevalidation: true,
+  },
+});
 
 function wait( time:number) {
   return new Promise((resolve) => {
@@ -92,15 +100,12 @@ function wait( time:number) {
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <ErrorBoundary>
-
-
     <Provider store={store}>
       <PersistGate loading={null} persistor={persistor}>
-      <Suspense fallback={<Loader />}>
-      <RouterProvider router={router} />
-      </Suspense>
-        
+        <Suspense fallback={<Loader />}>
+          <RouterProvider router={router} />
+        </Suspense>
       </PersistGate>
     </Provider>
-</ErrorBoundary>
+  </ErrorBoundary>
 );
