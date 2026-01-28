@@ -65,6 +65,7 @@ interface TotalResults {
   totalmalePaid: number;
   totalfemalePending: number;
   totalfemalePaid: number;
+  totalCitizensServed: number;
   // Add totals for each module
   bpTotalnewPending?: number;
   bpTotalnewPaid?: number;
@@ -76,6 +77,7 @@ interface TotalResults {
   bpTotalmalePaid?: number;
   bpTotalfemalePending?: number;
   bpTotalfemalePaid?: number;
+  bpTotalCitizensServed?: number;
   wpTotalnewPending?: number;
   wpTotalnewPaid?: number;
   wpTotalnewPaidViaEgov?: number;
@@ -86,6 +88,7 @@ interface TotalResults {
   wpTotalmalePaid?: number;
   wpTotalfemalePending?: number;
   wpTotalfemalePaid?: number;
+  wpTotalCitizensServed?: number;
   bpcoTotalnewPending?: number;
   bpcoTotalnewPaid?: number;
   bpcoTotalnewPaidViaEgov?: number;
@@ -96,6 +99,7 @@ interface TotalResults {
   bpcoTotalmalePaid?: number;
   bpcoTotalfemalePending?: number;
   bpcoTotalfemalePaid?: number;
+  bpcoTotalCitizensServed?: number;
   bpbpTotalnewPending?: number;
   bpbpTotalnewPaid?: number;
   bpbpTotalnewPaidViaEgov?: number;
@@ -106,6 +110,7 @@ interface TotalResults {
   bpbpTotalmalePaid?: number;
   bpbpTotalfemalePending?: number;
   bpbpTotalfemalePaid?: number;
+  bpbpTotalCitizensServed?: number;
   brgyTotalnewPending?: number;
   brgyTotalnewPaid?: number;
   brgyTotalnewPaidViaEgov?: number;
@@ -116,6 +121,7 @@ interface TotalResults {
   brgyTotalmalePaid?: number;
   brgyTotalfemalePending?: number;
   brgyTotalfemalePaid?: number;
+  brgyTotalCitizensServed?: number;
 }
 
 const mergeModuleResults = (bpResults: any[], wpResults: any[], bpcoResults: any[], bpbpResults: any[], brgyResults: any[]): any[] => {
@@ -199,7 +205,8 @@ const mergeModuleResults = (bpResults: any[], wpResults: any[], bpcoResults: any
       region: bpLgu.region,
       monthlyResults: bpLgu.monthlyResults.map((month: any) => 
         mergeMonthData({ ...createDefaultMonth(), month: month.month }, month, 'bp')
-      )
+      ),
+      bpTotalCitizensServed: bpLgu.totalCitizensServed || 0
     });
   });
 
@@ -211,13 +218,15 @@ const mergeModuleResults = (bpResults: any[], wpResults: any[], bpcoResults: any
         const wpMonth = wpLgu.monthlyResults.find((wp: any) => wp.month === month.month);
         return wpMonth ? mergeMonthData(month, wpMonth, 'wp') : month;
       });
+      existing.wpTotalCitizensServed = wpLgu.totalCitizensServed || 0;
     } else {
       mergedMap.set(wpLgu.lgu, {
         lgu: wpLgu.lgu,
         region: wpLgu.region,
         monthlyResults: wpLgu.monthlyResults.map((month: any) => 
           mergeMonthData({ ...createDefaultMonth(), month: month.month }, month, 'wp')
-        )
+        ),
+        wpTotalCitizensServed: wpLgu.totalCitizensServed || 0
       });
     }
   });
@@ -230,13 +239,15 @@ const mergeModuleResults = (bpResults: any[], wpResults: any[], bpcoResults: any
         const bpcoMonth = bpcoLgu.monthlyResults.find((bpco: any) => bpco.month === month.month);
         return bpcoMonth ? mergeMonthData(month, bpcoMonth, 'bpco') : month;
       });
+      existing.bpcoTotalCitizensServed = bpcoLgu.totalCitizensServed || 0;
     } else {
       mergedMap.set(bpcoLgu.lgu, {
         lgu: bpcoLgu.lgu,
         region: bpcoLgu.region,
         monthlyResults: bpcoLgu.monthlyResults.map((month: any) => 
           mergeMonthData({ ...createDefaultMonth(), month: month.month }, month, 'bpco')
-        )
+        ),
+        bpcoTotalCitizensServed: bpcoLgu.totalCitizensServed || 0
       });
     }
   });
@@ -249,13 +260,15 @@ const mergeModuleResults = (bpResults: any[], wpResults: any[], bpcoResults: any
         const bpbpMonth = bpbpLgu.monthlyResults.find((bpbp: any) => bpbp.month === month.month);
         return bpbpMonth ? mergeMonthData(month, bpbpMonth, 'bpbp') : month;
       });
+      existing.bpbpTotalCitizensServed = bpbpLgu.totalCitizensServed || 0;
     } else {
       mergedMap.set(bpbpLgu.lgu, {
         lgu: bpbpLgu.lgu,
         region: bpbpLgu.region,
         monthlyResults: bpbpLgu.monthlyResults.map((month: any) => 
           mergeMonthData({ ...createDefaultMonth(), month: month.month }, month, 'bpbp')
-        )
+        ),
+        bpbpTotalCitizensServed: bpbpLgu.totalCitizensServed || 0
       });
     }
   });
@@ -285,6 +298,7 @@ const mergeModuleResults = (bpResults: any[], wpResults: any[], bpcoResults: any
         }
         return month;
       });
+      existing.brgyTotalCitizensServed = brgyLgu.totalCitizensServed || 0;
     } else {
       mergedMap.set(brgyLgu.lgu, {
         lgu: brgyLgu.lgu,
@@ -303,7 +317,8 @@ const mergeModuleResults = (bpResults: any[], wpResults: any[], bpcoResults: any
           brgyFemalePending: 0, // BRGY doesn't have gender data
           brgyFemalePaid: 0, // BRGY doesn't have gender data
           totalCount: month.totalCount || 0, // Keep original field for reference
-        }))
+        })),
+        brgyTotalCitizensServed: brgyLgu.totalCitizensServed || 0
       });
     }
   });
@@ -323,6 +338,7 @@ const calculateTotals = (data: any): TotalResults => {
     totalmalePaid: 0,
     totalfemalePending: 0,
     totalfemalePaid: 0,
+    totalCitizensServed: 0,
     // Module-specific totals
     bpTotalnewPending: 0,
     bpTotalnewPaid: 0,
@@ -334,6 +350,7 @@ const calculateTotals = (data: any): TotalResults => {
     bpTotalmalePaid: 0,
     bpTotalfemalePending: 0,
     bpTotalfemalePaid: 0,
+    bpTotalCitizensServed: 0,
     wpTotalnewPending: 0,
     wpTotalnewPaid: 0,
     wpTotalnewPaidViaEgov: 0,
@@ -344,6 +361,7 @@ const calculateTotals = (data: any): TotalResults => {
     wpTotalmalePaid: 0,
     wpTotalfemalePending: 0,
     wpTotalfemalePaid: 0,
+    wpTotalCitizensServed: 0,
     bpcoTotalnewPending: 0,
     bpcoTotalnewPaid: 0,
     bpcoTotalnewPaidViaEgov: 0,
@@ -354,6 +372,7 @@ const calculateTotals = (data: any): TotalResults => {
     bpcoTotalmalePaid: 0,
     bpcoTotalfemalePending: 0,
     bpcoTotalfemalePaid: 0,
+    bpcoTotalCitizensServed: 0,
     bpbpTotalnewPending: 0,
     bpbpTotalnewPaid: 0,
     bpbpTotalnewPaidViaEgov: 0,
@@ -364,6 +383,7 @@ const calculateTotals = (data: any): TotalResults => {
     bpbpTotalmalePaid: 0,
     bpbpTotalfemalePending: 0,
     bpbpTotalfemalePaid: 0,
+    bpbpTotalCitizensServed: 0,
     brgyTotalnewPending: 0,
     brgyTotalnewPaid: 0,
     brgyTotalnewPaidViaEgov: 0,
@@ -374,9 +394,27 @@ const calculateTotals = (data: any): TotalResults => {
     brgyTotalmalePaid: 0,
     brgyTotalfemalePending: 0,
     brgyTotalfemalePaid: 0,
+    brgyTotalCitizensServed: 0,
   };
 
   data.results.forEach((lgu: any) => {
+    // Sum totalCitizensServed for each module from LGU level
+    if (lgu.bpTotalCitizensServed !== undefined) {
+      totals.bpTotalCitizensServed! += lgu.bpTotalCitizensServed;
+    }
+    if (lgu.wpTotalCitizensServed !== undefined) {
+      totals.wpTotalCitizensServed! += lgu.wpTotalCitizensServed;
+    }
+    if (lgu.bpcoTotalCitizensServed !== undefined) {
+      totals.bpcoTotalCitizensServed! += lgu.bpcoTotalCitizensServed;
+    }
+    if (lgu.bpbpTotalCitizensServed !== undefined) {
+      totals.bpbpTotalCitizensServed! += lgu.bpbpTotalCitizensServed;
+    }
+    if (lgu.brgyTotalCitizensServed !== undefined) {
+      totals.brgyTotalCitizensServed! += lgu.brgyTotalCitizensServed;
+    }
+   
     lgu.monthlyResults.forEach((result: any) => {
       // Calculate combined totals
       const bpNewPending = result.bpNewPending || 0;
@@ -389,6 +427,8 @@ const calculateTotals = (data: any): TotalResults => {
       const bpMalePaid = result.bpMalePaid || 0;
       const bpFemalePending = result.bpFemalePending || 0;
       const bpFemalePaid = result.bpFemalePaid || 0;
+      
+
 
       const wpNewPending = result.wpNewPending || 0;
       const wpNewPaid = result.wpNewPaid || 0;
@@ -507,6 +547,14 @@ const calculateTotals = (data: any): TotalResults => {
       totals.brgyTotalfemalePaid! += brgyFemalePaid;
     });
   });
+
+  // Calculate total citizens served across all modules
+  totals.totalCitizensServed = 
+    (totals.bpTotalCitizensServed || 0) + 
+    (totals.wpTotalCitizensServed || 0) + 
+    (totals.bpcoTotalCitizensServed || 0) + 
+    (totals.bpbpTotalCitizensServed || 0) + 
+    (totals.brgyTotalCitizensServed || 0);
 
   return totals;
 };
@@ -1143,23 +1191,14 @@ function Admin() {
           if (response.type === 'bp') {
             // Filter out results with errors
             const validResults = (response.data.results || []).filter((result: any) => !result.error);
-            if (validResults.length < (response.data.results || []).length) {
-              console.warn(`BP: Filtered out ${(response.data.results || []).length - validResults.length} results with errors`);
-            }
             allBPResults = allBPResults.concat(validResults);
           } else if (response.type === 'wp') {
             // Filter out results with errors
             const validResults = (response.data.results || []).filter((result: any) => !result.error);
-            if (validResults.length < (response.data.results || []).length) {
-              console.warn(`WP: Filtered out ${(response.data.results || []).length - validResults.length} results with errors`);
-            }
             allWPResults = allWPResults.concat(validResults);
           } else if (response.type === 'bpco') {
             // Filter out results with errors first
             const validResults = (response.data.results || []).filter((result: any) => !result.error);
-            if (validResults.length < (response.data.results || []).length) {
-              console.warn(`BPCO: Filtered out ${(response.data.results || []).length - validResults.length} results with errors`);
-            }
             // Map coPaid → newPaid, coPending → newPending for BPCO
             const mappedResults = validResults.map((result: any) => ({
               ...result,
@@ -1171,14 +1210,13 @@ function Admin() {
                 coPaid: month.coPaid || 0,
                 coPending: month.coPending || 0
               })) || []
+              , bpcoTotalCitizensServed: result.TotalCitizensServed // Retain the total citizens served field
             }));
             allBPCOResults = allBPCOResults.concat(mappedResults);
+          
           } else if (response.type === 'bpbp') {
             // Filter out results with errors first
             const validResults = (response.data.results || []).filter((result: any) => !result.error);
-            if (validResults.length < (response.data.results || []).length) {
-              console.warn(`BPBP: Filtered out ${(response.data.results || []).length - validResults.length} results with errors`);
-            }
             // Map buildingPaid → newPaid, buildingPending → newPending for BPBP
             const mappedResults = validResults.map((result: any) => ({
               ...result,
@@ -1203,9 +1241,6 @@ function Admin() {
           } else if (response.type === 'brgy') {
             // Filter out results with errors
             const validResults = (response.data.results || []).filter((result: any) => !result.error);
-            if (validResults.length < (response.data.results || []).length) {
-              console.warn(`BRGY: Filtered out ${(response.data.results || []).length - validResults.length} results with errors`);
-            }
             // Process Barangay Clearance data - use as-is since it should already have the correct structure
             allBRGYResults = allBRGYResults.concat(validResults);
           }
@@ -1233,9 +1268,11 @@ function Admin() {
           wpResults: allWPResults,
           bpcoResults: allBPCOResults,
           bpbpResults: allBPBPResults
-        };
 
+        };
         const totals = calculateTotals(updatedData);
+
+        
         dispatch(setCard(totals));
         
         // Keep the full data but limit the size to prevent QuotaExceededError
@@ -1352,6 +1389,12 @@ function Admin() {
           bpbpTotalmalePaid: 0,
           bpbpTotalfemalePending: 0,
           bpbpTotalfemalePaid: 0,
+          bpTotalCitizensServed: 0,
+          wpTotalCitizensServed: 0,
+          bpcoTotalCitizensServed: 0,
+          bpbpTotalCitizensServed: 0,
+          brgyTotalCitizensServed: 0,
+          totalCitizensServed: 0,
         }));
         dispatch(setTransaction({
           results: [],
@@ -1379,13 +1422,11 @@ function Admin() {
 
         dispatch(setLoad(false));
         setIsLoading(false);
-        console.log(`All ${totalRegions} regions completed successfully!`);
         
         // Mark first run as complete if it was a first run
         const isFirstRun = localStorage.getItem('elgu_first_run');
         if (isFirstRun === '0') {
           localStorage.setItem('elgu_first_run', '1');
-          console.log('First run completed, marked as done');
         }
 
       } catch (error: any) {
@@ -1394,7 +1435,6 @@ function Admin() {
         controllerRef.current = null;
         
         if (axios.isCancel(error) || error.name === "CanceledError") {
-          console.warn("Transaction request was canceled.");
           // Don't show error popup for user-initiated cancellations
           return;
         } else {
@@ -1427,7 +1467,6 @@ function Admin() {
       }
       setIsLoading(false);
       dispatch(setLoad(false));
-      console.log("Request canceled by user");
     };
 
     // Add event listeners

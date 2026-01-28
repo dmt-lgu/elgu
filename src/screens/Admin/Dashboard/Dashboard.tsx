@@ -1562,7 +1562,21 @@ const scrollToStatusChart = () => {
             }
             showInfo={`Number of applicants identifying as non-binary for ${formatList(getSelectedCardModules(data))} from ${data.startDate} to ${data.endDate}`}
           />
+              {/* Total Citizens Served Card */}
+          <StatisticCard 
+            title="Total Citizens Served"
+            value={filteredCard?.totalCitizensServed ?? 0}
+            bpValue={filteredCard?.bpTotalCitizensServed ?? 0}
+            wpValue={filteredCard?.wpTotalCitizensServed ?? 0}
+            bpcoValue={filteredCard?.bpcoTotalCitizensServed ?? 0}
+            bpbpValue={filteredCard?.bpbpTotalCitizensServed ?? 0}
+            brgyValue={filteredCard?.brgyTotalCitizensServed ?? 0}
+            showInfo={`Total number of citizens served across all ${formatList(getSelectedCardModules(data))} from ${data.startDate} to ${data.endDate}`}
+          />
         </div>
+
+    
+      
       </div>
       )}
 
