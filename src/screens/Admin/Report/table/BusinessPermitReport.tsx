@@ -126,8 +126,11 @@ const BusinessPermitReport = forwardRef<HTMLDivElement, BusinessPermitProps>(({
   }, [filteredResults]);
   const regionMappingGrouped = useMemo(() => groupResultsByRegion(normalizedResults, lguToRegion), [normalizedResults, lguToRegion]);
   const grandTotals = useMemo(() => {
-    const totals: any = { newPaid: 0, newGeoPay: 0, newPending: 0, newLicenseIssued: 0, renewalPaid: 0, renewalGeoPay: 0, renewalPending: 0, renewalLicenseIssued: 0, malePaid: 0, malePending: 0, femalePaid: 0, femalePending: 0 };
+    const totals: any = { newPaid: 0, newGeoPay: 0, newPending: 0, newLicenseIssued: 0, renewalPaid: 0, renewalGeoPay: 0, renewalPending: 0, renewalLicenseIssued: 0, malePaid: 0, malePending: 0, femalePaid: 0, femalePending: 0, totalCitizensServed: 0 };
     normalizedResults.forEach((lgu: any) => {
+      // Sum per-LGU totalCitizensServed if provided (skip errored LGUs)
+      if (!lgu.hasError) totals.totalCitizensServed += Number(lgu.totalCitizensServed || 0);
+
       if (!lgu.hasError && Array.isArray(lgu.monthlyResults)) {
         lgu.monthlyResults.forEach((item: any) => {
           const itemNewPaid = Number(item.newPaid || 0);
@@ -184,16 +187,29 @@ const BusinessPermitReport = forwardRef<HTMLDivElement, BusinessPermitProps>(({
     sortedRegionKeys.forEach(region => {
       const lguList = regionMappingGrouped[region];
       const isRegionOpen = openRegions.has(region);
-      allRows.push(<TableRow key={`${region}-trigger`}><TableCell colSpan={21} className="text-center p-2 cursor-pointer bg-slate-50 hover:bg-slate-100 font-semibold text-blue-600 text-xs" onClick={() => toggleRegion(region)}>{isRegionOpen ? `▲ Hide ${getRegionCode(region) || region} Data` : `▼ View ${getRegionCode(region) || region} Data`}</TableCell></TableRow>);
+      // Compute region-level citizens served up-front so we can render it as a single, row-spanning cell
+      const regionCitizensServed = lguList.reduce((acc: number, lgu: any) => acc + (!lgu.hasError ? Number(lgu.totalCitizensServed || 0) : 0), 0);
+      allRows.push(<TableRow key={`${region}-trigger`}><TableCell colSpan={22} className="text-center p-2 cursor-pointer bg-slate-50 hover:bg-slate-100 font-semibold text-blue-600 text-xs" onClick={() => toggleRegion(region)}>{isRegionOpen ? `▲ Hide ${getRegionCode(region) || region} Data` : `▼ View ${getRegionCode(region) || region} Data`}</TableCell></TableRow>);
       if (isRegionOpen) {
         const rows: React.ReactNode[] = [];
         const isDayMode = selectedDateType === "Day";
         let totalRowsForRegion = lguList.reduce((acc, lgu) => acc + (lgu.hasError ? 1 : (isDayMode ? Math.max(1, lgu.monthlyResults?.length || 0) : 1)), 0);
         let isFirstRowOfRegion = true;
         lguList.forEach((lgu: any) => {
+          // Number of table rows this LGU will occupy (used for per-LGU rowSpan)
+          const rowsForThisLgu = lgu.hasError ? 1 : (isDayMode ? Math.max(1, lgu.monthlyResults?.length || 0) : 1);
+          let isFirstRowOfLgu = true;
           if (lgu.hasError) {
-            rows.push(<TableRow key={`${region}-${lgu.lgu}-error`} className="bg-red-50/50">{isFirstRowOfRegion && <TableCell className="p-3 text-center font-bold text-slate-700 align-middle bg-slate-50 border-r text-sm" rowSpan={totalRowsForRegion}>{getRegionCode(region) || region}</TableCell>}<TableCell className="p-3 text-left font-semibold text-slate-800 text-sm">{lgu.lgu}<br/><span className="text-[11px] font-bold text-red-600 mt-0.5 uppercase">{lgu.error || 'NO DATA AVAILABLE'}</span></TableCell><TableCell colSpan={19} className="p-3 text-center text-slate-500">-</TableCell></TableRow>);
-            isFirstRowOfRegion = false; return;
+            rows.push(
+              <TableRow key={`${region}-${lgu.lgu}-error`} className="bg-red-50/50">
+                {isFirstRowOfRegion && <TableCell className="p-3 text-center font-bold text-slate-700 align-middle bg-slate-50 border-r text-sm" rowSpan={totalRowsForRegion}>{getRegionCode(region) || region}</TableCell>}
+                <TableCell className="p-3 text-left font-semibold text-slate-800 text-sm">{lgu.lgu}<br/><span className="text-[11px] font-bold text-red-600 mt-0.5 uppercase">{lgu.error || 'NO DATA AVAILABLE'}</span></TableCell>
+                {isFirstRowOfLgu && <TableCell className="p-3 text-right tabular-nums text-slate-800" rowSpan={rowsForThisLgu}>{formatNumber(Number(lgu.totalCitizensServed || 0))}</TableCell>}
+                {!isFirstRowOfLgu && null}
+                <TableCell colSpan={19} className="p-3 text-center text-slate-500">-</TableCell>
+              </TableRow>
+            );
+            isFirstRowOfRegion = false; isFirstRowOfLgu = false; return;
           }
           const dataToRender = isDayMode ? (lgu.monthlyResults?.length > 0 ? lgu.monthlyResults : [{}]) : [ (lgu.monthlyResults || []).reduce((acc: any, current: any) => { Object.keys(current).forEach(key => { if (typeof current[key] === 'number') acc[key] = (acc[key] || 0) + Number(current[key]); }); return acc; }, {}) ];
           dataToRender.forEach((item: any, itemIdx: number) => {
@@ -234,6 +250,8 @@ const BusinessPermitReport = forwardRef<HTMLDivElement, BusinessPermitProps>(({
                   <div>{lgu.lgu}<span className="text-xs font-medium text-slate-500 ml-1.5">{lgu.province ? `(${lgu.province})` : ""}</span></div>
                   <div className="text-[11px] font-semibold text-blue-700 mt-0.5">{periodLabel}</div>
                 </TableCell>
+                {isFirstRowOfLgu && <TableCell className="p-3 text-right tabular-nums text-slate-800" rowSpan={rowsForThisLgu}>{formatNumber(Number(lgu.totalCitizensServed || 0))}</TableCell>}
+                {!isFirstRowOfLgu && null}
 
                 {/* New */}
                 <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(newLicenseIssued)}</TableCell>
@@ -267,11 +285,11 @@ const BusinessPermitReport = forwardRef<HTMLDivElement, BusinessPermitProps>(({
               </TableRow>
             );
 
-            isFirstRowOfRegion = false;
+            isFirstRowOfRegion = false; isFirstRowOfLgu = false;
           });
         });
-        allRows.push(...rows);
-  const regionTotals = lguList.reduce((totals, lgu) => {
+          allRows.push(...rows);
+        const regionTotals = lguList.reduce((totals, lgu) => {
     if (!lgu.hasError && lgu.monthlyResults) {
       lgu.monthlyResults.forEach((item: any) => {
         const itemNewPaid = Number(item.newPaid || 0);
@@ -319,6 +337,7 @@ const BusinessPermitReport = forwardRef<HTMLDivElement, BusinessPermitProps>(({
       <TableCell className="bg-slate-200 p-3 text-left" colSpan={2}>
         <div className="font-extrabold tracking-wider text-xs">SUB-TOTAL ({getRegionCode(region) || region})</div>
       </TableCell>
+      <TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionCitizensServed)}</TableCell>
       <TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionLicenseIssued)}</TableCell>
       <TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionNewPaid)}</TableCell>
       <TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.newGeoPay)}</TableCell>
@@ -360,6 +379,7 @@ const BusinessPermitReport = forwardRef<HTMLDivElement, BusinessPermitProps>(({
               <TableRow>
                 <TableHead rowSpan={2} className="bg-[#9ec6f7] text-black font-bold p-3 text-center align-middle sticky top-0 z-20 text-xs border-b border-r border-slate-300">Region</TableHead>
                 <TableHead rowSpan={2} className="bg-[#9ec6f7] text-black font-bold p-3 text-left align-middle sticky top-0 z-20 text-xs border-b border-r border-slate-300">LGU</TableHead>
+                <TableHead rowSpan={2} className="bg-[#9ec6f7] text-black font-bold p-3 text-center align-middle sticky top-0 z-20 text-xs border-b border-r border-slate-300">Citizens Served</TableHead>
                 <TableHead colSpan={5} className="bg-[#9ec6f7] text-black font-bold p-3 text-center sticky top-0 z-20 uppercase tracking-wider text-xs border-b border-r border-slate-300">New</TableHead>
                 <TableHead colSpan={5} className="bg-[#9ec6f7] text-black font-bold p-3 text-center sticky top-0 z-20 uppercase tracking-wider text-xs border-b border-r border-slate-300">Renewal</TableHead>
                 <TableHead colSpan={4} className="bg-[#9ec6f7] text-black font-bold p-3 text-center sticky top-0 z-20 uppercase tracking-wider text-xs border-b border-r border-slate-300">Male</TableHead>
@@ -392,13 +412,13 @@ const BusinessPermitReport = forwardRef<HTMLDivElement, BusinessPermitProps>(({
               {normalizedResults.length > 0 ? (
                 <>
                   {renderTableRows()}
-                  {Object.keys(regionMappingGrouped).length > 1 && <TableRow><TableCell colSpan={21} className="text-center p-2 cursor-pointer bg-slate-100 hover:bg-slate-200 font-bold text-slate-700 text-xs" onClick={toggleAllRegions}>{openRegions.size === Object.keys(regionMappingGrouped).length ? 'Collapse All Regions' : 'Expand All Regions'}</TableCell></TableRow>}
-                  {(loading || isProgressive) && <TableRow><TableCell colSpan={21} className="p-0"><LoaderTable message={isProgressive ? "Please wait for other regions..." : "Updating data..."} /></TableCell></TableRow>}
+                  {Object.keys(regionMappingGrouped).length > 1 && <TableRow><TableCell colSpan={22} className="text-center p-2 cursor-pointer bg-slate-100 hover:bg-slate-200 font-bold text-slate-700 text-xs" onClick={toggleAllRegions}>{openRegions.size === Object.keys(regionMappingGrouped).length ? 'Collapse All Regions' : 'Expand All Regions'}</TableCell></TableRow>}
+                  {(loading || isProgressive) && <TableRow><TableCell colSpan={22} className="p-0"><LoaderTable message={isProgressive ? "Please wait for other regions..." : "Updating data..."} /></TableCell></TableRow>}
                 </>
               ) : loading ? (
-                <TableRow><TableCell colSpan={21} className="text-center py-12"><LoaderTable /></TableCell></TableRow>
+                <TableRow><TableCell colSpan={22} className="text-center py-12"><LoaderTable /></TableCell></TableRow>
               ) : (
-                <TableRow><TableCell colSpan={21} className="text-center py-20 bg-white"><div className='flex flex-col items-center justify-center'><div className="rounded-full bg-slate-100 p-4"><Search className="h-10 w-10 text-slate-400" /></div><p className='font-bold text-lg text-slate-600 mt-5'>{hasSearched ? 'No Results Found' : 'Generate a Report'}</p><p className="text-sm text-slate-500 mt-1 max-w-md mx-auto">{hasSearched ? 'There is no data matching your selected filters. Please try adjusting your criteria.' : 'Use the filters above to generate your business permit report.'}</p></div></TableCell></TableRow>
+                <TableRow><TableCell colSpan={22} className="text-center py-20 bg-white"><div className='flex flex-col items-center justify-center'><div className="rounded-full bg-slate-100 p-4"><Search className="h-10 w-10 text-slate-400" /></div><p className='font-bold text-lg text-slate-600 mt-5'>{hasSearched ? 'No Results Found' : 'Generate a Report'}</p><p className="text-sm text-slate-500 mt-1 max-w-md mx-auto">{hasSearched ? 'There is no data matching your selected filters. Please try adjusting your criteria.' : 'Use the filters above to generate your business permit report.'}</p></div></TableCell></TableRow>
               )}
             </TableBody>
             
@@ -407,6 +427,7 @@ const BusinessPermitReport = forwardRef<HTMLDivElement, BusinessPermitProps>(({
               {/* Ang mga 'Total' columns (nga naay bg-slate-700 kaniadto) gi-usab na sa bg-slate-800 */}
               <TableRow className="font-bold border-t-4 border-slate-500">
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-left" colSpan={2}><div className="font-extrabold tracking-wider text-base">GRAND TOTAL</div><div className='text-xs font-medium text-slate-300'>({dateRangeLabel})</div></TableCell>
+                <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base">{formatNumber(grandTotals.totalCitizensServed)}</TableCell>
                 {/* New */}
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base">{formatNumber(grandTotals.newLicenseIssued)}</TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base">{formatNumber((grandTotals.newPaid || 0) + (grandTotals.newGeoPay || 0))}</TableCell>

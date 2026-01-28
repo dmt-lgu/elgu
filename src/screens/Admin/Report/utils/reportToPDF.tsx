@@ -59,6 +59,8 @@ const getMonthRangeLabel = (months?: string[]): string => {
   )})`;
 };
 
+let defaultBodyFontSize = '11px';
+
 const makeTd = (val: any, opts: any = {}): HTMLTableCellElement => {
     const td = document.createElement("td");
     td.innerHTML = val != null && val !== "" ? String(val) : "0";
@@ -67,7 +69,7 @@ const makeTd = (val: any, opts: any = {}): HTMLTableCellElement => {
     td.style.textAlign = opts.align || "center";
     td.style.fontFamily = "'Rubik', sans-serif";
     td.style.verticalAlign = "middle";
-    td.style.fontSize = opts.fontSize || "11px";
+  td.style.fontSize = opts.fontSize || defaultBodyFontSize;
     if (opts.bold) td.style.fontWeight = "bold";
     if (opts.color) td.style.color = opts.color;
     if (opts.bg) td.style.background = opts.bg;
@@ -220,9 +222,9 @@ const createReportTableHeader = (
         headerRow.appendChild(th);
       });
     } else {
-      // For Certificate of Occupancy and Building Permit, include License Issued and eGOV columns
-      const labels = ["Region", "LGU", "License Issued", "PAID", "PAID (eGOVPay)", "ONGOING", "Total"];
-      const widths = ["12%", "30%", "10%", "10%", "10%", "14%", "14%"];
+      // For Certificate of Occupancy and Building Permit: place Citizens Served before numeric columns
+      const labels = ["Region", "LGU", "Citizens Served", "License Issued", "PAID", "PAID (eGOVPay)", "ONGOING", "Total"];
+      const widths = ["12%", "30%", "8%", "10%", "10%", "10%", "12%", "12%"];
       labels.forEach((label, idx) => {
         const th = document.createElement("th");
         th.textContent = label;
@@ -240,6 +242,7 @@ const createReportTableHeader = (
     const mainHeaders = [
       { label: "Region", rowSpan: 2 },
       { label: "LGU", rowSpan: 2 },
+      { label: "Citizens Served", rowSpan: 2 },
       // Note: include License Issued as an explicit computed column for New and Renewal (colSpan 5)
       { label: "New", colSpan: 5 },
       { label: "Renewal", colSpan: 5 },
@@ -377,6 +380,20 @@ const createReportGrandTotalRow = (
   const paidColTotal = (totals.license || 0) + (totals.forIssuance || 0);
   const overallTotal = paidColTotal + (totals.geo || 0) + (totals.pending || 0);
 
+  // Compute grand total for Citizens Served first so it appears immediately after LGU column
+  const citizensGrandTotal = filteredResults.reduce((acc: number, lgu: any) => {
+        if (isDayMode) {
+          (lgu.monthlyResults || []).forEach((m: any) => { acc += Number(m?.totalCitizensServed || 0); });
+        } else {
+          const perLgu = Number(lgu?.totalCitizensServed ?? (Array.isArray(lgu?.monthlyResults) && lgu.monthlyResults.length
+            ? lgu.monthlyResults.reduce((s: number, m: any) => s + (Number(m.totalCitizensServed || 0)), 0)
+            : (lgu?.sum?.totalCitizensServed ?? 0)));
+          acc += perLgu;
+        }
+        return acc;
+      }, 0);
+  totalTr.appendChild(makeTd(citizensGrandTotal, commonProps));
+
   // NOTE: rows swap the displayed values for "License Issued" and "PAID",
   // so the GRAND TOTAL must follow the same column ordering. Append the
   // PAID aggregate first (so it appears under the "License Issued" header),
@@ -425,6 +442,22 @@ const createReportGrandTotalRow = (
       });
 
       // Now, calculate the derived totals from the aggregated sums
+      // Also compute Citizens Served grand total for complex modules
+      const citizensGrandTotal = filteredResults.reduce((acc: number, lgu: any) => {
+          if (isDayMode) {
+            (lgu.monthlyResults || []).forEach((m: any) => { acc += Number(m?.totalCitizensServed || 0); });
+          } else {
+            const perLgu = Number(lgu?.totalCitizensServed ?? (Array.isArray(lgu?.monthlyResults) && lgu.monthlyResults.length
+              ? lgu.monthlyResults.reduce((s: number, m: any) => s + (Number(m.totalCitizensServed || 0)), 0)
+              : (lgu?.sum?.totalCitizensServed ?? 0)));
+            acc += perLgu;
+          }
+          return acc;
+        }, 0);
+      // Prepend Citizens Served grand total so it aligns right after LGU column
+      totalTr.appendChild(makeTd(citizensGrandTotal, commonProps));
+
+      // Now compute numeric derived totals
       const newPaidCol = totals.newLicense + totals.newPaid; // License Issued + For Issuance
       const newOverallTotal = newPaidCol + totals.newGeo + totals.newPending;
       const renewalPaidCol = totals.renewalLicense + totals.renewalPaid;
@@ -487,6 +520,8 @@ const createPageContent = (
   const tableChunk = document.createElement("table");
   tableChunk.setAttribute("style", `width: 100%; font-size: 16px; font-family: Rubik, sans-serif; border-collapse: collapse; table-layout: fixed;`);
   
+  // Increase body font size for landscape (wide) modules
+  defaultBodyFontSize = isLandscape ? '13px' : '11px';
   const thead = createReportTableHeader(moduleLabel, isCO, isBldg, isBC);
   const tbodyChunk = document.createElement("tbody");
 
@@ -552,8 +587,11 @@ const createPageContent = (
         const paidCol = licenseIssuedField + forIssuance; // PAID shows License Issued + For Issuance
         const total = paidCol + geo + pending;
 
+        // Citizens Served column: prefer per-month value in Day mode, otherwise per-LGU total
+        const citizensServedValue = isDayMode ? Number(src?.totalCitizensServed ?? 0) : Number(row.lgu?.totalCitizensServed ?? row.lgu?.sum?.totalCitizensServed ?? 0);
+        tr.appendChild(makeTd(citizensServedValue, { striped: isStriped, fontSize: "14px", bold: true }));
         // Swap: show PAID value in the License Issued column, and show License Issued
-        // value in the PAID column (headers remain unchanged).
+        // value in the PAID column (headers remain unchanged). Append numeric columns after Citizens Served.
         tr.appendChild(makeTd(paidCol, { striped: isStriped, fontSize: "14px", bold: true, color: '#166534' }));
         tr.appendChild(makeTd(licenseIssuedField, { striped: isStriped, fontSize: "14px", bold: true, color: '#0f172a' }));
         tr.appendChild(makeTd(geo, { striped: isStriped, fontSize: "14px", bold: true, color: '#0ea5a4' }));
@@ -570,6 +608,10 @@ const createPageContent = (
 
           const newPaidCol = newLicenseIssuedField + newForIssuance; // PAID = License Issued + For Issuance
           const newTotal = newPaidCol + newGeo + newPending;
+
+          // Citizens Served column for Business/Working Permit: prefer per-month value in Day mode, otherwise per-LGU
+          const citizensVal = isDayMode ? Number(data?.totalCitizensServed ?? 0) : Number(row.lgu?.totalCitizensServed ?? row.lgu?.sum?.totalCitizensServed ?? 0);
+          tr.appendChild(makeTd(citizensVal, cellOpts));
 
           // Swap: put PAID (LicenseIssued + ForIssuance) under the License Issued header,
           // and show the explicit License Issued field under the PAID header.
@@ -722,7 +764,9 @@ export async function exportTableReportToPDF(params: ExportTableReportToPDFParam
         try {
           const orientation = (isBP || isWP) ? "landscape" : "portrait";
           const isLandscape = orientation === "landscape";
-          pdf = new jsPDF({ orientation, unit: "pt", format: "a4", compress: true, putOnlyUsedFonts: true } as any);
+          // Use A3 for wide (landscape) modules to give more horizontal space
+          const pdfFormat: any = (isBP || isWP) ? 'a3' : 'a4';
+          pdf = new jsPDF({ orientation, unit: "pt", format: pdfFormat, compress: true, putOnlyUsedFonts: true } as any);
           const pageWidth = pdf.internal.pageSize.getWidth();
           const pageHeight = pdf.internal.pageSize.getHeight();
           const marginX = isSimpleReport ? 8 : 20;
