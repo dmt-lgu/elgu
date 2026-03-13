@@ -425,7 +425,7 @@ export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal)
           const newPaidColumn = newLicenseIssued + newEgov;
           const newTotal = newPaidColumn + (itemToDisplay.newPending || 0);
 
-          const renewLicenseIssued = Number(itemToDisplay.renewLicenseIssued ?? itemToDisplay.renewIssued ?? 0);
+          const renewLicenseIssued = Number(itemToDisplay.renewLicenseIssued ?? itemToDisplay.renewIssued ?? itemToDisplay.renewPaid ?? 0);
           const renewEgov = Number(itemToDisplay.renewPaidViaEgov || 0);
           const renewPaidColumn = renewLicenseIssued + renewEgov;
           const renewTotal = renewPaidColumn + (itemToDisplay.renewPending || 0);

@@ -187,7 +187,7 @@ function _generateBusinessPermitSheet(data: any[], isDayMode: boolean): xlsx.Wor
       const renewForIssuance = Number(item.renewPaid || 0);
       const renewGeo = Number(item.renewPaidViaEgov || 0);
       const renewPending = Number(item.renewPending || 0);
-      const renewLicense = Number(item.renewLicenseIssued ?? item.renewIssued ?? 0);
+      const renewLicense = Number(item.renewLicenseIssued ?? item.renewIssued ?? item.renewPaid ?? 0);
       const renewPaidCol = renewLicense + renewForIssuance;
       const renewTotal = renewPaidCol + renewGeo + renewPending;
 

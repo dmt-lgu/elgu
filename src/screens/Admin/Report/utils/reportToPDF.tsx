@@ -417,7 +417,7 @@ const createReportGrandTotalRow = (
           const rPaid = Number(s.renewPaid || s.renew_paid || 0);
           const rGeo = Number(s.renewPaidViaEgov || s.renewPaidViaEGov || 0);
           const rPending = Number(s.renewPending || s.renew_pending || 0);
-          const rLicense = Number(s.renewLicenseIssued ?? s.renewIssued ?? 0);
+          const rLicense = Number(s.renewLicenseIssued ?? s.renewIssued ?? s.renewPaid ?? 0);
 
           acc.newPaid += nPaid;
           acc.newGeo += nGeo;
@@ -621,8 +621,8 @@ const createPageContent = (
           tr.appendChild(makeTd(newPending, cellOpts));
           tr.appendChild(makeTd(newTotal, cellOpts));
 
-          // Renewal: prefer explicit license-issued field when present
-          const renewLicenseIssuedField = Number(data?.renewLicenseIssued ?? data?.renewIssued ?? 0);
+          // Renewal: prefer explicit license-issued field when present (fall back to renewPaid)
+          const renewLicenseIssuedField = Number(data?.renewLicenseIssued ?? data?.renewIssued ?? data?.renewPaid ?? 0);
           const renewForIssuance = Number(data?.renewPaid ?? 0);
           const renewGeo = Number(data?.renewPaidViaEgov ?? 0);
           const renewPending = Number(data?.renewPending ?? 0);
