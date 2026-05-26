@@ -61,6 +61,17 @@ const ComparisonChartComponent: React.FC<ComparisonChartProps> = ({
 }) => {
   const data = useSelector(selectData);
   const charts = useSelector(selectCharts);
+
+  // Maps locationName short codes → breakdown display names (from _REGION_DISPLAY_MAP in backend)
+  const LOCATION_TO_DISPLAY: Record<string, string> = {
+    'I': 'Region 1', 'II': 'Region 2', 'III': 'Region 3',
+    'IV-A': 'Region 4A', 'IV-B': 'MIMAROPA', 'V': 'Region 5',
+    'VI': 'Region 6', 'VII': 'Region 7', 'VIII': 'Region 8',
+    'IX': 'Region 9', 'X': 'Region 10', 'XI': 'Region 11',
+    'XII': 'Region 12', 'XIII': 'Region 13',
+    'CAR': 'CAR', 'NCR': 'NCR', 'NIR': 'NIR',
+    'BARMM I': 'BARMM', 'BARMM II': 'BARMM',
+  };
   
   // Get chart type from Redux, defaulting to bar
   let reduxChartType: 'bar' | 'pie' = 'bar';
@@ -100,11 +111,21 @@ const ComparisonChartComponent: React.FC<ComparisonChartProps> = ({
   const comparisonData = useMemo(() => {
     const moduleResults: { [key: string]: { startDate: number; endDate: number } } = {};
 
+    // Build set of breakdown display names for the selected regions (client-side filter)
+    const selectedLocations: string[] = Array.isArray(data?.locationName) ? data.locationName : [];
+    const selectedDisplayNames = new Set<string>(
+      selectedLocations.map((loc: string) => LOCATION_TO_DISPLAY[loc] ?? loc)
+    );
+    const filterByRegion = (items: any[]) =>
+      selectedDisplayNames.size === 0
+        ? items
+        : items.filter((item: any) => selectedDisplayNames.has(item.name));
+
     // Process each module type
     const processModuleData = (moduleData: any[], moduleRaw: any[], moduleName: string, shortName: string) => {
       const filteredData = getModuleData(moduleData, moduleName);
       const filteredRaw = getModuleData(moduleRaw, moduleName);
-      
+
       if (filteredData.length > 0 && filteredRaw.length > 0) {
         let startDateTotal = 0;
         let endDateTotal = 0;
@@ -112,20 +133,20 @@ const ComparisonChartComponent: React.FC<ComparisonChartProps> = ({
         // Find data for start date and end date from breakdown
         const startDateStr = startDate;
         const endDateStr = endDate;
-        
+
         // Look for exact date matches in breakdown data
         const startDateEntry = filteredRaw.find((item: any) => item.date === startDateStr);
         const endDateEntry = filteredRaw.find((item: any) => item.date === endDateStr);
-        
-        // Calculate totals from breakdown data
+
+        // Calculate totals from breakdown data, filtered by selected regions
         if (startDateEntry && startDateEntry.data) {
-          startDateTotal = startDateEntry.data.reduce((sum: number, item: any) => 
+          startDateTotal = filterByRegion(startDateEntry.data).reduce((sum: number, item: any) =>
             sum + (Number(item[selectedStatus]) || 0), 0
           );
         }
-        
+
         if (endDateEntry && endDateEntry.data) {
-          endDateTotal = endDateEntry.data.reduce((sum: number, item: any) => 
+          endDateTotal = filterByRegion(endDateEntry.data).reduce((sum: number, item: any) =>
             sum + (Number(item[selectedStatus]) || 0), 0
           );
         }
@@ -134,22 +155,22 @@ const ComparisonChartComponent: React.FC<ComparisonChartProps> = ({
         if (startDateTotal === 0 && endDateTotal === 0 && filteredRaw.length > 0) {
           // Sort by date and get first and last
           const sortedRaw = [...filteredRaw].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-          
+
           if (sortedRaw[0] && sortedRaw[0].data) {
-            startDateTotal = sortedRaw[0].data.reduce((sum: number, item: any) => 
+            startDateTotal = filterByRegion(sortedRaw[0].data).reduce((sum: number, item: any) =>
               sum + (Number(item[selectedStatus]) || 0), 0
             );
           }
-          
+
           if (sortedRaw[sortedRaw.length - 1] && sortedRaw[sortedRaw.length - 1].data) {
-            endDateTotal = sortedRaw[sortedRaw.length - 1].data.reduce((sum: number, item: any) => 
+            endDateTotal = filterByRegion(sortedRaw[sortedRaw.length - 1].data).reduce((sum: number, item: any) =>
               sum + (Number(item[selectedStatus]) || 0), 0
             );
           }
         }
 
-        moduleResults[shortName] = { 
-          startDate: startDateTotal, 
+        moduleResults[shortName] = {
+          startDate: startDateTotal,
           endDate: endDateTotal
         };
       }
@@ -173,7 +194,7 @@ const ComparisonChartComponent: React.FC<ComparisonChartProps> = ({
     }
 
     return moduleResults;
-  }, [bpData, wpData, brgyData, bpcoData, bpbpData, bpRaw, wpRaw, brgyRaw, bpcoRaw, bpbpRaw, modules, startDate, endDate, data?.selectedChartModuleFilter, selectedStatus]);
+  }, [bpData, wpData, brgyData, bpcoData, bpbpData, bpRaw, wpRaw, brgyRaw, bpcoRaw, bpbpRaw, modules, startDate, endDate, data?.selectedChartModuleFilter, data?.locationName, selectedStatus]);
 
   // Calculate increase data for circular charts
   const increaseData = useMemo(() => {
@@ -279,72 +300,66 @@ const ComparisonChartComponent: React.FC<ComparisonChartProps> = ({
           weight: 'bold' as const,
           size: 11,
         },
-        formatter: (value: number) => {
+        formatter: (value: number, context: any) => {
+          if (chartType === 'pie') {
+            const dataset = context.chart.data.datasets[0];
+            const total = (dataset.data as number[]).reduce((a: number, b: number) => a + b, 0);
+            if (!total || value <= 0) return '';
+            return `${((value / total) * 100).toFixed(1)}%`;
+          }
           return value > 0 ? value : '';
         },
       },
       tooltip: {
         callbacks: {
           title: function(context: any) {
-            // Show the module name and both dates in the title
-            const moduleKey = context[0].label;
-            return `${moduleKey} `;
+            const label = context[0].label;
+            return label;
           },
           label: function(context: any) {
-            const label = context.dataset.label || '';
-            const value = context.parsed.y || context.parsed;
-            const dateStr = label; // This already contains the formatted date
-            return `${dateStr}: ${value} ${selectedStatus}`;
+            const rawValue: number = context.raw ?? context.parsed ?? 0;
+            if (chartType === 'pie') {
+              // Compute the same percentage shown on the slice
+              const dataset = context.chart.data.datasets[0];
+              const total = (dataset.data as number[]).reduce((a: number, b: number) => a + b, 0);
+              const pct = total > 0 ? ((rawValue / total) * 100).toFixed(1) : '0.0';
+              return ` ${rawValue} ${selectedStatus} (${pct}%)`;
+            }
+            const datasetLabel = context.dataset.label || '';
+            return ` ${datasetLabel}: ${rawValue} ${selectedStatus}`;
           },
           afterBody: function(context: any) {
             if (chartType === 'pie') {
-              // For pie chart, get the module from the dataset label
-              const datasetIndex = context[0].datasetIndex;
-              const moduleKeys = Object.keys(comparisonData);
-              const moduleKey = moduleKeys[datasetIndex];
-              const moduleData = comparisonData[moduleKey];
-              
-              if (moduleData) {
-                const totalIncrease = moduleData.endDate - moduleData.startDate;
-                const percentageChange = moduleData.startDate > 0 ? (((moduleData.endDate - moduleData.startDate) / moduleData.startDate) * 100) : 0;
-                const changeText = totalIncrease >= 0 ? 'increase' : 'decrease';
-                const sign = totalIncrease >= 0 ? '+' : '';
-                
-                return [
-                  '',
-                  `${moduleKey} Module Only:`,
-                  `Start Date: ${startDate} (${moduleData.startDate})`,
-                  `End Date: ${endDate} (${moduleData.endDate})`,
-                  '',
-                  `Change: ${sign}${totalIncrease} (${sign}${percentageChange.toFixed(1)}% ${changeText})`,
-                  '',
-                  'Hover over other segments to see other modules'
-                ];
+              // dataIndex distinguishes which slice (0 = startDate, 1 = endDate)
+              const dataIndex = context[0].dataIndex;
+              const startTotal = Object.values(comparisonData).reduce((s, m) => s + m.startDate, 0);
+              const endTotal   = Object.values(comparisonData).reduce((s, m) => s + m.endDate,   0);
+              const change     = endTotal - startTotal;
+              const sign       = change >= 0 ? '+' : '';
+              const pctChange  = startTotal > 0 ? `${sign}${(((endTotal - startTotal) / startTotal) * 100).toFixed(1)}%` : 'N/A';
+              if (dataIndex === 0) {
+                return ['', `Period start total: ${startTotal}`, `Period end total:   ${endTotal}`, `Overall change: ${sign}${change} (${pctChange})`];
               }
+              return ['', `Period start total: ${startTotal}`, `Period end total:   ${endTotal}`, `Overall change: ${sign}${change} (${pctChange})`];
             } else {
-              // For bar chart, show the specific module being hovered
-              const moduleKey = context[0].label;
+              const moduleKey  = context[0].label;
               const moduleData = comparisonData[moduleKey];
-              
               if (moduleData) {
-                const totalIncrease = moduleData.endDate - moduleData.startDate;
-                const percentageChange = moduleData.startDate > 0 ? (((moduleData.endDate - moduleData.startDate) / moduleData.startDate) * 100) : 0;
-                const changeText = totalIncrease >= 0 ? 'increase' : 'decrease';
-                const sign = totalIncrease >= 0 ? '+' : '';
-                
+                const diff = moduleData.endDate - moduleData.startDate;
+                const sign = diff >= 0 ? '+' : '';
+                const pct  = moduleData.startDate > 0
+                  ? `${sign}${(((moduleData.endDate - moduleData.startDate) / moduleData.startDate) * 100).toFixed(1)}%`
+                  : 'N/A';
                 return [
                   '',
-                  `${moduleKey} Details:`,
                   `${formatDate(startDate)}: ${moduleData.startDate}`,
                   `${formatDate(endDate)}: ${moduleData.endDate}`,
-                  `Change: ${sign}${totalIncrease} (${sign}${percentageChange.toFixed(1)}% ${changeText})`,
-                  ''
+                  `Change: ${sign}${diff} (${pct})`,
                 ];
               }
             }
-            
-            return ['', 'No data available'];
-          }
+            return [];
+          },
         },
         displayColors: true,
         backgroundColor: 'rgba(0, 0, 0, 0.8)',

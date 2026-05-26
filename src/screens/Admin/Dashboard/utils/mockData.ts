@@ -172,15 +172,15 @@ export const modules = [
 ];
 
 export const regions = [
-  "I", "II", "III", "IV-A", "V","CAR", "IV-B", "VII", "VIII", "NIR", "VI", "IX", "X", "XI", "XII", "BARMM I", "BARMM II", "XIII"
+  "I", "II", "III", "IV-A", "V","CAR", "NCR", "IV-B", "VII", "VIII", "NIR", "VI", "IX", "X", "XI", "XII", "BARMM I", "BARMM II", "XIII"
 ];
 
 
 export const groupOfIslands = ["Luzon", "Visayas", "Mindanao"];
 export const regionGroups = [
   ["I", "II", "III", "IV-A", "V"],
-  ["CAR", "IV-B", "VII", "VIII"],
-  ["VI", "IX", "X", "XI", "XII"],
+  ["CAR", "NCR", "IV-B", "VII", "VIII"],
+  ["VI", "NIR", "IX", "X", "XI", "XII"],
   [ "BARMM I", "BARMM II", "XIII"]
 ];
 
@@ -280,7 +280,7 @@ export const cities:any = {
 };
 
 export const islandRegionMap: Record<string, string[]> = {
-  "Luzon": ["I", "II", "III", "IV-A", "V", "CAR", "IV-B"],
+  "Luzon": ["I", "II", "III", "IV-A", "V", "CAR", "NCR", "IV-B"],
   "Visayas": ["VI", "VII", "VIII", "NIR"],
   "Mindanao": ["IX", "X", "XI", "XII", "XIII", "BARMM I", "BARMM II"],
 };

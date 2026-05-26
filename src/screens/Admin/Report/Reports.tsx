@@ -106,8 +106,15 @@ function useReportData({
       setData(null); setLoading(false); return;
     }
     setLoading(true);
+    const expandNIR = (regions: string[]): string[] => {
+      if (!regions.includes('NIR')) return regions;
+      const expanded = regions.filter(r => r !== 'NIR');
+      ['Negros Occidental', 'Negros Oriental', 'Siquijor'].forEach(p => { if (!expanded.includes(p)) expanded.push(p); });
+      return expanded;
+    };
+    const expandedRegions = expandNIR(appliedFilter.selectedRegions || []);
     const payload: any = {
-      locationName: appliedFilter.selectedRegions,
+      locationName: expandedRegions,
       startDate: appliedFilter.dateRange.start ? formatLocalDate(ensureDate(appliedFilter.dateRange.start)) : null,
       endDate: appliedFilter.dateRange.end ? formatLocalDate(ensureDate(appliedFilter.dateRange.end)) : null,
     };
@@ -115,8 +122,8 @@ function useReportData({
     // If multiple regions selected and not select-all, fetch sequentially per-region so progress is step-by-step.
     const doFetch = async () => {
       try {
-        if (Array.isArray(appliedFilter.selectedRegions) && appliedFilter.selectedRegions.length > 1 && !isSelectAll) {
-          const regions = appliedFilter.selectedRegions.slice();
+        if (Array.isArray(expandedRegions) && expandedRegions.length > 1 && !isSelectAll) {
+          const regions = expandedRegions.slice();
           const aggregated: any[] = [];
           for (let i = 0; i < regions.length; i++) {
             const region = regions[i];
@@ -300,7 +307,14 @@ const Reports: React.FC = () => {
     const fetchSequentially = async () => {
       setIsProgressiveLoading(true);
       const regionOrder = ["Region I", "Region II", "Region III", "IV-A", "IV-B", "Region V", "Region VI", "Region VII", "Region VIII", "Region IX", "Region X", "Region XI", "Region XII", "Region XIII", "CAR", "BARMM1", "BARMM2"];
-      const sortedRegions = appliedFilter.selectedRegions.slice().sort((a, b) => regionOrder.indexOf(a) - regionOrder.indexOf(b));
+      const expandedRegions = (() => {
+        const raw: string[] = appliedFilter.selectedRegions || [];
+        if (!raw.includes('NIR')) return raw;
+        const expanded = raw.filter((r: string) => r !== 'NIR');
+        ['Negros Occidental', 'Negros Oriental', 'Siquijor'].forEach((p: string) => { if (!expanded.includes(p)) expanded.push(p); });
+        return expanded;
+      })();
+      const sortedRegions = expandedRegions.slice().sort((a, b) => regionOrder.indexOf(a) - regionOrder.indexOf(b));
       const initialProgress: ProgressState = {};
       (appliedFilter.selectedModules || []).forEach(moduleKey => { initialProgress[moduleKey] = { currentRegion: "Initializing...", currentIndex: 0, totalRegions: sortedRegions.length }; });
       setProgressState(initialProgress);

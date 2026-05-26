@@ -10,6 +10,8 @@ import Buildings from './../../assets/image/9cb79cee-3ea4-4187-9f1f-868c47ae.png
 // Import SweetAlert2
 import Swal from "sweetalert2";
 import { useNavigate } from "react-router-dom";
+import { isAxiosError } from "axios";
+import axios from "@/plugin/axios";
 
 
 
@@ -19,23 +21,57 @@ function Login() {
   const [showPassword, setShowPassword] = useState(false); // State for show/hide
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
-    // Simulate async login
-    
-      setLoading(false);
+    try {
+      const loginResponse = await axios.post(`/api/v1/token/login/`, {
+        email,
+        password,
+      });
+
+      const token = loginResponse.data.auth_token || loginResponse.data.token;
+      if (!token) {
+        throw new Error("Login failed. No auth token was returned.");
+      }
+
+      localStorage.setItem("auth_token", token);
+      axios.defaults.headers.common["Authorization"] = `Token ${token}`;
+
+      const userResponse = await axios.get(`/api/v1/users/me/`);
+      const user = userResponse.data;
+      localStorage.setItem("user", JSON.stringify(user));
+
       Swal.fire({
         icon: "success",
         title: "Login Successful",
-        text: `Welcome, ${email}!`,
+        text: `Welcome, ${user.email || email}!`,
         showConfirmButton: false,
         timer: 2000,
       });
- 
 
-    navigate("/react-vite-supreme/admin");
+      const accessLevel = user.act_lvl ?? user.acc_lvl ?? user.accLvl ?? user.access_level;
+      if (accessLevel === 0 || accessLevel === 1) {
+        navigate("/elgu/admin");
+      } else {
+        navigate("/elgu/main");
+      }
+    } catch (error: unknown) {
+      const message =
+        isAxiosError(error) && error.response?.data
+          ? JSON.stringify(error.response.data)
+          : (error as Error).message || "Login failed. Please try again.";
+
+      Swal.fire({
+        icon: "error",
+        title: "Login Failed",
+        text: message,
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

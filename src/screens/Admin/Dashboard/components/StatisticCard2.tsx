@@ -1,5 +1,5 @@
 import React from 'react';
-import { InfoIcon, Building2, TrendingUp, Shield } from 'lucide-react';
+import { InfoIcon, Building2, TrendingUp, Shield, CreditCard,  ParkingCircle, PauseCircleIcon, StopCircleIcon } from 'lucide-react';
 import IncreasingTextAnimation from './textAnimation';
 import { useSelector } from 'react-redux';
 import { selectLoad2 } from '@/redux/loadSlice2';
@@ -7,16 +7,18 @@ import { selectLoad2 } from '@/redux/loadSlice2';
 interface StatisticCardProps {
   title: string;
   value: string | number;
-  showInfo?: string; // Tooltip text
+  showInfo?: string;
   className?: string;
-  onClick?: () => void; // Click handler
+  onClick?: () => void;
+  loading?: boolean;
 }
 
-const StatisticCard2: React.FC<StatisticCardProps> = ({ title, value, showInfo, onClick }) => {
-  const loading = useSelector(selectLoad2);
+const StatisticCard2: React.FC<StatisticCardProps> = ({ title, value, showInfo, onClick, loading: loadingProp }) => {
+  const reduxLoading = useSelector(selectLoad2);
+  const loading = loadingProp ?? reduxLoading;
 
   const getCardTheme = () => {
-    const themes = {
+    const themes: Record<string, { icon: any; iconColor: string; accentColor: string; borderAccent: string }> = {
       'No. of LGU Operational': {
         icon: Building2,
         iconColor: 'bg-[#2464e8]',
@@ -34,10 +36,28 @@ const StatisticCard2: React.FC<StatisticCardProps> = ({ title, value, showInfo, 
         iconColor: 'bg-red-600',
         accentColor: 'text-red-600',
         borderAccent: 'border-l-red-500'
-      }
+      },
+      'No. of LGU with ePayment': {
+        icon: CreditCard,
+        iconColor: 'bg-blue-600',
+        accentColor: 'text-blue-600',
+        borderAccent: 'border-l-blue-500'
+      },
+      'No. of LGU with eGovPay v1': {
+        icon: StopCircleIcon,
+        iconColor: 'bg-[#fcbf21]',
+        accentColor: 'text-[#fcbf21]',
+        borderAccent: 'border-l-[#fcbf21]'
+      },
+      'No. of LGU with eGovPay v2': {
+        icon: PauseCircleIcon,
+        iconColor: 'bg-green-600',
+        accentColor: 'text-green-600',
+        borderAccent: 'border-l-green-500'
+      },
     };
 
-    return themes[title as keyof typeof themes] || themes['No. of LGU Operational'];
+    return themes[title] ?? themes['No. of LGU Operational'];
   };
 
   const theme = getCardTheme();
@@ -48,6 +68,7 @@ const StatisticCard2: React.FC<StatisticCardProps> = ({ title, value, showInfo, 
       className={loading?`bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 relative `:`bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer duration-200 relative border-l-4 ${theme.borderAccent}`}
       onClick={onClick}
       >
+    
       {/* Loading bar */}
       {loading && (
         <div className="absolute left-0 top-0 w-1 h-full z-0 overflow-hidden rounded-l-md flex flex-col">
@@ -70,7 +91,7 @@ const StatisticCard2: React.FC<StatisticCardProps> = ({ title, value, showInfo, 
             className="w-full delay-600"
             style={{
               height: '50%',
-              background: '#0134b2'
+           background: '#0134b2'
             }}
           />
             
@@ -115,9 +136,13 @@ const StatisticCard2: React.FC<StatisticCardProps> = ({ title, value, showInfo, 
 
         {/* Value */}
         <div>
-          <p className={`text-2xl font-bold ${theme.accentColor}`}>
-            <IncreasingTextAnimation isNumber={true} text={String(value)} />
-          </p>
+          {loading ? (
+            <div className="h-8 w-24 bg-gray-200 rounded animate-pulse mt-1" />
+          ) : (
+            <p className={`text-2xl font-bold ${theme.accentColor}`}>
+              <IncreasingTextAnimation isNumber={true} text={String(value)} />
+            </p>
+          )}
         </div>
       </div>
     </div>

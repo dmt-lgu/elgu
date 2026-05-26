@@ -13,6 +13,16 @@ type Filters = any;
 const globalAny: any = (globalThis as any);
 if (!globalAny._reportFetches) globalAny._reportFetches = {};
 
+// NIR has no backend region — replace it with its three provinces so the API
+// can filter by province name instead of a region ID.
+const NIR_PROVINCES = ['Negros Occidental', 'Negros Oriental', 'Siquijor'];
+function expandNIR(regions: string[]): string[] {
+  if (!regions.includes('NIR')) return regions;
+  const expanded = regions.filter(r => r !== 'NIR');
+  NIR_PROVINCES.forEach(p => { if (!expanded.includes(p)) expanded.push(p); });
+  return expanded;
+}
+
 function getActionForModule(moduleKey: string) {
   switch (moduleKey) {
     case 'Business Permit': return setTableData;
@@ -25,7 +35,7 @@ function getActionForModule(moduleKey: string) {
 }
 
 async function fetchModuleSequentially(moduleKey: string, apiUrl: string, filters: Filters, controller: AbortController) {
-  const regions: string[] = Array.isArray(filters.selectedRegions) ? filters.selectedRegions : [];
+  const regions: string[] = expandNIR(Array.isArray(filters.selectedRegions) ? filters.selectedRegions : []);
   const aggregated: any[] = [];
   for (let i = 0; i < regions.length; i++) {
     if (controller.signal.aborted) break;
@@ -73,7 +83,7 @@ async function fetchModuleSequentially(moduleKey: string, apiUrl: string, filter
 
 async function fetchModuleOnce(moduleKey: string, apiUrl: string, filters: Filters, controller: AbortController) {
   const payload: any = {
-    locationName: filters.selectedRegions,
+    locationName: expandNIR(Array.isArray(filters.selectedRegions) ? filters.selectedRegions : []),
     startDate: filters.dateRange?.start || null,
     endDate: filters.dateRange?.end || null,
   };

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Select from 'react-select';
-import { Check, ChevronDown, Filter, MapPin, Calendar, Settings2,  Loader2,  BarChart3, Monitor } from 'lucide-react';
+import { Check, ChevronDown, Filter, MapPin, Calendar, Settings2, Loader2, BarChart3, Monitor } from 'lucide-react';
 import { useSelector, useDispatch } from 'react-redux';
 
 import DateRangeDay from './DateRangeDay';
@@ -24,8 +24,8 @@ interface FormattedFilterState {
 
 // Map group of islands to their regions
 const islandRegionMap: any = {
-  "Luzon": ["I", "II", "III", "IV-A", "V", "CAR", "IV-B"],
-  "Visayas": ["VI", "VII", "VIII"],
+  "Luzon": ["I", "II", "III", "IV-A", "V", "CAR", "NCR", "IV-B"],
+  "Visayas": ["VI", "VII", "VIII", "NIR"],
   "Mindanao": ["IX", "X", "XI", "XII", "XIII", "BARMM I", "BARMM II"]
 };
 
@@ -52,7 +52,9 @@ const FilterSection: React.FC<FilterSectionProps> = ({ onStartProcessing }) => {
   // Update province options when regions or selected regions change
   useEffect(() => {
     const selectedRegionData = regions.filter(r => (data.locationName || []).includes(r.text));
-    const allMunicipalities = selectedRegionData.flatMap(r => r.municipalities);
+    const allMunicipalities = selectedRegionData
+      .flatMap(r => r.municipalities || [])
+      .filter((m): m is string => typeof m === 'string');
 
     const provinceSet = new Set<string>();
     allMunicipalities.forEach((m: string) => {
@@ -75,7 +77,9 @@ const FilterSection: React.FC<FilterSectionProps> = ({ onStartProcessing }) => {
   // Update city options when regions or provinces change
   useEffect(() => {
     const selectedRegionData = regions.filter(r => (data.locationName || []).includes(r.text));
-    const allMunicipalities = selectedRegionData.flatMap(r => r.municipalities);
+    const allMunicipalities = selectedRegionData
+      .flatMap(r => r.municipalities || [])
+      .filter((m): m is string => typeof m === 'string');
 
     let filtered = allMunicipalities;
     if (selectedProvinces.length > 0) {
@@ -249,7 +253,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({ onStartProcessing }) => {
   // When group of islands is toggled
   const toggleIsland = (island: string) => {
     const regionsToAdd = islandRegionMap[island] || [];
-    
+
     setFilterState(prevState => {
       const isRemoving = selectedIslands.includes(island);
       let newRegions: string[];
@@ -361,7 +365,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({ onStartProcessing }) => {
       const islandRegions = islandRegionMap[island] || [];
       return islandRegions.every((region: any) => filterState.selectedRegions.includes(region));
     });
-    
+
     if (JSON.stringify(selectedIslandsList.sort()) !== JSON.stringify(selectedIslands.sort())) {
       setSelectedIslands(selectedIslandsList);
     }
@@ -412,11 +416,11 @@ const FilterSection: React.FC<FilterSectionProps> = ({ onStartProcessing }) => {
   };
 
   // Function to cancel the API request
- 
+
 
   return (
     <div className="relative bg-white border border-gray-200 rounded-md shadow-sm p-6 mb-6 z-100">
-      
+
       {/* Title Section */}
       <div className="mb-6 pb-4 border-b border-gray-200">
         <div className="flex items-center gap-3 mb-2">
@@ -430,7 +434,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({ onStartProcessing }) => {
         </div>
         <p className="text-sm text-gray-600 ml-13">Monitor and analyze eLGU service transactions across different regions </p>
       </div>
-      
+
       <div className="relative grid grid-cols-10 lg:grid-cols-3 md:grid-cols-1 gap-2 ">
         {/* Module */}
         <div className="flex col-span-3 flex-col group" ref={moduleRef}>
@@ -481,11 +485,10 @@ const FilterSection: React.FC<FilterSectionProps> = ({ onStartProcessing }) => {
                           onChange={() => toggleModule(module)}
                           className="opacity-0 absolute h-5 w-5 cursor-pointer"
                         />
-                        <div className={`border-2 h-5 w-5 rounded-sm flex items-center justify-center transition-all duration-200 ${
-                          filterState.selectedModules.includes(module)
+                        <div className={`border-2 h-5 w-5 rounded-sm flex items-center justify-center transition-all duration-200 ${filterState.selectedModules.includes(module)
                             ? 'bg-[#2162e7] border-[#2162e7] shadow-sm'
                             : 'border-gray-300 hover:border-[#2162e7] group-hover:bg-gray-50'
-                        }`}>
+                          }`}>
                           {filterState.selectedModules.includes(module) && (
                             <Check size={12} className="text-white" />
                           )}
@@ -540,7 +543,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({ onStartProcessing }) => {
                   {/* Group of Islands */}
                   <div className="mb-4">
                     <div className="flex items-center gap-2 mb-2">
-                      
+
                       <label className="text-sm font-bold text-gray-800">Island Groups</label>
                     </div>
                     <div className="flex gap-6 mb-3">
@@ -560,7 +563,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({ onStartProcessing }) => {
                   {/* Regions */}
                   <div className="mb-4">
                     <div className="flex items-center gap-2 mb-2">
-                     
+
                       <label className="text-sm font-bold text-gray-800">Regions</label>
                     </div>
                     <div className="grid grid-cols-4 gap-2 mb-3">
@@ -574,7 +577,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({ onStartProcessing }) => {
                                 onChange={() => toggleRegion(region)}
                                 className="accent-[#2162e7] w-4 h-4 rounded-sm"
                               />
-                              <span className="text-xs font-medium">{region}</span> 
+                              <span className="text-xs font-medium">{region}</span>
                             </label>
                           ))}
                         </div>
@@ -708,22 +711,22 @@ const FilterSection: React.FC<FilterSectionProps> = ({ onStartProcessing }) => {
                       </div>
                     )}
                     {selectedDateType === 'Day' && (
-                      <DateRangeDay 
-                        value={{ start: startDate, end: endDate }} 
+                      <DateRangeDay
+                        value={{ start: startDate, end: endDate }}
                         onChange={handleDateRangeChange}
                         onApply={() => setIsDateOpen(false)}
                       />
                     )}
                     {selectedDateType === 'Month' && (
-                      <DateRangeMonth 
-                        value={{ start: startDate, end: endDate }} 
+                      <DateRangeMonth
+                        value={{ start: startDate, end: endDate }}
                         onChange={handleDateRangeChange}
                         onApply={() => setIsDateOpen(false)}
                       />
                     )}
                     {selectedDateType === 'Year' && (
-                      <DateRangeYear 
-                        value={{ start: startDate, end: endDate }} 
+                      <DateRangeYear
+                        value={{ start: startDate, end: endDate }}
                         onChange={handleDateRangeChange}
                         onApply={() => setIsDateOpen(false)}
                       />
@@ -737,17 +740,16 @@ const FilterSection: React.FC<FilterSectionProps> = ({ onStartProcessing }) => {
 
         {/* Filter Button Section - Inline with filters */}
         <div className="flex flex-col justify-end">
-          
+
           <div className="flex flex-col gap-3">
-            
+
             <button
               onClick={handleFilterClick}
               disabled={isLoading}
-              className={`flex items-center justify-center gap-2 px-6 text-sm py-3 font-semibold rounded-md transition-all duration-200 ${
-                isLoading
+              className={`flex items-center justify-center gap-2 px-6 text-sm py-3 font-semibold rounded-md transition-all duration-200 ${isLoading
                   ? 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed'
                   : 'bg-[#2162e7] text-[#fcfcfc] border border-[#2162e7] hover:bg-[#1d56d1] hover:border-[#1d56d1] focus:outline-none focus:ring-2 focus:ring-[#2162e7]/20 shadow-sm'
-              }`}
+                }`}
             >
               {isLoading ? (
                 <>
@@ -761,7 +763,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({ onStartProcessing }) => {
                 </>
               )}
             </button>
-           
+
           </div>
         </div>
       </div>

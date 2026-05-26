@@ -297,7 +297,7 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
 
   // Use combined data for chart, but selected modules data for breakdown
   const chartDataSource = combinedData;
-  const { raw: selectedRaw } = getSelectedModulesData();
+  const { data: selectedCurrentData, raw: selectedRaw } = getSelectedModulesData();
 
   // Generate dynamic title based on enabled modules
   const getModuleTitle = () => {
@@ -654,17 +654,13 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
             </div>
           )}
 
-          {/* Total Status Summary for Most Recent Date */}
-          {selectedModules.length > 0 && selectedRaw && Array.isArray(selectedRaw) && selectedRaw.length > 0 && (() => {
-            // Get the most recent date (sorted data)
-            const sortedRaw = [...selectedRaw].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-            const mostRecentData = sortedRaw[0];
-            
-            // Calculate totals for the most recent date
-            const totals = mostRecentData.data.reduce((acc: any, item: any) => ({
-              operational: acc.operational + (Number(item.operational) || 0),
+          {/* Total Status Summary — derived from the same current data as the chart */}
+          {selectedModules.length > 0 && selectedCurrentData && selectedCurrentData.length > 0 && (() => {
+            // Sum the current (latest-per-LGU) data for the selected module(s)
+            const totals = selectedCurrentData.reduce((acc: any, item: any) => ({
+              operational:   acc.operational   + (Number(item.operational)   || 0),
               developmental: acc.developmental + (Number(item.developmental) || 0),
-              withdraw: acc.withdraw + (Number(item.withdraw) || 0)
+              withdraw:      acc.withdraw      + (Number(item.withdraw)      || 0),
             }), { operational: 0, developmental: 0, withdraw: 0 });
 
             const grandTotal = totals.operational + totals.developmental + totals.withdraw;

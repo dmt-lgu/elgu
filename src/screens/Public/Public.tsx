@@ -3,16 +3,8 @@ import {
   BarChart3Icon,
   MenuIcon,
   XIcon,
-
-  FileTextIcon,
-  BriefcaseIcon,
-  HomeIcon,
-  BuildingIcon,
-  Settings2Icon,
-  ChevronRightIcon,
-  HistoryIcon,
 } from "lucide-react";
-import DashboardProgressIndicator from './Dashboard/components/DashboardProgressIndicator';
+import DashboardProgressIndicator from './../Admin/Dashboard/components/DashboardProgressIndicator.tsx';
 import { useLocation } from "react-router-dom";
 import Logo from './../../assets/logo/dict-logo.png'
 import { useEffect, useRef, useState } from "react";
@@ -21,7 +13,7 @@ import eLGULogo from "./../../assets/logo/lgu-logo.png";
 import { Link, Outlet } from "react-router-dom";
 import { ThemeProvider } from "@/components/theme-provider";
 import { isCancel } from "axios";
-import axios from "./../../plugin/axios";
+import axios from "../../plugin/axios";
 import Swal from "sweetalert2";
 import { useSelector, useDispatch } from "react-redux";
 import {  setRegions } from "@/redux/regionSlice";
@@ -32,6 +24,7 @@ import { setTransaction } from "@/redux/transactionSlice";
 import { clearStorageIfNeeded, handleStorageError } from "@/lib/storageUtils";
 import { setLoad2 } from '@/redux/loadSlice2';
 
+import  { initializeGoogleAuth, isGoogleAuthenticated } from "../../plugin/axios2";
 
 const regionMapping = [
   { id: "region1", text: "I", municipalities: [] },
@@ -567,7 +560,7 @@ const calculateTotals = (data: any): TotalResults => {
   return totals;
 };
 
-function Admin() {
+function main() {
 
 
 
@@ -577,12 +570,13 @@ function Admin() {
   const data = useSelector(selectData);
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [manageOpen, setManageOpen] = useState(false);
 
   const controllerRef = useRef<AbortController | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   // Controllers for status data fetching
+
+
   // Helper function to reset first run flag (useful for testing)
   const resetFirstRun = () => {
     localStorage.setItem('elgu_first_run', '0');
@@ -595,7 +589,7 @@ function Admin() {
   const [progressState, setProgressState] = useState<Record<string, { currentRegion: string; currentIndex: number; totalRegions: number } | null>>({});
   const [moduleLoadingState, setModuleLoadingState] = useState<Record<string, boolean>>({});
   const [moduleCounts, setModuleCounts] = useState<Record<string, number>>({});
-  
+  const [_isGoogleLoggedIn, setIsGoogleLoggedIn] = useState(isGoogleAuthenticated());
 
   function fetchRegions() {
     dispatch(setLoad(true));
@@ -635,16 +629,9 @@ function Admin() {
   }
 
   // Region mapping for status data
- 
-
-
 
   // NIR is populated from R6's Negros Occidental records and R7's Negros Oriental/Siquijor
   // records, which are removed from their original region to avoid double-counting.
-
-
-
-
 
 
   const loadModulesSequentially = async () => {
@@ -946,10 +933,17 @@ function Admin() {
 
   useEffect(() => {
     // Initialize Google Auth first
-
+    const setupGoogleAuth = async () => {
+      try {
+        await initializeGoogleAuth();
+        setIsGoogleLoggedIn(isGoogleAuthenticated());
+      } catch (error) {
+        console.error("Google Auth initialization error:", error);
+      }
+    };
 
     clearStorageIfNeeded();
-  
+    setupGoogleAuth();
     fetchRegions();
     
     const isFirstRun = localStorage.getItem('elgu_first_run');
@@ -973,9 +967,9 @@ function Admin() {
           </div>
           <nav className="flex flex-col mt-10  ">
             <Link
-              to="/elgu/admin/dashboard"
+              to="/elgu/main/dashboard"
               className={`flex items-center gap-2 ${
-                location.pathname === "/elgu/admin/dashboard"
+                location.pathname === "/elgu/main/dashboard"
                   ? "text-white bg-[#282b30] font-medium w-full p-2  pl-10 py-5"
                   : "text-secondary-foreground w-full p-2  pl-10 py-5"
               }`}
@@ -985,9 +979,9 @@ function Admin() {
             </Link>
 
             <Link
-              to="/elgu/admin/report"
+              to="/elgu/main/report"
               className={`flex items-center gap-2 ${
-                location.pathname === "/elgu/admin/report"
+                location.pathname === "/elgu/main/report"
                   ? "text-white bg-[#282b30] font-medium w-full p-2  pl-10 py-5 "
                   : "text-secondary-foreground w-full p-2  pl-10 py-5 "
               }`}
@@ -996,58 +990,7 @@ function Admin() {
               <span>Reports</span>
             </Link>
             <div className="mt-6 mx-4 border-t border-border" />
-            <button
-              type="button"
-              onClick={() => setManageOpen((p) => !p)}
-              className="mt-2 w-full flex items-center justify-between px-4 py-3 bg-slate-100 hover:bg-slate-200 transition-colors"
-            >
-              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-500">
-                <Settings2Icon className="w-3.5 h-3.5" />
-                <span>Manage</span>
-              </div>
-              <ChevronRightIcon className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${manageOpen ? 'rotate-90' : ''}`} />
-            </button>
-            {manageOpen && [
-              { to: '/elgu/admin/manage/general',  code: 'GEN',  label: 'General',                             Icon: FileTextIcon },
-              { to: '/elgu/admin/manage/epayment', code: 'EPAY', label: 'ePayment',                          Icon: FileTextIcon },
-              { to: '/elgu/admin/manage/bp1',  code: 'BP1',  label: 'Business Permit',                    Icon: FileTextIcon },
-              { to: '/elgu/admin/manage/wp',   code: 'WP',   label: 'Working Permit',                     Icon: BriefcaseIcon },
-              { to: '/elgu/admin/manage/bc',   code: 'BC',   label: 'Barangay Clearance',                 Icon: HomeIcon },
-              { to: '/elgu/admin/manage/bpco', code: 'BPCO', label: 'Cert. of Occupancy & Bldg. Permit',  Icon: BuildingIcon },
-            ].map(({ to, code, label, Icon }) => {
-              const active = location.pathname === to;
-              return (
-                <Link
-                  key={to}
-                  to={to}
-                  className={`relative flex items-center gap-3 w-full pl-8 pr-3 py-3 transition-colors ${
-                    active
-                      ? 'bg-primary/10 text-primary font-semibold'
-                      : 'text-secondary-foreground hover:bg-slate-100 hover:text-foreground'
-                  }`}
-                >
-                  {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-primary rounded-r-full" />}
-                  <Icon className="w-4 h-4 shrink-0" />
-                  <div className="flex flex-col min-w-0">
-                    <span className="text-sm leading-snug truncate">{label}</span>
-                    <span className={`text-[10px] font-normal ${active ? 'text-primary/70' : 'text-slate-400'}`}>{code}</span>
-                  </div>
-                  {active && <ChevronRightIcon className="w-3.5 h-3.5 ml-auto shrink-0 text-primary/60" />}
-                </Link>
-              );
-            })}
-            <div className="mt-6 mx-4 border-t border-border" />
-            <Link
-              to="/elgu/admin/audit-trail"
-              className={`flex items-center gap-2 ${
-                location.pathname === "/elgu/admin/audit-trail"
-                  ? "text-white bg-[#282b30] font-medium w-full p-2 pl-10 py-5"
-                  : "text-secondary-foreground w-full p-2 pl-10 py-5"
-              }`}
-            >
-              <HistoryIcon className="w-5 h-5" />
-              <span>Audit Trail</span>
-            </Link>
+           
           </nav>
 
            <footer className="mt-auto p-4 border-t border-border text-sm text-secondary-foreground flex flex-col gap-2 font-medium text-start content-center items-center">
@@ -1073,9 +1016,9 @@ function Admin() {
               </div>
               <nav className="flex flex-col mt-10 gap-6 ml-10">
                 <Link
-                  to="/elgu/admin/dashboard"
+                  to="/elgu/main/dashboard"
                   className={`flex items-center gap-2 ${
-                    location.pathname === "/elgu/admin/dashboard"
+                    location.pathname === "/elgu/main/dashboard"
                       ? "text-primary"
                       : "text-secondary-foreground"
                   }`}
@@ -1085,9 +1028,9 @@ function Admin() {
                   <span>Dashboard</span>
                 </Link>
                 <Link
-                  to="/elgu/admin/report"
+                  to="/elgu/main/report"
                   className={`flex items-center gap-2 ${
-                    location.pathname === "/elgu/admin/report"
+                    location.pathname === "/elgu/main/report"
                       ? "text-primary"
                       : "text-secondary-foreground"
                   }`}
@@ -1097,57 +1040,7 @@ function Admin() {
                   <span>Reports</span>
                 </Link>
                 <div className="border-t border-border pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setManageOpen((p) => !p)}
-                    className="w-full flex items-center justify-between px-2 py-2.5 rounded-lg hover:bg-slate-100 transition-colors mb-1"
-                  >
-                    <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-500">
-                      <Settings2Icon className="w-3.5 h-3.5" />
-                      <span>Manage</span>
-                    </div>
-                    <ChevronRightIcon className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${manageOpen ? 'rotate-90' : ''}`} />
-                  </button>
-                  {manageOpen && [
-                    { to: '/elgu/admin/manage/general',  code: 'GEN',  label: 'General',                            Icon: FileTextIcon },
-                    { to: '/elgu/admin/manage/epayment', code: 'EPAY', label: 'ePayment',                         Icon: FileTextIcon },
-                    { to: '/elgu/admin/manage/bp1',  code: 'BP1',  label: 'Business Permit',                   Icon: FileTextIcon },
-                    { to: '/elgu/admin/manage/wp',   code: 'WP',   label: 'Working Permit',                    Icon: BriefcaseIcon },
-                    { to: '/elgu/admin/manage/bc',   code: 'BC',   label: 'Barangay Clearance',                Icon: HomeIcon },
-                    { to: '/elgu/admin/manage/bpco', code: 'BPCO', label: 'Cert. of Occupancy & Bldg. Permit', Icon: BuildingIcon },
-                  ].map(({ to, code, label, Icon }) => {
-                    const active = location.pathname === to;
-                    return (
-                      <Link
-                        key={to}
-                        to={to}
-                        onClick={() => setSidebarOpen(false)}
-                        className={`flex items-center gap-3 py-2 px-3 rounded-lg transition-colors mb-1 ${
-                          active ? 'bg-primary/10 text-primary font-semibold' : 'text-secondary-foreground hover:bg-slate-100'
-                        }`}
-                      >
-                        <Icon className="w-4 h-4 shrink-0" />
-                        <div className="flex flex-col min-w-0">
-                          <span className="text-sm leading-snug font-medium truncate">{label}</span>
-                          <span className="text-[10px] text-slate-400">{code}</span>
-                        </div>
-                      </Link>
-                    );
-                  })}
-                </div>
-                <div className="border-t border-border mt-2 pt-2">
-                  <Link
-                    to="/elgu/admin/audit-trail"
-                    onClick={() => setSidebarOpen(false)}
-                    className={`flex items-center gap-2 py-2 px-3 rounded-lg transition-colors ${
-                      location.pathname === '/elgu/admin/audit-trail'
-                        ? 'text-primary font-semibold'
-                        : 'text-secondary-foreground hover:bg-slate-100'
-                    }`}
-                  >
-                    <HistoryIcon className="w-5 h-5" />
-                    <span>Audit Trail</span>
-                  </Link>
+                
                 </div>
               </nav>
             </div>
@@ -1169,7 +1062,7 @@ function Admin() {
                 <MenuIcon className="w-6 h-6" />
               </button>
               <div className="flex-1 flex justify-end items-center gap-3">
-             
+               
               </div>
             </div>
           </header>
@@ -1180,7 +1073,7 @@ function Admin() {
       </div>
 
   {/* Progress indicator (Dashboard only) */}
-  {location.pathname === "/elgu/admin/dashboard" && (
+  {location.pathname === "/elgu/main/dashboard" && (
     <DashboardProgressIndicator
       isLoading={isLoading}
       progress={progressState}
@@ -1202,4 +1095,4 @@ function Admin() {
   );
 }
 
-export default Admin;
+export default main;
