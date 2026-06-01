@@ -371,9 +371,11 @@ export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal)
 
         if (isComplex) {
             const newIssued = getLicenseIssued(itemToDisplay, NEW_LICENSE_KEYS, Number(itemToDisplay.newPaid || 0));
-            dataCells.push(formatNumberForDisplay(newIssued), formatNumberForDisplay(itemToDisplay.newPaid), formatNumberForDisplay(itemToDisplay.newPaidViaEgov), formatNumberForDisplay(itemToDisplay.newPending), { content: formatNumberForDisplay((itemToDisplay.newPaid || 0) + (itemToDisplay.newPaidViaEgov || 0) + (itemToDisplay.newPending || 0)), styles: { fontStyle: 'bold', fillColor: '#f1f5f9' } });
+            const newPaidWithEgov = (itemToDisplay.newPaid || 0) + (itemToDisplay.newPaidViaEgov || 0);
+            dataCells.push(formatNumberForDisplay(newIssued), formatNumberForDisplay(newPaidWithEgov), formatNumberForDisplay(itemToDisplay.newPaidViaEgov), formatNumberForDisplay(itemToDisplay.newPending), { content: formatNumberForDisplay(newPaidWithEgov + (itemToDisplay.newPending || 0)), styles: { fontStyle: 'bold', fillColor: '#f1f5f9' } });
             const renewIssued = getLicenseIssued(itemToDisplay, RENEW_LICENSE_KEYS, Number(itemToDisplay.renewPaid || 0));
-            dataCells.push(formatNumberForDisplay(renewIssued), formatNumberForDisplay(itemToDisplay.renewPaid), formatNumberForDisplay(itemToDisplay.renewPaidViaEgov), formatNumberForDisplay(itemToDisplay.renewPending), { content: formatNumberForDisplay((itemToDisplay.renewPaid || 0) + (itemToDisplay.renewPaidViaEgov || 0) + (itemToDisplay.renewPending || 0)), styles: { fontStyle: 'bold', fillColor: '#f1f5f9' } });
+            const renewPaidWithEgov = (itemToDisplay.renewPaid || 0) + (itemToDisplay.renewPaidViaEgov || 0);
+            dataCells.push(formatNumberForDisplay(renewIssued), formatNumberForDisplay(renewPaidWithEgov), formatNumberForDisplay(itemToDisplay.renewPaidViaEgov), formatNumberForDisplay(itemToDisplay.renewPending), { content: formatNumberForDisplay(renewPaidWithEgov + (itemToDisplay.renewPending || 0)), styles: { fontStyle: 'bold', fillColor: '#f1f5f9' } });
             dataCells.push(formatNumberForDisplay(getLicenseIssued(itemToDisplay, MALE_LICENSE_KEYS, Number(itemToDisplay.malePaid || 0))), formatNumberForDisplay(itemToDisplay.malePaid), formatNumberForDisplay(itemToDisplay.malePending), { content: formatNumberForDisplay((itemToDisplay.malePaid || 0) + (itemToDisplay.malePending || 0)), styles: { fontStyle: 'bold', fillColor: '#f1f5f9' } });
             dataCells.push(formatNumberForDisplay(getLicenseIssued(itemToDisplay, FEMALE_LICENSE_KEYS, Number(itemToDisplay.femalePaid || 0))), formatNumberForDisplay(itemToDisplay.femalePaid), formatNumberForDisplay(itemToDisplay.femalePending), { content: formatNumberForDisplay((itemToDisplay.femalePaid || 0) + (itemToDisplay.femalePending || 0)), styles: { fontStyle: 'bold', fillColor: '#f1f5f9' } });
         } else if (moduleLabel === 'Barangay Clearance') {
@@ -396,8 +398,8 @@ export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal)
       const licenseIssuedRenewalTotal = totals.renewalIssued;
             grandTotalRow = [ { content: `GRAND TOTAL\n(${dateRangeLabel})`, colSpan: 2 },
                 formatNumberForDisplay(totals.citizensServed),
-                formatNumberForDisplay(licenseIssuedNewTotal), formatNumberForDisplay(totals.newPaid), formatNumberForDisplay(totals.newGeoPay), formatNumberForDisplay(totals.newPending), formatNumberForDisplay(totals.newPaid + totals.newGeoPay + totals.newPending),
-                formatNumberForDisplay(licenseIssuedRenewalTotal), formatNumberForDisplay(totals.renewalPaid), formatNumberForDisplay(totals.renewalGeoPay), formatNumberForDisplay(totals.renewalPending), formatNumberForDisplay(totals.renewalPaid + totals.renewalGeoPay + totals.renewalPending),
+                formatNumberForDisplay(licenseIssuedNewTotal), formatNumberForDisplay(totals.newPaid + totals.newGeoPay), formatNumberForDisplay(totals.newGeoPay), formatNumberForDisplay(totals.newPending), formatNumberForDisplay(totals.newPaid + totals.newGeoPay + totals.newPending),
+                formatNumberForDisplay(licenseIssuedRenewalTotal), formatNumberForDisplay(totals.renewalPaid + totals.renewalGeoPay), formatNumberForDisplay(totals.renewalGeoPay), formatNumberForDisplay(totals.renewalPending), formatNumberForDisplay(totals.renewalPaid + totals.renewalGeoPay + totals.renewalPending),
                 formatNumberForDisplay(totals.maleIssued), formatNumberForDisplay(totals.malePaid), formatNumberForDisplay(totals.malePending), formatNumberForDisplay(totals.malePaid + totals.malePending),
                 formatNumberForDisplay(totals.femaleIssued), formatNumberForDisplay(totals.femalePaid), formatNumberForDisplay(totals.femalePending), formatNumberForDisplay(totals.femalePaid + totals.femalePending)
             ];
@@ -579,9 +581,11 @@ export const exportReportToExcel = (params: ExcelParams, signal?: AbortSignal) =
 
         if (isComplex) {
             const newIssued = getLicenseIssued(itemToDisplay, NEW_LICENSE_KEYS, Number(itemToDisplay.newPaid || 0));
-            row.push(formatNumberForExcel(newIssued), formatNumberForExcel(itemToDisplay.newPaid), formatNumberForExcel(itemToDisplay.newPaidViaEgov), formatNumberForExcel(itemToDisplay.newPending), (itemToDisplay.newPaid || 0) + (itemToDisplay.newPaidViaEgov || 0) + (itemToDisplay.newPending || 0));
+            const newPaidWithEgov = (itemToDisplay.newPaid || 0) + (itemToDisplay.newPaidViaEgov || 0);
+            row.push(formatNumberForExcel(newIssued), formatNumberForExcel(newPaidWithEgov), formatNumberForExcel(itemToDisplay.newPaidViaEgov), formatNumberForExcel(itemToDisplay.newPending), newPaidWithEgov + (itemToDisplay.newPending || 0));
             const renewIssued = getLicenseIssued(itemToDisplay, RENEW_LICENSE_KEYS, Number(itemToDisplay.renewPaid || 0));
-            row.push(formatNumberForExcel(renewIssued), formatNumberForExcel(itemToDisplay.renewPaid), formatNumberForExcel(itemToDisplay.renewPaidViaEgov), formatNumberForExcel(itemToDisplay.renewPending), (itemToDisplay.renewPaid || 0) + (itemToDisplay.renewPaidViaEgov || 0) + (itemToDisplay.renewPending || 0));
+            const renewPaidWithEgov = (itemToDisplay.renewPaid || 0) + (itemToDisplay.renewPaidViaEgov || 0);
+            row.push(formatNumberForExcel(renewIssued), formatNumberForExcel(renewPaidWithEgov), formatNumberForExcel(itemToDisplay.renewPaidViaEgov), formatNumberForExcel(itemToDisplay.renewPending), renewPaidWithEgov + (itemToDisplay.renewPending || 0));
             const maleIssued = getLicenseIssued(itemToDisplay, MALE_LICENSE_KEYS, Number(itemToDisplay.malePaid || 0));
             row.push(formatNumberForExcel(maleIssued), formatNumberForExcel(itemToDisplay.malePaid), formatNumberForExcel(itemToDisplay.malePending), (itemToDisplay.malePaid || 0) + (itemToDisplay.malePending || 0));
             const femaleIssued = getLicenseIssued(itemToDisplay, FEMALE_LICENSE_KEYS, Number(itemToDisplay.femalePaid || 0));
@@ -611,7 +615,7 @@ export const exportReportToExcel = (params: ExcelParams, signal?: AbortSignal) =
       // Use the same issued totals shown in the rows for grand totals.
       const licenseIssuedNewTotal = totals.newIssued;
       const licenseIssuedRenewalTotal = totals.renewalIssued;
-            totalRow = [ 'GRAND TOTAL', null, totals.citizensServed, licenseIssuedNewTotal, totals.newPaid, totals.newGeoPay, totals.newPending, (totals.newPaid + totals.newGeoPay + totals.newPending), licenseIssuedRenewalTotal, totals.renewalPaid, totals.renewalGeoPay, totals.renewalPending, (totals.renewalPaid + totals.renewalGeoPay + totals.renewalPending), totals.maleIssued, totals.malePaid, totals.malePending, (totals.malePaid + totals.malePending), totals.femaleIssued, totals.femalePaid, totals.femalePending, (totals.femalePaid + totals.femalePending) ];
+            totalRow = [ 'GRAND TOTAL', null, totals.citizensServed, licenseIssuedNewTotal, totals.newPaid + totals.newGeoPay, totals.newGeoPay, totals.newPending, (totals.newPaid + totals.newGeoPay + totals.newPending), licenseIssuedRenewalTotal, totals.renewalPaid + totals.renewalGeoPay, totals.renewalGeoPay, totals.renewalPending, (totals.renewalPaid + totals.renewalGeoPay + totals.renewalPending), totals.maleIssued, totals.malePaid, totals.malePending, (totals.malePaid + totals.malePending), totals.femaleIssued, totals.femalePaid, totals.femalePending, (totals.femalePaid + totals.femalePending) ];
             merges.push({ s: { r: currentRowIndex, c: 0 }, e: { r: currentRowIndex, c: 1 } });
         } else {
             if (moduleLabel === 'Barangay Clearance') {

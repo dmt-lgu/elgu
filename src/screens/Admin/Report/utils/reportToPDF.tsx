@@ -443,14 +443,14 @@ const createReportGrandTotalRow = (
       // New group: License Issued, Paid, eGOV, Pending, Total
       totalTr.appendChild(makeTd(citizensServed, commonProps));
       totalTr.appendChild(makeTd(newLicenseTotal, commonProps));
-      totalTr.appendChild(makeTd(totals.newPaid, commonProps));
+      totalTr.appendChild(makeTd(totals.newPaid + totals.newGeo, commonProps));
       totalTr.appendChild(makeTd(totals.newGeo, commonProps));
       totalTr.appendChild(makeTd(totals.newPending, commonProps));
       totalTr.appendChild(makeTd(newOverallTotal, commonProps));
 
       // Renewal group: License Issued, Paid, eGOV, Pending, Total
       totalTr.appendChild(makeTd(renewalLicenseTotal, commonProps));
-      totalTr.appendChild(makeTd(totals.renewalPaid, commonProps));
+      totalTr.appendChild(makeTd(totals.renewalPaid + totals.renewalGeo, commonProps));
       totalTr.appendChild(makeTd(totals.renewalGeo, commonProps));
       totalTr.appendChild(makeTd(totals.renewalPending, commonProps));
       totalTr.appendChild(makeTd(renewalOverallTotal, commonProps));
@@ -562,9 +562,10 @@ const createPageContent = (
         const newGeo = data?.newPaidViaEgov ?? 0;
         const newPending = data?.newPending ?? 0;
         const newLicenseIssued = getLicenseIssued(data, NEW_LICENSE_KEYS, Number(newPaid || 0));
-        const newTotal = Number(newPaid || 0) + Number(newGeo || 0) + Number(newPending || 0);
+        const newPaidWithEgov = Number(newPaid || 0) + Number(newGeo || 0);
+        const newTotal = newPaidWithEgov + Number(newPending || 0);
         tr.appendChild(makeTd(newLicenseIssued, cellOpts));
-        tr.appendChild(makeTd(newPaid, cellOpts));
+        tr.appendChild(makeTd(newPaidWithEgov, cellOpts));
         tr.appendChild(makeTd(newGeo, cellOpts));
         tr.appendChild(makeTd(newPending, cellOpts));
         tr.appendChild(makeTd(newTotal, cellOpts));
@@ -573,9 +574,10 @@ const createPageContent = (
         const renewGeo = data?.renewPaidViaEgov ?? 0;
         const renewPending = data?.renewPending ?? 0;
         const renewLicenseIssued = getLicenseIssued(data, RENEW_LICENSE_KEYS, Number(renewPaid || 0));
-        const renewTotal = Number(renewPaid || 0) + Number(renewGeo || 0) + Number(renewPending || 0);
+        const renewPaidWithEgov = Number(renewPaid || 0) + Number(renewGeo || 0);
+        const renewTotal = renewPaidWithEgov + Number(renewPending || 0);
         tr.appendChild(makeTd(renewLicenseIssued, cellOpts));
-        tr.appendChild(makeTd(renewPaid, cellOpts));
+        tr.appendChild(makeTd(renewPaidWithEgov, cellOpts));
         tr.appendChild(makeTd(renewGeo, cellOpts));
         tr.appendChild(makeTd(renewPending, cellOpts));
         tr.appendChild(makeTd(renewTotal, cellOpts));

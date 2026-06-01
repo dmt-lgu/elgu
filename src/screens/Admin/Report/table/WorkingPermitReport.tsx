@@ -158,13 +158,15 @@ const WorkingPermitReport = forwardRef<HTMLDivElement, WorkingPermitProps>(({
             const newGeo = Number(item.newPaidViaEgov || 0);
             const newPending = Number(item.newPending || 0);
             const newLicenseIssued = getLicenseIssued(item, NEW_LICENSE_KEYS, newPaid);
-            const newTotal = newPaid + newGeo + newPending;
+            const newPaidWithEgov = newPaid + newGeo;
+            const newTotal = newPaidWithEgov + newPending;
 
             const renewPaid = Number(item.renewPaid || 0);
             const renewGeo = Number(item.renewPaidViaEgov || 0);
             const renewPending = Number(item.renewPending || 0);
             const renewLicenseIssued = getLicenseIssued(item, RENEW_LICENSE_KEYS, renewPaid);
-            const renewTotal = renewPaid + renewGeo + renewPending;
+            const renewPaidWithEgov = renewPaid + renewGeo;
+            const renewTotal = renewPaidWithEgov + renewPending;
 
             const malePaid = Number(item.malePaid || 0);
             const malePending = Number(item.malePending || 0);
@@ -185,14 +187,14 @@ const WorkingPermitReport = forwardRef<HTMLDivElement, WorkingPermitProps>(({
 
                 {/* New */}
                 <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(newLicenseIssued)}</TableCell>
-                <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(newPaid)}</TableCell>
+                <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(newPaidWithEgov)}</TableCell>
                 <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(newGeo)}</TableCell>
                 <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(newPending)}</TableCell>
                 <TableCell className="p-3 text-right font-bold text-slate-900 bg-slate-100 tabular-nums">{formatNumber(newTotal)}</TableCell>
 
                 {/* Renewal */}
                 <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(renewLicenseIssued)}</TableCell>
-                <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(renewPaid)}</TableCell>
+                <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(renewPaidWithEgov)}</TableCell>
                 <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(renewGeo)}</TableCell>
                 <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(renewPending)}</TableCell>
                 <TableCell className="p-3 text-right font-bold text-slate-900 bg-slate-100 tabular-nums">{formatNumber(renewTotal)}</TableCell>
@@ -224,7 +226,7 @@ const WorkingPermitReport = forwardRef<HTMLDivElement, WorkingPermitProps>(({
   const regionMaleTotal = (regionTotals.malePaid || 0) + (regionTotals.malePending || 0);
   const regionFemaleTotal = (regionTotals.femalePaid || 0) + (regionTotals.femalePending || 0);
 
-  allRows.push(<TableRow key={`${region}-subtotal`} className="font-bold text-slate-900"><TableCell className="bg-slate-200 p-3 text-left" colSpan={2}><div className="font-extrabold tracking-wider text-xs">SUB-TOTAL ({getRegionCode(region) || region})</div></TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.citizensServed)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionLicenseIssued)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.newPaid)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.newGeoPay)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.newPending)}</TableCell><TableCell className="bg-slate-300 p-3 text-right tabular-nums text-sm">{formatNumber(regionNewTotal)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionRenewLicenseIssued)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.renewalPaid)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.renewalGeoPay)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.renewalPending)}</TableCell><TableCell className="bg-slate-300 p-3 text-right tabular-nums text-sm">{formatNumber(regionRenewTotal)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.maleIssued)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.malePaid)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.malePending)}</TableCell><TableCell className="bg-slate-300 p-3 text-right tabular-nums text-sm">{formatNumber(regionMaleTotal)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.femaleIssued)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.femalePaid)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.femalePending)}</TableCell><TableCell className="bg-slate-300 p-3 text-right tabular-nums text-sm">{formatNumber(regionFemaleTotal)}</TableCell></TableRow>);
+  allRows.push(<TableRow key={`${region}-subtotal`} className="font-bold text-slate-900"><TableCell className="bg-slate-200 p-3 text-left" colSpan={2}><div className="font-extrabold tracking-wider text-xs">SUB-TOTAL ({getRegionCode(region) || region})</div></TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.citizensServed)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionLicenseIssued)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber((regionTotals.newPaid || 0) + (regionTotals.newGeoPay || 0))}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.newGeoPay)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.newPending)}</TableCell><TableCell className="bg-slate-300 p-3 text-right tabular-nums text-sm">{formatNumber(regionNewTotal)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionRenewLicenseIssued)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber((regionTotals.renewalPaid || 0) + (regionTotals.renewalGeoPay || 0))}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.renewalGeoPay)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.renewalPending)}</TableCell><TableCell className="bg-slate-300 p-3 text-right tabular-nums text-sm">{formatNumber(regionRenewTotal)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.maleIssued)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.malePaid)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.malePending)}</TableCell><TableCell className="bg-slate-300 p-3 text-right tabular-nums text-sm">{formatNumber(regionMaleTotal)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.femaleIssued)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.femalePaid)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotals.femalePending)}</TableCell><TableCell className="bg-slate-300 p-3 text-right tabular-nums text-sm">{formatNumber(regionFemaleTotal)}</TableCell></TableRow>);
       }
     });
     return allRows;
@@ -318,12 +320,12 @@ const WorkingPermitReport = forwardRef<HTMLDivElement, WorkingPermitProps>(({
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-left" colSpan={2}><div className="font-extrabold tracking-wider text-base">GRAND TOTAL</div><div className='text-xs font-medium text-slate-300'>({dateRangeLabel})</div></TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base">{formatNumber(grandTotals.citizensServed)}</TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base">{formatNumber(grandTotals.newIssued)}</TableCell>
-                <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base">{formatNumber(grandTotals.newPaid)}</TableCell>
+                <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base">{formatNumber((grandTotals.newPaid || 0) + (grandTotals.newGeoPay || 0))}</TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base">{formatNumber(grandTotals.newGeoPay)}</TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base">{formatNumber(grandTotals.newPending)}</TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base font-bold">{formatNumber((grandTotals.newPaid || 0) + (grandTotals.newGeoPay || 0) + (grandTotals.newPending || 0))}</TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base">{formatNumber(grandTotals.renewalIssued)}</TableCell>
-                <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base">{formatNumber(grandTotals.renewalPaid)}</TableCell>
+                <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base">{formatNumber((grandTotals.renewalPaid || 0) + (grandTotals.renewalGeoPay || 0))}</TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base">{formatNumber(grandTotals.renewalGeoPay)}</TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base">{formatNumber(grandTotals.renewalPending)}</TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base font-bold">{formatNumber((grandTotals.renewalPaid || 0) + (grandTotals.renewalGeoPay || 0) + (grandTotals.renewalPending || 0))}</TableCell>

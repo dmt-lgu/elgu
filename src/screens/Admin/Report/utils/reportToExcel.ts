@@ -191,13 +191,15 @@ function _generateBusinessPermitSheet(data: any[], isDayMode: boolean): xlsx.Wor
       const newGeo = Number(item.newPaidViaEgov || 0);
       const newPending = Number(item.newPending || 0);
       const newLicense = getLicenseIssued(item, NEW_LICENSE_KEYS, newPaid);
-      const newTotal = newPaid + newGeo + newPending;
+      const newPaidWithEgov = newPaid + newGeo;
+      const newTotal = newPaidWithEgov + newPending;
 
       const renewPaid = Number(item.renewPaid || 0);
       const renewGeo = Number(item.renewPaidViaEgov || 0);
       const renewPending = Number(item.renewPending || 0);
       const renewLicense = getLicenseIssued(item, RENEW_LICENSE_KEYS, renewPaid);
-      const renewTotal = renewPaid + renewGeo + renewPending;
+      const renewPaidWithEgov = renewPaid + renewGeo;
+      const renewTotal = renewPaidWithEgov + renewPending;
 
       const malePaid = Number(item.malePaid || 0);
       const malePending = Number(item.malePending || 0);
@@ -210,8 +212,8 @@ function _generateBusinessPermitSheet(data: any[], isDayMode: boolean): xlsx.Wor
       const femaleTotal = femalePaid + femalePending;
 
       return [
-        formatNumber(newLicense), formatNumber(newPaid), formatNumber(newGeo), formatNumber(newPending), formatNumber(newTotal),
-        formatNumber(renewLicense), formatNumber(renewPaid), formatNumber(renewGeo), formatNumber(renewPending), formatNumber(renewTotal),
+        formatNumber(newLicense), formatNumber(newPaidWithEgov), formatNumber(newGeo), formatNumber(newPending), formatNumber(newTotal),
+        formatNumber(renewLicense), formatNumber(renewPaidWithEgov), formatNumber(renewGeo), formatNumber(renewPending), formatNumber(renewTotal),
         formatNumber(maleLicense), formatNumber(malePaid), formatNumber(malePending), formatNumber(maleTotal),
         formatNumber(femaleLicense), formatNumber(femalePaid), formatNumber(femalePending), formatNumber(femaleTotal),
       ];

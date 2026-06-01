@@ -419,7 +419,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({ onStartProcessing }) => {
 
 
   return (
-    <div className="relative bg-white border border-gray-200 rounded-md shadow-sm p-6 md:p-4 sm:p-3 mb-6 z-100 overflow-hidden">
+    <div className="relative z-[999] bg-white border border-gray-200 rounded-md shadow-sm p-6 md:p-4 sm:p-3 mb-6">
 
       {/* Title Section */}
       <div className="mb-6 pb-4 border-b border-gray-200">
@@ -504,7 +504,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({ onStartProcessing }) => {
         </div>
 
         {/* Region, Group of Islands, Province, City/Municipality */}
-        <div className="flex col-span-4 md:col-span-1 flex-col group" ref={regionRef}>
+        <div className="flex col-span-4 md:col-span-1 z-50 flex-col group" ref={regionRef}>
           <div className="flex items-center gap-2 mb-3">
             <div className="w-8 h-8 bg-[#2162e7]/10 rounded-md flex items-center justify-center">
               <MapPin size={16} className="text-[#2162e7]" />
