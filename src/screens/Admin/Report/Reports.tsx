@@ -40,12 +40,38 @@ type ReportData = { results: any[] } | null;
 type ProgressiveDataState = { [key: string]: ReportData };
 type ProgressDetail = { currentRegion: string; currentIndex: number; totalRegions: number };
 type ProgressState = { [moduleKey: string]: ProgressDetail | null };
+type ProgressiveCacheState = {
+  key: string | null;
+  loading: boolean;
+  data: ProgressiveDataState;
+  progress: ProgressState;
+};
 
 const BP = "Business Permit";
 const WP = "Working Permit";
 const BC = "Barangay Clearance";
 const BLDG = "Building Permit";
 const CO = "Certificate of Occupancy";
+
+const moduleRequestState = new Map<string, { active: boolean; completed: boolean }>();
+const progressiveRequestCache: ProgressiveCacheState = {
+  key: null,
+  loading: false,
+  data: { [BP]: null, [WP]: null, [BC]: null, [BLDG]: null, [CO]: null },
+  progress: {},
+};
+const progressiveSubscribers = new Set<(state: ProgressiveCacheState) => void>();
+let reportSearchGeneration = 0;
+
+function notifyProgressiveSubscribers() {
+  const snapshot: ProgressiveCacheState = {
+    key: progressiveRequestCache.key,
+    loading: progressiveRequestCache.loading,
+    data: { ...progressiveRequestCache.data },
+    progress: { ...progressiveRequestCache.progress },
+  };
+  progressiveSubscribers.forEach(listener => listener(snapshot));
+}
 
 // Other helper functions (ensureDate, etc.) remain the same...
 function ensureDate(val: Date | string | null | undefined): Date | null {
@@ -96,7 +122,8 @@ function useReportData({
     // current UI filter, reuse that data so the tables remain after a page refresh.
     // This allows users to refresh the page and still see the results they previously
     // fetched without needing to click Search again.
-    const canUseCachedData = refreshKey === 0 || completedRequestKey.current === requestKey;
+    const globalRequestKey = `${moduleKey}:${requestKey}`;
+    const canUseCachedData = refreshKey === 0 || completedRequestKey.current === requestKey || moduleRequestState.get(globalRequestKey)?.completed;
     if (canUseCachedData && reduxTableData && reduxAppliedFilter && currentFilterKey === JSON.stringify(reduxAppliedFilter)) {
       setData(reduxTableData); setLoading(false); return;
     }
@@ -106,12 +133,14 @@ function useReportData({
       setData(null); setLoading(false); return;
     }
 
-    if (activeRequestKey.current === requestKey) {
+    const globalRequest = moduleRequestState.get(globalRequestKey);
+    if (activeRequestKey.current === requestKey || globalRequest?.active) {
       setLoading(true);
       return;
     }
 
     activeRequestKey.current = requestKey;
+    moduleRequestState.set(globalRequestKey, { active: true, completed: false });
     setLoading(true);
     const expandNIR = (regions: string[]): string[] => {
       if (!regions.includes('NIR')) return regions;
@@ -174,6 +203,7 @@ function useReportData({
           setReduxTableData(final);
           setReduxAppliedFilter(currentFilter);
           completedRequestKey.current = requestKey;
+          moduleRequestState.set(globalRequestKey, { active: false, completed: true });
         } else {
           const response = await axios.post(apiUrl, payload, { signal: abortSignal });
           // --- START OF FIX ---
@@ -194,6 +224,7 @@ function useReportData({
           setReduxTableData(cleanedData);
           setReduxAppliedFilter(currentFilter);
           completedRequestKey.current = requestKey;
+          moduleRequestState.set(globalRequestKey, { active: false, completed: true });
           // --- END OF FIX ---
         }
       } catch (err: any) {
@@ -202,6 +233,8 @@ function useReportData({
         }
       } finally {
         if (activeRequestKey.current === requestKey) activeRequestKey.current = null;
+        const latestRequest = moduleRequestState.get(globalRequestKey);
+        if (latestRequest?.active) moduleRequestState.set(globalRequestKey, { active: false, completed: false });
         setLoading(false);
       }
     };
@@ -260,11 +293,25 @@ const Reports: React.FC = () => {
   const [isProgressiveLoading, setIsProgressiveLoading] = useState(false);
   const [progressiveData, setProgressiveData] = useState<ProgressiveDataState>({ [BP]: null, [WP]: null, [BC]: null, [BLDG]: null, [CO]: null });
   const [progressState, setProgressState] = useState<ProgressState>({});
-  const [searchRefreshKey, setSearchRefreshKey] = useState(0);
+  const [searchRefreshKey, setSearchRefreshKey] = useState(reportSearchGeneration);
   
   // Track search vs export separately so UI doesn't show cancel/progress during export
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [isExportActive, setIsExportActive] = useState(false);
+
+  useEffect(() => {
+    const syncProgressiveState = (state: ProgressiveCacheState) => {
+      setProgressiveData(state.data);
+      setProgressState(state.progress);
+      setIsProgressiveLoading(state.loading);
+      if (state.loading) setIsSearchActive(true);
+    };
+    syncProgressiveState(progressiveRequestCache);
+    progressiveSubscribers.add(syncProgressiveState);
+    return () => {
+      progressiveSubscribers.delete(syncProgressiveState);
+    };
+  }, []);
 
   // Listen to progress events dispatched by useReportData and update local progress state
   useEffect(() => {
@@ -308,8 +355,13 @@ const Reports: React.FC = () => {
 
   useEffect(() => {
     if (!hasSearched || !isSelectAll) return;
-    const abortController = new AbortController();
-    const { signal } = abortController;
+    const progressiveKey = `${searchRefreshKey}:${JSON.stringify(appliedFilter)}`;
+    if (progressiveRequestCache.key === progressiveKey) {
+      setProgressiveData({ ...progressiveRequestCache.data });
+      setProgressState({ ...progressiveRequestCache.progress });
+      setIsProgressiveLoading(progressiveRequestCache.loading);
+      return;
+    }
     const getModuleUrl = (moduleKey: string) => {
       if (moduleKey === BP) return `${import.meta.env.VITE_URL}/api/bp/transaction-count`;
       if (moduleKey === WP) return `${import.meta.env.VITE_URL}/api/wp/transaction-count`;
@@ -319,6 +371,10 @@ const Reports: React.FC = () => {
       return '';
     };
     const fetchSequentially = async () => {
+      progressiveRequestCache.key = progressiveKey;
+      progressiveRequestCache.loading = true;
+      progressiveRequestCache.data = { [BP]: null, [WP]: null, [BC]: null, [BLDG]: null, [CO]: null };
+      progressiveRequestCache.progress = {};
       setIsProgressiveLoading(true);
       const regionOrder = ["Region I", "Region II", "Region III", "IV-A", "IV-B", "Region V", "Region VI", "Region VII", "Region VIII", "Region IX", "Region X", "Region XI", "Region XII", "Region XIII", "CAR", "BARMM1", "BARMM2"];
       const expandedRegions = (() => {
@@ -332,38 +388,49 @@ const Reports: React.FC = () => {
       const selectedModules = appliedFilter.selectedModules || [];
       const initialProgress: ProgressState = {};
       selectedModules.forEach(moduleKey => { initialProgress[moduleKey] = { currentRegion: "Initializing...", currentIndex: 0, totalRegions: sortedRegions.length }; });
+      progressiveRequestCache.progress = initialProgress;
       setProgressState(initialProgress);
       const initialState: ProgressiveDataState = {};
       selectedModules.forEach(moduleKey => { initialState[moduleKey] = { results: [] }; });
+      progressiveRequestCache.data = initialState;
       setProgressiveData(initialState);
+      notifyProgressiveSubscribers();
 
       await Promise.all(selectedModules.map(async moduleKey => {
         const url = getModuleUrl(moduleKey);
         if (!url) return;
         for (let i = 0; i < sortedRegions.length; i++) {
           const region = sortedRegions[i];
-          if (signal.aborted) break;
           const payload = { locationName: [region], startDate: formatLocalDate(ensureDate(appliedFilter.dateRange.start)), endDate: formatLocalDate(ensureDate(appliedFilter.dateRange.end)) };
           try {
-            const res = await axios.post(url, payload, { signal });
+            const res = await axios.post(url, payload);
             if (res.data?.results) {
-              setProgressiveData(prev => ({ ...prev, [moduleKey]: { results: [...(prev[moduleKey]?.results || []), ...res.data.results] } }));
+              const nextModuleData = { results: [...(progressiveRequestCache.data[moduleKey]?.results || []), ...res.data.results] };
+              progressiveRequestCache.data = { ...progressiveRequestCache.data, [moduleKey]: nextModuleData };
+              setProgressiveData(prev => ({ ...prev, [moduleKey]: nextModuleData }));
+              if (moduleKey === BP) dispatch(setTableData(nextModuleData));
+              if (moduleKey === WP) dispatch(setWorkingPermitTableData(nextModuleData));
+              if (moduleKey === BC) dispatch(setBrgyClearanceTableData(nextModuleData));
+              if (moduleKey === BLDG) dispatch(setbuildingPermitData(nextModuleData));
+              if (moduleKey === CO) dispatch(setcertificateOfOccupancy(nextModuleData));
             }
           } catch (err: any) {
             if (err.name !== 'CanceledError') {
               console.error(`Failed to fetch ${moduleKey} for ${region}`);
             }
           } finally {
-            if (!signal.aborted) {
-              setProgressState(prev => ({ ...prev, [moduleKey]: { currentRegion: region, currentIndex: i + 1, totalRegions: sortedRegions.length } }));
-            }
+            const nextProgress = { currentRegion: region, currentIndex: i + 1, totalRegions: sortedRegions.length };
+            progressiveRequestCache.progress = { ...progressiveRequestCache.progress, [moduleKey]: nextProgress };
+            setProgressState(prev => ({ ...prev, [moduleKey]: nextProgress }));
+            notifyProgressiveSubscribers();
           }
         }
       }));
+      progressiveRequestCache.loading = false;
       setIsProgressiveLoading(false);
+      notifyProgressiveSubscribers();
     };
     fetchSequentially();
-    return () => abortController.abort();
   }, [hasSearched, isSelectAll, JSON.stringify(appliedFilter), searchRefreshKey]);
   
   const setBpTableData = useCallback((data:any) => dispatch(setTableData(data)), [dispatch]);
@@ -453,7 +520,8 @@ const Reports: React.FC = () => {
     }
     setAppliedFilterState(normalizedFilters);
     setHasSearched(true);
-    setSearchRefreshKey(key => key + 1);
+    reportSearchGeneration += 1;
+    setSearchRefreshKey(reportSearchGeneration);
     const selected = normalizedFilters.selectedModules || [];
     if (selected.includes(BP)) dispatch(setAppliedFilter(normalizedFilters));
     if (selected.includes(WP)) dispatch(setWorkingPermitAppliedFilter(normalizedFilters));
