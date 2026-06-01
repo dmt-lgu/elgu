@@ -364,15 +364,15 @@ export default function GeneralManage() {
   };
 
   return (
-    <div className="min-h-full bg-slate-50/40 p-4 sm:p-6 space-y-5">
+    <div className="min-h-full bg-slate-50/40 p-6 md:p-4 sm:p-3 space-y-5">
 
       {/* Page Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-white rounded-2xl border border-border px-6 py-4 shadow-sm">
-        <div>
+      <div className="flex flex-row items-start justify-between gap-3 md:flex-col bg-white rounded-2xl border border-border px-6 py-4 md:px-4 shadow-sm">
+        <div className="min-w-0">
           <h1 className="text-xl font-bold text-slate-900">General Summary</h1>
           <p className="text-xs text-slate-500 mt-0.5">Aggregated view of all modules (BP1, WP, BC, BPCO) and ePayment — one row per unique LGU per month.</p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap md:w-full shrink-0">
           <label className="text-sm text-slate-500 font-medium shrink-0">Year</label>
           {yearOptions.map(y => (
             <label key={y} className="flex items-center gap-1 text-sm cursor-pointer select-none">
@@ -390,7 +390,7 @@ export default function GeneralManage() {
 
       {/* Summary Cards — row 1: UStatus, row 2: ePayment */}
       <div className="space-y-4">
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-3 slg:grid-cols-2 sm:grid-cols-1 gap-4">
           {[
             { label: 'Operational',   count: summary.operational,   from: 'from-emerald-400', to: 'to-teal-400',   text: 'text-emerald-500' },
             { label: 'Developmental', count: summary.developmental, from: 'from-blue-400',    to: 'to-indigo-500', text: 'text-blue-500'    },
@@ -398,16 +398,16 @@ export default function GeneralManage() {
           ].map(({ label, count, from, to, text }) => (
             <div key={label} className="rounded-2xl overflow-hidden bg-white shadow-sm border border-slate-100">
               <div className={`h-1 bg-gradient-to-r ${from} ${to}`} />
-              <div className="px-6 py-5">
+              <div className="px-6 py-5 md:px-4 md:py-4">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">No. of LGU</p>
                 <p className="text-sm font-semibold text-slate-600 mt-0.5">{label}</p>
-                <p className={`text-5xl font-black mt-3 tabular-nums leading-none ${text}`}>{count}</p>
+                <p className={`text-5xl md:text-4xl font-black mt-3 tabular-nums leading-none ${text}`}>{count}</p>
                 <p className="text-xs text-slate-400 mt-3">{monthFilter.length > 0 || searchQuery ? 'Filtered view' : `All records · ${selectedYears.join(', ')}`}</p>
               </div>
             </div>
           ))}
         </div>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-3 slg:grid-cols-2 sm:grid-cols-1 gap-4">
           {[
             { label: 'ePayment',   count: summary.epayment,   from: 'from-emerald-400', to: 'to-teal-400',    text: 'text-emerald-500' },
             { label: 'eGovPay v1', count: summary.egovpay_v1, from: 'from-sky-400',     to: 'to-cyan-500',    text: 'text-sky-500'     },
@@ -415,10 +415,10 @@ export default function GeneralManage() {
           ].map(({ label, count, from, to, text }) => (
             <div key={label} className="rounded-2xl overflow-hidden bg-white shadow-sm border border-slate-100">
               <div className={`h-1 bg-gradient-to-r ${from} ${to}`} />
-              <div className="px-6 py-5">
+              <div className="px-6 py-5 md:px-4 md:py-4">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">No. of LGU with</p>
                 <p className="text-sm font-semibold text-slate-600 mt-0.5">{label}</p>
-                <p className={`text-5xl font-black mt-3 tabular-nums leading-none ${text}`}>{count}</p>
+                <p className={`text-5xl md:text-4xl font-black mt-3 tabular-nums leading-none ${text}`}>{count}</p>
                 <p className="text-xs text-slate-400 mt-3">{monthFilter.length > 0 || searchQuery ? 'Filtered view' : `All records · ${selectedYears.join(', ')}`}</p>
               </div>
             </div>
@@ -428,9 +428,9 @@ export default function GeneralManage() {
 
       {/* Records Table */}
       <div className="bg-white rounded-2xl border border-border shadow-sm">
-        <div className="px-6 py-4 border-b border-border flex flex-col gap-3">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
+        <div className="px-6 py-4 md:px-4 border-b border-border flex flex-col gap-3">
+          <div className="flex flex-row items-center justify-between gap-3 md:flex-col md:items-start">
+            <div className="min-w-0">
               <h3 className="font-semibold text-slate-900">General Records</h3>
               <p className="text-xs text-slate-500 mt-0.5">
                 {filteredRecords.length !== mergedRecords.length
@@ -440,7 +440,7 @@ export default function GeneralManage() {
             </div>
             <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
               placeholder="Search LGU, RO, District…"
-              className="rounded-lg border border-border bg-slate-50 px-3 py-1.5 text-sm text-slate-900 outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 sm:w-64 w-full" />
+              className="rounded-lg border border-border bg-slate-50 px-3 py-1.5 text-sm text-slate-900 outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 w-64 md:w-full shrink-0" />
           </div>
 
           {/* Month chips */}
@@ -563,7 +563,7 @@ export default function GeneralManage() {
         </div>
 
         {/* Pagination */}
-        <div className="px-5 py-3 border-t border-border flex flex-wrap items-center justify-between gap-3 bg-slate-50/50 rounded-b-2xl">
+        <div className="px-5 py-3 md:px-4 border-t border-border flex flex-wrap items-center justify-between gap-3 bg-slate-50/50 rounded-b-2xl">
           <div className="flex items-center gap-2">
             <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={safePage === 1}
               className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 transition">← Prev</button>
@@ -585,19 +585,19 @@ export default function GeneralManage() {
 
       {/* Edit Modal */}
       {showEditModal && editRecord && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-2 bg-black/40 backdrop-blur-sm"
           onClick={e => { if (e.target === e.currentTarget) setShowEditModal(false); }}>
-          <div className="bg-white rounded-2xl border border-border shadow-xl w-full max-w-lg">
-            <div className="px-6 py-4 border-b border-border flex items-center justify-between">
-              <div>
-                <h3 className="font-semibold text-slate-900 truncate max-w-xs" title={editRecord.lgu_name}>{editRecord.lgu_name}</h3>
+          <div className="bg-white rounded-2xl border border-border shadow-xl w-full max-w-lg sm:max-w-full sm:rounded-xl">
+            <div className="px-6 py-4 sm:px-4 border-b border-border flex items-center justify-between">
+              <div className="min-w-0">
+                <h3 className="font-semibold text-slate-900 truncate" title={editRecord.lgu_name}>{editRecord.lgu_name}</h3>
                 <p className="text-xs text-slate-500 mt-0.5">{editRecord.month.replace(/^\[\d+\]\s*/, '')} {editRecord.year}</p>
               </div>
               <button type="button" onClick={() => setShowEditModal(false)}
                 className="rounded-lg border border-border px-2.5 py-1 text-sm text-slate-500 hover:bg-slate-50 transition shrink-0 ml-4">✕</button>
             </div>
 
-            <div className="p-6 space-y-5 overflow-y-auto max-h-[70vh]">
+            <div className="p-6 sm:p-4 space-y-5 overflow-y-auto max-h-[70vh] sm:max-h-[65vh]">
 
               {/* Reporting Period */}
               <div>
@@ -735,7 +735,7 @@ export default function GeneralManage() {
               </div>
             </div>
 
-            <div className="px-6 py-4 border-t border-border flex flex-col gap-3 bg-slate-50/60 rounded-b-2xl">
+            <div className="px-6 py-4 sm:px-4 border-t border-border flex flex-col gap-3 bg-slate-50/60 rounded-b-2xl sm:rounded-b-xl">
               {editError && (
                 <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 break-all">{editError}</div>
               )}

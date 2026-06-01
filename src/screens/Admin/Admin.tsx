@@ -11,9 +11,10 @@ import {
   Settings2Icon,
   ChevronRightIcon,
   HistoryIcon,
+  LogOutIcon,
 } from "lucide-react";
 import DashboardProgressIndicator from './Dashboard/components/DashboardProgressIndicator';
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import Logo from './../../assets/logo/dict-logo.png'
 import { useEffect, useRef, useState } from "react";
 
@@ -572,6 +573,7 @@ function Admin() {
 
 
   const location = useLocation();
+  const navigate = useNavigate();
   const dispatch = useDispatch();
 
   const data = useSelector(selectData);
@@ -1050,11 +1052,25 @@ function Admin() {
             </Link>
           </nav>
 
-           <footer className="mt-auto p-4 border-t border-border text-sm text-secondary-foreground flex flex-col gap-2 font-medium text-start content-center items-center">
-               <p> Developed by:</p> 
-
-               <img src={Logo} className=" w-[140px] object-contain" alt="" />
-              </footer>
+          <div className="mt-auto">
+            <div className="px-4 pb-2">
+              <button
+                onClick={() => {
+                  localStorage.removeItem('auth_token');
+                  localStorage.removeItem('user');
+                  navigate('/elgu/login');
+                }}
+                className="flex items-center gap-2 w-full px-4 py-2.5 rounded-md text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
+              >
+                <LogOutIcon className="w-4 h-4" />
+                <span>Logout</span>
+              </button>
+            </div>
+            <footer className="p-4 border-t border-border text-sm text-secondary-foreground flex flex-col gap-2 font-medium text-start content-center items-center">
+              <p>Developed by:</p>
+              <img src={Logo} className="w-[140px] object-contain" alt="" />
+            </footer>
+          </div>
         </aside>
 
         {/* Sidebar for mobile */}
@@ -1149,6 +1165,19 @@ function Admin() {
                     <span>Audit Trail</span>
                   </Link>
                 </div>
+                <div className="px-3 pb-2 pt-2 border-t border-border mt-2">
+                  <button
+                    onClick={() => {
+                      localStorage.removeItem('auth_token');
+                      localStorage.removeItem('user');
+                      navigate('/elgu/login');
+                    }}
+                    className="flex items-center gap-2 w-full px-3 py-2 rounded-md text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
+                  >
+                    <LogOutIcon className="w-4 h-4" />
+                    <span>Logout</span>
+                  </button>
+                </div>
               </nav>
             </div>
             <div
@@ -1169,7 +1198,6 @@ function Admin() {
                 <MenuIcon className="w-6 h-6" />
               </button>
               <div className="flex-1 flex justify-end items-center gap-3">
-             
               </div>
             </div>
           </header>

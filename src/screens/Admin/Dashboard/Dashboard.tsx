@@ -920,7 +920,7 @@ const scrollToStatusChart = () => {
   const bpbpRawProp      = bpbpSelected && !bpcoSelected ? bpcoBreakdown : [];
 
   return (
-    <div className="p-6 sm:p-2 md:p-4 max-w-[1200px] mx-auto  bg-background ">
+    <div className="p-6 md:p-4 sm:p-3 max-w-[1200px] mx-auto bg-background min-w-0">
       <FilterSection />
       
       {/* Toggle Controls Section */}
@@ -1006,7 +1006,7 @@ const scrollToStatusChart = () => {
       {showStatisticCards && (
       <div className="mb-6">
       
-        <div className="grid grid-cols-3 lg:grid-cols-2 sm:grid-cols-1 gap-4">
+        <div className="grid grid-cols-3 slg:grid-cols-2 md:grid-cols-1 gap-4">
           <StatisticCard2
             title="No. of LGU Operational"
             value={apiUstatus.operational}
@@ -1031,7 +1031,7 @@ const scrollToStatusChart = () => {
         </div>
 
         {/* ePayment counts */}
-        <div className="grid grid-cols-3 lg:grid-cols-2 sm:grid-cols-1 gap-4 mt-4">
+        <div className="grid grid-cols-3 slg:grid-cols-2 md:grid-cols-1 gap-4 mt-4">
           <StatisticCard2
             title="No. of LGU with ePayment"
             value={filteredEpaymentCounts.epayment}
@@ -1064,7 +1064,7 @@ const scrollToStatusChart = () => {
           />
     
         
-        <div className="grid grid-cols-3 md:grid-cols-2 sm:grid-cols-1 gap-4">
+        <div className="grid grid-cols-3 slg:grid-cols-2 md:grid-cols-1 gap-4">
           <StatisticCard 
             title="No. of Transaction"
             value={

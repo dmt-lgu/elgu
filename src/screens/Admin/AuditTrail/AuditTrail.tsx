@@ -105,24 +105,24 @@ const AuditTrail: React.FC = () => {
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
-    <div className="p-6 space-y-5">
+    <div className="p-6 slg:p-4 sm:p-3 space-y-5">
       {/* Header */}
       <div className="flex items-center gap-2">
         <HistoryIcon className="w-5 h-5 text-gray-500" />
-        <h1 className="text-xl font-semibold text-gray-800">Audit Trail</h1>
+        <h1 className="text-xl sm:text-lg font-semibold text-gray-800">Audit Trail</h1>
         <span className="ml-2 text-xs text-gray-400 font-normal">
           {total > 0 ? `${total} record${total !== 1 ? 's' : ''}` : ''}
         </span>
       </div>
 
       {/* Filter bar */}
-      <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm space-y-3">
+      <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-3 shadow-sm space-y-3">
         <div className="flex items-center gap-1 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
           <FilterIcon className="w-3.5 h-3.5" />
           <span>Advanced Search</span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-4 slg:grid-cols-2 sm:grid-cols-1 gap-3">
           {/* Action */}
           <div className="flex flex-col gap-1">
             <label className="text-xs text-gray-500 font-medium">Action</label>
@@ -177,7 +177,7 @@ const AuditTrail: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex gap-2 pt-1">
+        <div className="flex flex-wrap gap-2 pt-1">
           <button
             onClick={handleSearch}
             className="bg-[#2464e8] hover:bg-blue-700 text-white text-sm font-medium px-5 py-2 rounded-md transition-colors"
@@ -197,13 +197,13 @@ const AuditTrail: React.FC = () => {
       {/* Table */}
       <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[600px]">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-[120px]">Action</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-[110px]">Action</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Description</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-[200px]">Username</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-[190px]">Date / Time</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-[180px]">Username</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-[170px]">Date / Time</th>
               </tr>
             </thead>
             <tbody>
@@ -239,7 +239,7 @@ const AuditTrail: React.FC = () => {
                         : <>Deleted <span className="font-medium">{entry.specific_data}</span></>
                       }
                     </td>
-                    <td className="px-4 py-3 text-gray-600 truncate max-w-[200px]">{entry.username}</td>
+                    <td className="px-4 py-3 text-gray-600 truncate max-w-[180px]">{entry.username}</td>
                     <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{formatDate(entry.timestamp)}</td>
                   </tr>
                 ))
@@ -250,22 +250,22 @@ const AuditTrail: React.FC = () => {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 text-sm text-gray-600">
-            <span>
+          <div className="flex items-center justify-between flex-wrap gap-2 px-4 py-3 border-t border-gray-100 text-sm text-gray-600">
+            <span className="text-xs sm:text-xs">
               Page {page} of {totalPages} &nbsp;·&nbsp; {total} total
             </span>
             <div className="flex gap-1">
               <button
                 onClick={() => setPage(p => Math.max(1, p - 1))}
                 disabled={page === 1}
-                className="px-3 py-1 rounded border border-gray-200 disabled:opacity-40 hover:bg-gray-50 transition-colors"
+                className="px-3 py-1 rounded border border-gray-200 disabled:opacity-40 hover:bg-gray-50 transition-colors text-xs"
               >
                 Prev
               </button>
               <button
                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                 disabled={page === totalPages}
-                className="px-3 py-1 rounded border border-gray-200 disabled:opacity-40 hover:bg-gray-50 transition-colors"
+                className="px-3 py-1 rounded border border-gray-200 disabled:opacity-40 hover:bg-gray-50 transition-colors text-xs"
               >
                 Next
               </button>

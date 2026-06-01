@@ -1,14 +1,5 @@
-import { Link, Outlet, useLocation } from 'react-router-dom';
-import { BarChart3Icon } from 'lucide-react';
+import { Outlet, } from 'react-router-dom';
 
-const navItems = [
-  { path: 'general',   label: 'General',   description: 'Aggregated view of all modules + ePayment' },
-  { path: 'bp1',       label: 'BP1',       description: 'Manage BP1 UR Input' },
-  { path: 'wp',        label: 'WP',        description: 'Manage WP UR Input' },
-  { path: 'bc',        label: 'BC',        description: 'Manage BC UR Input' },
-  { path: 'bpco',      label: 'BPCO',      description: 'Manage BPCO UR Input' },
-  { path: 'epayment',  label: 'ePayment',  description: 'Manage ePayment / eGovPay records' },
-];
 
 function Manage() {
 

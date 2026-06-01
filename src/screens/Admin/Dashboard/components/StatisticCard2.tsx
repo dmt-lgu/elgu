@@ -1,5 +1,5 @@
 import React from 'react';
-import { InfoIcon, Building2, TrendingUp, Shield, CreditCard,  ParkingCircle, PauseCircleIcon, StopCircleIcon } from 'lucide-react';
+import { InfoIcon, Building2, TrendingUp, Shield, CreditCard, PauseCircleIcon, StopCircleIcon } from 'lucide-react';
 import IncreasingTextAnimation from './textAnimation';
 import { useSelector } from 'react-redux';
 import { selectLoad2 } from '@/redux/loadSlice2';

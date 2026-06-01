@@ -419,25 +419,25 @@ const FilterSection: React.FC<FilterSectionProps> = ({ onStartProcessing }) => {
 
 
   return (
-    <div className="relative bg-white border border-gray-200 rounded-md shadow-sm p-6 mb-6 z-100">
+    <div className="relative bg-white border border-gray-200 rounded-md shadow-sm p-6 md:p-4 sm:p-3 mb-6 z-100 overflow-hidden">
 
       {/* Title Section */}
       <div className="mb-6 pb-4 border-b border-gray-200">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="w-10 h-10 bg-[#2162e7]/10 rounded-lg flex items-center justify-center">
+        <div className="flex items-center gap-3 mb-2 flex-wrap">
+          <div className="w-10 h-10 bg-[#2162e7]/10 rounded-lg flex items-center justify-center shrink-0">
             <Monitor size={20} className="text-[#2162e7]" />
           </div>
-          <h1 className="text-2xl font-bold text-[#2162e7]">eLGU Services Data Monitoring Tool</h1>
-          <div className="w-8 h-8 bg-[#2162e7]/10 rounded-md flex items-center justify-center">
+          <h1 className="text-2xl md:text-lg sm:text-base font-bold text-[#2162e7] leading-tight">eLGU Services Data Monitoring Tool</h1>
+          <div className="w-8 h-8 bg-[#2162e7]/10 rounded-md flex items-center justify-center shrink-0">
             <BarChart3 size={16} className="text-[#2162e7]" />
           </div>
         </div>
-        <p className="text-sm text-gray-600 ml-13">Monitor and analyze eLGU service transactions across different regions </p>
+        <p className="text-sm text-gray-600 md:text-xs">Monitor and analyze eLGU service transactions across different regions</p>
       </div>
 
-      <div className="relative grid grid-cols-10 lg:grid-cols-3 md:grid-cols-1 gap-2 ">
+      <div className="relative grid grid-cols-10 lg:grid-cols-3 md:grid-cols-1 gap-2 gap-y-4">
         {/* Module */}
-        <div className="flex col-span-3 flex-col group" ref={moduleRef}>
+        <div className="flex col-span-3 md:col-span-1 flex-col group" ref={moduleRef}>
           <div className="flex items-center gap-2 mb-3">
             <div className="w-8 h-8 bg-[#2162e7]/10 rounded-md flex items-center justify-center">
               <Settings2 size={16} className="text-[#2162e7]" />
@@ -504,7 +504,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({ onStartProcessing }) => {
         </div>
 
         {/* Region, Group of Islands, Province, City/Municipality */}
-        <div className="flex col-span-4 flex-col group" ref={regionRef}>
+        <div className="flex col-span-4 md:col-span-1 flex-col group" ref={regionRef}>
           <div className="flex items-center gap-2 mb-3">
             <div className="w-8 h-8 bg-[#2162e7]/10 rounded-md flex items-center justify-center">
               <MapPin size={16} className="text-[#2162e7]" />
@@ -657,7 +657,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({ onStartProcessing }) => {
         </div>
 
         {/* Date Range */}
-        <div className="flex col-span-2 flex-col group" ref={dateRef}>
+        <div className="flex col-span-2 md:col-span-1 flex-col group" ref={dateRef}>
           <div className="flex items-center gap-2 mb-3">
             <div className="w-8 h-8 bg-[#2162e7]/10 rounded-md flex items-center justify-center">
               <Calendar size={16} className="text-[#2162e7]" />
