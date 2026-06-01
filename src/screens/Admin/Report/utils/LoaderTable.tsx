@@ -1,16 +1,19 @@
-import "./loader.css"
+import React from 'react';
+import '../utils/loader.css';
 
-export function LoaderTable() {
-  return (
-    <div>
-      <div id="wave">
-  <span className="dot blue"></span>
-  <span className="dot red"></span>
-  <span className="dot yellow"></span>
-</div>
-
-    </div>
-  )
+interface LoaderTableProps {
+  message?: string;
 }
 
-export default LoaderTable
+const LoaderTable: React.FC<LoaderTableProps> = ({ message }) => {
+  return (
+    <div className='flex flex-col items-center justify-center gap-4 py-4'>
+      <div className="loader animate-pulse"></div>
+      <p className='text-sm font-semibold text-slate-500 animate-pulse'>
+        {message || 'Loading data, please wait...'}
+      </p>
+    </div>
+  );
+};
+
+export default LoaderTable;

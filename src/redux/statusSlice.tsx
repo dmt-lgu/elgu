@@ -6,16 +6,6 @@ interface StatusState {
 
 const initialState: StatusState = {
   value: {
-  "BP": [],
-  "BPraw": [],
-  "totalBP": [],
-  "totalStatus":[],
-  "WP": [],
-  "WPraw": [],
-  "totalWP": [],
-  "BC": [],
-  "BCraw": [],
-  "totalBC": [],
 }, // Initial empty list of regions
 };
 
@@ -27,7 +17,7 @@ export const statusSlice = createSlice({
       state.value = {};
     },
     setStatus: (state, action: PayloadAction<any>) => {
-      state.value = action.payload;
+      state.value = { ...state.value, ...action.payload };
     },
    
   },

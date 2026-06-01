@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { Bar, Line, Pie } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -15,6 +15,7 @@ import {
 import ChartDataLabels from 'chartjs-plugin-datalabels';
 import { useSelector } from 'react-redux';
 import { selectLoad } from '@/redux/loadSlice';
+import { selectData } from '@/redux/dataSlice';
 
 // Register Chart.js components
 ChartJS.register(
@@ -59,23 +60,128 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
   const [chartType, setChartType] = useState<'bar' | 'line' | 'pie'>('bar');
   const [hidden, setHidden] = useState<boolean[]>([false, false, false, false]);
   const chartRef = useRef<any>(null);
-  const labels = data.map(item => item.name);
+  
+  const dataState = useSelector(selectData);
+
+  // Helper function to format selected modules for display
+  const getSelectedModulesDisplay = () => {
+    const moduleFilters = Array.isArray(dataState.selectedChartModuleFilter) ? dataState.selectedChartModuleFilter : [];
+    if (moduleFilters.length === 0) return 'All Modules';
+    if (moduleFilters.length === 1) return moduleFilters[0];
+    if (moduleFilters.length === 2) return `${moduleFilters[0]} & ${moduleFilters[1]}`;
+    return `${moduleFilters.length} Selected Modules`;
+  };
+
+  // Process data based on module filter
+  const processedData = useMemo(() => {
+    const moduleFilters = Array.isArray(dataState.selectedChartModuleFilter) ? dataState.selectedChartModuleFilter : [];
+    const isAllModules = moduleFilters.length === 0;
+    
+    return data.map(item => {
+      let baseData = {
+        name: item.name,
+        paidMale: 0,
+        paidFemale: 0,
+        pendingMale: 0,
+        pendingFemale: 0,
+      };
+
+      // Helper function to get module data
+      const getModuleData = (moduleType: string) => {
+        let moduleData = { paidMale: 0, paidFemale: 0, pendingMale: 0, pendingFemale: 0 };
+        
+        switch (moduleType) {
+          case 'Business Permit':
+            moduleData = {
+              paidMale: item.bpMalePaid || 0,
+              paidFemale: item.bpFemalePaid || 0,
+              pendingMale: item.bpMalePending || 0,
+              pendingFemale: item.bpFemalePending || 0,
+            };
+            break;
+          case 'Working Permit':
+            moduleData = {
+              paidMale: item.wpMalePaid || 0,
+              paidFemale: item.wpFemalePaid || 0,
+              pendingMale: item.wpMalePending || 0,
+              pendingFemale: item.wpFemalePending || 0,
+            };
+            break;
+          case 'Certificate of Occupancy':
+            moduleData = {
+              paidMale: item.bpcoMalePaid || 0,
+              paidFemale: item.bpcoFemalePaid || 0,
+              pendingMale: item.bpcoMalePending || 0,
+              pendingFemale: item.bpcoFemalePending || 0,
+            };
+            break;
+          case 'Building Permit':
+            moduleData = {
+              paidMale: item.bpbpMalePaid || 0,
+              paidFemale: item.bpbpFemalePaid || 0,
+              pendingMale: item.bpbpMalePending || 0,
+              pendingFemale: item.bpbpFemalePending || 0,
+            };
+            break;
+          case 'Barangay Clearance':
+            // BRGY data doesn't have gender breakdown, so all values are 0
+            moduleData = {
+              paidMale: 0,
+              paidFemale: 0,
+              pendingMale: 0,
+              pendingFemale: 0,
+            };
+            break;
+        }
+        
+        return moduleData;
+      };
+
+      // Calculate data based on selected modules
+      if (isAllModules) {
+        // All modules - combine all module data
+        const modules = ['Business Permit', 'Working Permit', 'Certificate of Occupancy', 'Building Permit', 'Barangay Clearance'];
+        modules.forEach((moduleType: string) => {
+          const moduleData = getModuleData(moduleType);
+          baseData.paidMale += moduleData.paidMale;
+          baseData.paidFemale += moduleData.paidFemale;
+          baseData.pendingMale += moduleData.pendingMale;
+          baseData.pendingFemale += moduleData.pendingFemale;
+        });
+      } else {
+        // Selected modules only
+        moduleFilters.forEach((moduleType: string) => {
+          const moduleData = getModuleData(moduleType);
+          baseData.paidMale += moduleData.paidMale;
+          baseData.paidFemale += moduleData.paidFemale;
+          baseData.pendingMale += moduleData.pendingMale;
+          baseData.pendingFemale += moduleData.pendingFemale;
+        });
+      }
+
+      return baseData;
+    });
+  }, [data, dataState.selectedChartModuleFilter]);
+
+  const labels = processedData.map(item => item.name);
 
   // For Pie chart, aggregate all values
-  const pieLabels = ['Paid Male', 'Paid Female', 'Pending Male', 'Pending Female'];
+  const pieLabels = ['Paid Male (License Issued for Male)', 'Paid Female (License Issued for Female)', 'Pending Male', 'Pending Female'];
   const pieValues = [
-    data.reduce((sum, item) => sum + (item.paidMale ?? 0), 0),
-    data.reduce((sum, item) => sum + (item.paidFemale ?? 0), 0),
-    data.reduce((sum, item) => sum + (item.pendingMale ?? 0), 0),
-    data.reduce((sum, item) => sum + (item.pendingFemale ?? 0), 0),
+    processedData.reduce((sum, item) => sum + (item.paidMale ?? 0), 0),
+    processedData.reduce((sum, item) => sum + (item.paidFemale ?? 0), 0),
+    processedData.reduce((sum, item) => sum + (item.pendingMale ?? 0), 0),
+    processedData.reduce((sum, item) => sum + (item.pendingFemale ?? 0), 0),
   ];
-  const pieTotal = pieValues.reduce((a, b) => a + b, 0);
+  // Filter out hidden values and recalculate total
+  const visiblePieValues = pieValues.map((value, idx) => hidden[idx] ? 0 : value);
+  const pieTotal = visiblePieValues.reduce((a, b) => a + b, 0);
 
   const pieData = {
     labels: pieLabels,
     datasets: [
       {
-        data: pieValues,
+        data: visiblePieValues,
         backgroundColor: ['#0047CC', '#FFD700', '#DC2626', '#38BDF8'],
       },
     ],
@@ -85,32 +191,32 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
     labels,
     datasets: [
       {
-        label: 'Paid Male',
-        data: data.map(item => item.paidMale),
+        label: 'Paid Male (License Issued for Male)',
+        data: processedData.map(item => item.paidMale),
         backgroundColor: '#0047CC',
         borderColor: '#0047CC',
         fill: false,
         hidden: hidden[0],
       },
       {
-        label: 'Paid Female',
-        data: data.map(item => item.paidFemale),
+        label: 'Paid Female (License Issued for Female)',
+        data: processedData.map(item => item.paidFemale),
         backgroundColor: '#FFD700',
         borderColor: '#FFD700',
         fill: false,
         hidden: hidden[1],
       },
       {
-        label: 'Pending Male',
-        data: data.map(item => item.pendingMale),
+        label: 'Ongoing Male',
+        data: processedData.map(item => item.pendingMale),
         backgroundColor: '#DC2626',
         borderColor: '#DC2626',
         fill: false,
         hidden: hidden[2],
       },
       {
-        label: 'Pending Female',
-        data: data.map(item => item.pendingFemale),
+        label: 'Ongoing  Female',
+        data: processedData.map(item => item.pendingFemale),
         backgroundColor: '#38BDF8',
         borderColor: '#38BDF8',
         fill: false,
@@ -165,9 +271,12 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
           size: 10,
         },
         // Show percentage for pie, value for others
-        formatter: (value: number, _context: any) => {
+        formatter: (value: number, context: any) => {
           if (chartType === 'pie') {
             if (pieTotal === 0) return '0%';
+            // Only show label if the segment is visible
+            const index = context.dataIndex;
+            if (hidden[index]) return '';
             const percent = ((value / pieTotal) * 100);
             return percent > 0 ? `${percent.toFixed(1)}%` : '';
           }
@@ -197,7 +306,7 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
   };
 
   // Set minWidth based on data length (e.g., 120px per bar group)
-  const minWidth = Math.max(600, data.length * 120);
+  const minWidth = Math.max(600, processedData.length * 120);
     const loading = useSelector(selectLoad);
   return (
     <div className="bg-card p-4 rounded-md border text-secondary-foreground border-border relative shadow-sm mb-6">
@@ -242,7 +351,9 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
         </div>
       )}
         <div className="flex gap-2  justify-between">
-          <p className="font-semibold">{title}</p>
+          <div className="flex flex-col gap-2">
+            <p className="font-semibold">{title} ({getSelectedModulesDisplay()})</p>
+          </div>
           <div className=' gap-2 flex items-center'>
            {chartTypes.map(type => (
             <button

@@ -1,19 +1,20 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
 // --- Filter Slice ---
-interface DateRange {
-  start: string | null;
-  end: string | null;
-}
+// interface DateRange {
+//   start: string | null;
+//   end: string | null;
+// }
 
 export interface FilterState {
   selectedModules: string[];
   selectedRegions: string[];
   selectedProvinces: string[];
   selectedCities: string[];
-  selectedIslands: string[];
-  dateRange: DateRange;
+  dateRange: { start: string | null; end: string | null };
   selectedDateType: string;
+  selectedIslands: string[];
+  allRegionsSelected?: boolean;
 }
 
 const initialFilterState: FilterState = {

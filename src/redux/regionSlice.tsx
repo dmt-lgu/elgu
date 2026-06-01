@@ -17,6 +17,7 @@ const initialState: RegionState = {
   { id: "region3", text: "III", municipalities: [] },
   { id: "region4a", text: "IV-A", municipalities: [] },
   { id: "region5", text: "V", municipalities: [] },
+  { id: "NIR", text: "NIR", municipalities: [] },
   { id: "CAR", text: "CAR", municipalities: [] },
   { id: "NCR", text: "NCR", municipalities: [] },
   { id: "region7", text: "VII", municipalities: [] },

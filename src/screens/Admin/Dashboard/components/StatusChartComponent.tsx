@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Bar, Line, Pie } from 'react-chartjs-2';
+import Select from 'react-select';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -15,7 +16,6 @@ import {
 import ChartDataLabels from 'chartjs-plugin-datalabels';
 import { useSelector } from 'react-redux';
 import { selectCharts } from '@/redux/chartSlice';
-import { parseISO, isAfter, isBefore, isEqual } from 'date-fns';
 
 ChartJS.register(
   CategoryScale,
@@ -34,9 +34,22 @@ interface BarChartProps {
   data: any[];
   title: string;
   period?: string;
-  startDate?: string; // Add these
+  startDate?: string;
   endDate?: string;
-  raw?:any
+  raw?: any;
+  // New props for multi-module support
+  bpData?: any[];
+  wpData?: any[];
+  brgyData?: any[];
+  bpcoData?: any[];
+  bpbpData?: any[];
+  bpRaw?: any[];
+  wpRaw?: any[];
+  brgyRaw?: any[];
+  bpcoRaw?: any[];
+  bpbpRaw?: any[];
+  modules?: string[];
+  loading?: boolean;
 }
 
 const chartTypes = [
@@ -65,15 +78,24 @@ function aggregateData(data: any[]) {
 const COLORS = ['#2563eb', '#fbbf24', '#dc2626'];
 
 const StatusChartComponent: React.FC<BarChartProps> = ({
-  data,
-  title,
+  
   period,
-  startDate,
-  endDate,
-  raw
+ 
+  // New props
+  bpData = [],
+  wpData = [],
+  brgyData = [],
+  bpcoData = [],
+  bpbpData = [],
+  bpRaw = [],
+  wpRaw = [],
+  brgyRaw = [],
+  bpcoRaw = [],
+  bpbpRaw = [],
+  modules = [],
+  loading
 }) => {
   const charts = useSelector(selectCharts);
-
 
   let reduxChartType: 'bar' | 'line' | 'pie' = 'bar';
   if (charts.includes('Pie Graph')) reduxChartType = 'pie';
@@ -83,27 +105,210 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
   const [hidden, setHidden] = useState<boolean[]>([false, false, false]);
   const [chartType, setChartType] = useState<'bar' | 'line' | 'pie'>(reduxChartType);
   const [showBreakdown, setShowBreakdown] = useState(false);
+  const [selectedModules, setSelectedModules] = useState<string[]>([]);
+  const [hasInitialized, setHasInitialized] = useState(false); // Track if we've initialized
 
   useEffect(() => {
     setChartType(reduxChartType);
   }, [reduxChartType]);
 
-  // Filter data by date range if startDate and endDate are provided
-  const filteredData = useMemo(() => {
-    if (!startDate || !endDate) return data;
-    return data.filter(item => {
-      if (!item.date) return true;
-      const itemDate = parseISO(item.date);
-      const start = parseISO(startDate);
-      const end = parseISO(endDate);
-      return (
-        (isAfter(itemDate, start) || isEqual(itemDate, start)) &&
-        (isBefore(itemDate, end) || isEqual(itemDate, end))
-      );
-    });
-  }, [data, startDate, endDate]);
+  useEffect(() => {
+    // Only auto-select the first module on initial load, not when user clears selection
+    if (modules.length > 0 && !hasInitialized) {
+      setSelectedModules([modules[0]]);
+      setHasInitialized(true);
+    }
+  }, [modules, hasInitialized]);
 
-  const processedData = aggregateData(filteredData);
+  // Combine all module data
+  const combinedData = useMemo(() => {
+    const combined = new Map<string, { operational: number; developmental: number; withdraw: number }>();
+    
+    // Add Business Permit data
+    if (modules.includes("Business Permit")) {
+      bpData.forEach(item => {
+        const key = item.name;
+        if (!combined.has(key)) {
+          combined.set(key, { operational: 0, developmental: 0, withdraw: 0 });
+        }
+        const entry = combined.get(key)!;
+        entry.operational += Number(item.operational) || 0;
+        entry.developmental += Number(item.developmental) || 0;
+        entry.withdraw += Number(item.withdraw) || 0;
+      });
+    }
+
+    // Add Working Permit data
+    if (modules.includes("Working Permit")) {
+      wpData.forEach(item => {
+        const key = item.name;
+        if (!combined.has(key)) {
+          combined.set(key, { operational: 0, developmental: 0, withdraw: 0 });
+        }
+        const entry = combined.get(key)!;
+        entry.operational += Number(item.operational) || 0;
+        entry.developmental += Number(item.developmental) || 0;
+        entry.withdraw += Number(item.withdraw) || 0;
+      });
+    }
+
+    // Add Barangay Clearance data
+    if (modules.includes("Barangay Clearance")) {
+      brgyData.forEach(item => {
+        const key = item.name;
+        if (!combined.has(key)) {
+          combined.set(key, { operational: 0, developmental: 0, withdraw: 0 });
+        }
+        const entry = combined.get(key)!;
+        entry.operational += Number(item.operational) || 0;
+        entry.developmental += Number(item.developmental) || 0;
+        entry.withdraw += Number(item.withdraw) || 0;
+      });
+    }
+
+    // Add Certificate of Occupancy data
+    if (modules.includes("Certificate of Occupancy")) {
+      bpcoData.forEach(item => {
+        const key = item.name;
+        if (!combined.has(key)) {
+          combined.set(key, { operational: 0, developmental: 0, withdraw: 0 });
+        }
+        const entry = combined.get(key)!;
+        entry.operational += Number(item.operational) || 0;
+        entry.developmental += Number(item.developmental) || 0;
+        entry.withdraw += Number(item.withdraw) || 0;
+      });
+    }
+
+    // Add Building Permit data
+    if (modules.includes("Building Permit")) {
+      bpbpData.forEach(item => {
+        const key = item.name;
+        if (!combined.has(key)) {
+          combined.set(key, { operational: 0, developmental: 0, withdraw: 0 });
+        }
+        const entry = combined.get(key)!;
+        entry.operational += Number(item.operational) || 0;
+        entry.developmental += Number(item.developmental) || 0;
+        entry.withdraw += Number(item.withdraw) || 0;
+      });
+    }
+
+    return Array.from(combined.entries()).map(([name, values]) => ({
+      name,
+      ...values,
+    }));
+  }, [bpData, wpData, brgyData, bpcoData, bpbpData, modules]);
+
+  // Get selected modules data for breakdown (combine multiple selections)
+  const getSelectedModulesData = () => {
+    if (selectedModules.length === 0) {
+      return { data: combinedData, raw: null };
+    }
+
+    const combinedSelectedData = new Map<string, { operational: number; developmental: number; withdraw: number }>();
+    const combinedRawData: any[] = [];
+
+    selectedModules.forEach(module => {
+      let moduleData: any[] = [];
+      let moduleRaw: any[] = [];
+
+      switch (module) {
+        case 'Business Permit':
+          moduleData = bpData;
+          moduleRaw = bpRaw;
+          break;
+        case 'Working Permit':
+          moduleData = wpData;
+          moduleRaw = wpRaw;
+          break;
+        case 'Barangay Clearance':
+          moduleData = brgyData;
+          moduleRaw = brgyRaw;
+          break;
+        case 'Certificate of Occupancy':
+          moduleData = bpcoData;
+          moduleRaw = bpcoRaw;
+          break;
+        case 'Building Permit':
+          moduleData = bpbpData;
+          moduleRaw = bpbpRaw;
+          break;
+        case 'Building Permit & Certificate of Occupancy':
+          moduleData = [...bpbpData, ...bpcoData];
+          moduleRaw = [...bpbpRaw, ...bpcoRaw];
+          break;
+      }
+
+      // Combine data
+      moduleData.forEach(item => {
+        const key = item.name;
+        if (!combinedSelectedData.has(key)) {
+          combinedSelectedData.set(key, { operational: 0, developmental: 0, withdraw: 0 });
+        }
+        const entry = combinedSelectedData.get(key)!;
+        entry.operational += Number(item.operational) || 0;
+        entry.developmental += Number(item.developmental) || 0;
+        entry.withdraw += Number(item.withdraw) || 0;
+      });
+
+      // Combine raw data by merging dates
+      moduleRaw.forEach(rawPeriod => {
+        const existingPeriod = combinedRawData.find(p => p.date === rawPeriod.date);
+        if (existingPeriod) {
+          // Merge data for the same date
+          rawPeriod.data.forEach((item: any) => {
+            const existingItem = existingPeriod.data.find((d: any) => d.name === item.name);
+            if (existingItem) {
+              existingItem.operational = (existingItem.operational || 0) + (Number(item.operational) || 0);
+              existingItem.developmental = (existingItem.developmental || 0) + (Number(item.developmental) || 0);
+              existingItem.withdraw = (existingItem.withdraw || 0) + (Number(item.withdraw) || 0);
+            } else {
+              existingPeriod.data.push({
+                name: item.name,
+                operational: Number(item.operational) || 0,
+                developmental: Number(item.developmental) || 0,
+                withdraw: Number(item.withdraw) || 0
+              });
+            }
+          });
+        } else {
+          // Add new period
+          combinedRawData.push({
+            date: rawPeriod.date,
+            data: rawPeriod.data.map((item: any) => ({
+              name: item.name,
+              operational: Number(item.operational) || 0,
+              developmental: Number(item.developmental) || 0,
+              withdraw: Number(item.withdraw) || 0
+            }))
+          });
+        }
+      });
+    });
+
+    const resultData = Array.from(combinedSelectedData.entries()).map(([name, values]) => ({
+      name,
+      ...values,
+    }));
+
+    return { data: resultData, raw: combinedRawData };
+  };
+
+  // Use combined data for chart, but selected modules data for breakdown
+  const chartDataSource = combinedData;
+  const { data: selectedCurrentData, raw: selectedRaw } = getSelectedModulesData();
+
+  // Generate dynamic title based on enabled modules
+  const getModuleTitle = () => {
+    if (modules.length === 0) return "No Modules";
+    if (modules.length === 1) return modules[0];
+    if (modules.length === 2) return modules.join(" and ");
+    return modules.slice(0, -1).join(", ") + ", and " + modules[modules.length - 1];
+  };
+
+  // Use the combined data directly (date filtering is handled at the source level)
+  const processedData = aggregateData(chartDataSource);
   const categories = processedData.map(item => item.name);
 
   // Pie chart data with hidden support
@@ -261,12 +466,50 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
   const minWidth = Math.max(400, processedData.length * 80);
 
   return (
-    <div className="bg-card p-4 rounded-md border text-secondary-foreground border-border shadow-sm mb-6">
+    <div className="bg-card relative flex flex-col  p-4 rounded-md border text-secondary-foreground border-border shadow-sm mb-6">
+         {loading && (
+            <div className=" absolute left-0 top-0 w-full h-1 z-50 overflow-hidden rounded-t-md flex">
+              <div className=' h-full w-[100%] ease-in-out animate-[moveLine_1.3s_linear_infinite] flex'>
+                <div
+                className="h-full "
+                style={{
+                  width: '30%',
+                  background: '#eccb58'
+                }}
+              />
+              <div
+                className="h-full  delay-300"
+                style={{
+                  width: '40%',
+                  background: '#b8232e'
+                }}
+              />
+              <div
+                className="h-full  delay-600"
+                style={{
+                  width: '50%',
+                  background: '#0134b2'
+                }}
+              />
+                
+              </div>
+              
+           <style>
+                {`
+                  @keyframes moveLine {
+                    0% { transform: translateX(-100%); }
+                    100% { transform: translateX(250%); }
+                  }
+                `}
+              </style>
+            </div>
+          )}
+      
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-sm font-bold uppercase">
+        <h2 className="text-sm font-bold w-[85%] uppercase">
           {chartType === "pie"
-            ? `BPLS - Operational vs Developmental vs Withdraw ( Overall Percentage)`
-            : title}
+            ? `Operational vs Developmental vs Withdraw (Percentage) - ${getModuleTitle()}`
+            : `Operational vs. Developmental vs. Withdrawal (${getModuleTitle()})`}
         </h2>
         <div className="flex gap-2">
           {chartTypes.map(type => (
@@ -280,7 +523,6 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
               {type.label}
             </button>
           ))}
-          
         </div>
       </div>
       {/* Custom legend styled like ApexCharts */}
@@ -306,7 +548,10 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
         ))}
       </div>
       <div className="w-full overflow-x-auto">
-        <div style={{ minWidth: chartType === 'pie' ? 400 : minWidth, height: 400 }}>
+        <div style={{ minWidth: chartType === 'pie' ? 400 : minWidth, height: 400 }} className="relative">
+          {/* Loading overlay */}
+       
+          
           {chartType === 'bar' && (
             <Bar data={chartData} options={options} plugins={[ChartDataLabels]} />
           )}
@@ -330,9 +575,139 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
           >
             {showBreakdown ? 'Hide Breakdown ▼ ' : 'Show Breakdown ▶ '}
           </button>
-      {showBreakdown && raw && Array.isArray(raw) && (() => {
-  // 1. Sort raw by date (oldest to latest)
-  const sortedRaw = [...raw].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+      {showBreakdown && (
+        <div className="mt-4">
+          {/* Module Selection Dropdown */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-2">Select Module(s) for Breakdown:</label>
+            <Select
+              isMulti
+              value={selectedModules.map(module => ({ value: module, label: module }))}
+              onChange={(selectedOptions) => {
+                const values = selectedOptions ? selectedOptions.map((option: any) => option.value) : [];
+                setSelectedModules(values);
+              }}
+              options={['Business Permit', 'Working Permit', 'Barangay Clearance', 'Building Permit & Certificate of Occupancy'].map(module => ({ value: module, label: module }))}
+              placeholder="Choose modules to analyze..."
+              className="text-sm"
+              classNamePrefix="react-select"
+              styles={{
+                control: (base, state) => ({
+                  ...base,
+                  borderColor: state.isFocused ? '#2162e7' : '#d1d5db',
+                  boxShadow: state.isFocused ? '0 0 0 3px rgba(33, 98, 231, 0.1)' : 'none',
+                  backgroundColor: '#f9fafb',
+                  '&:hover': {
+                    borderColor: '#2162e7'
+                  }
+                }),
+                multiValue: (base) => ({
+                  ...base,
+                  backgroundColor: '#2162e7',
+                }),
+                multiValueLabel: (base) => ({
+                  ...base,
+                  color: 'white',
+                }),
+                multiValueRemove: (base) => ({
+                  ...base,
+                  color: 'white',
+                  ':hover': {
+                    backgroundColor: '#1d56d1',
+                    color: 'white',
+                  },
+                }),
+              }}
+            />
+          </div>
+
+          {/* Instruction when no modules are selected */}
+          {selectedModules.length === 0 && (
+            <div className="mb-4 p-6 bg-gray-50 border border-gray-200 rounded-md text-center">
+              <div className="flex flex-col items-center space-y-3">
+                <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
+                  <svg className="w-8 h-8 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
+                </div>
+                <div className="text-center">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No Modules Selected</h3>
+                  <p className="text-sm text-gray-600 mb-1">
+                    Please select one or more modules from the dropdown above to view detailed breakdown analysis.
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    You can select multiple modules to compare and analyze combined data across different eLGU services.
+                  </p>
+                </div>
+                <div className="flex items-center space-x-2 text-xs text-gray-500">
+                  <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                  <span>Business Permit</span>
+                  <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                  <span>Working Permit</span>
+                  <span className="w-2 h-2 bg-yellow-500 rounded-full"></span>
+                  <span>Barangay Clearance</span>
+                  <span className="w-2 h-2 bg-purple-500 rounded-full"></span>
+                  <span>Building Permit & COO</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Total Status Summary — derived from the same current data as the chart */}
+          {selectedModules.length > 0 && selectedCurrentData && selectedCurrentData.length > 0 && (() => {
+            // Sum the current (latest-per-LGU) data for the selected module(s)
+            const totals = selectedCurrentData.reduce((acc: any, item: any) => ({
+              operational:   acc.operational   + (Number(item.operational)   || 0),
+              developmental: acc.developmental + (Number(item.developmental) || 0),
+              withdraw:      acc.withdraw      + (Number(item.withdraw)      || 0),
+            }), { operational: 0, developmental: 0, withdraw: 0 });
+
+            const grandTotal = totals.operational + totals.developmental + totals.withdraw;
+            const moduleText = selectedModules.length === 1 ? selectedModules[0] : `${selectedModules.length} Modules`;
+
+            return (
+              <div className="mb-4 p-4 bg-primary/5 border border-primary/20 rounded-md">
+                <h3 className="text-sm font-semibold mb-3 text-primary">
+                  Total Status Summary - {moduleText} 
+                </h3>
+                {selectedModules.length > 1 && (
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Combined data from: {selectedModules.join(', ')}
+                  </p>
+                )}
+                <div className="grid grid-cols-3 gap-4 text-sm">
+                  <div className="text-center p-2 bg-blue-50 rounded border">
+                    <div className="font-bold text-xl text-blue-700">{totals.operational}</div>
+                    <div className="text-xs text-blue-600">Operational</div>
+                    <div className="text-xs text-muted-foreground">
+                      {grandTotal > 0 ? `${((totals.operational / grandTotal) * 100).toFixed(1)}%` : '0%'}
+                    </div>
+                  </div>
+                  <div className="text-center p-2 bg-/10 rounded border">
+                    <div className="font-bold text-[#f8be24] text-xl">{totals.developmental}</div>
+                    <div className="text-xs text-[#f8be24]">Developmental</div>
+                    <div className="text-xs text-muted-foreground">
+                      {grandTotal > 0 ? `${((totals.developmental / grandTotal) * 100).toFixed(1)}%` : '0%'}
+                    </div>
+                  </div>
+                  <div className="text-center p-2 bg-red-50/30 rounded border">
+                    <div className="font-bold text-red-700 text-xl">{totals.withdraw}</div>
+                    <div className="text-xs text-red-600"> Withdraw</div>
+                    <div className="text-xs text-muted-foreground">
+                      {grandTotal > 0 ? `${((totals.withdraw / grandTotal) * 100).toFixed(1)}%` : '0%'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {showBreakdown && selectedRaw && Array.isArray(selectedRaw) && selectedModules.length > 0 && (() => {
+  // Split raw by date (oldest to latest)
+  const sortedRaw = [...selectedRaw].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   // 2. Get all unique region names in the order of the first date
   const regionNames = sortedRaw[0]?.data.map((item: any) => item.name) || [];
@@ -348,6 +723,16 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
 
   return (
     <div className="mt-6 overflow-x-auto">
+      <div className="mb-3">
+        <h3 className="text-sm font-semibold text-primary">
+          Data Table - {selectedModules.length === 1 ? selectedModules[0] : `${selectedModules.length} Combined Modules`}
+        </h3>
+        {selectedModules.length > 1 && (
+          <p className="text-xs text-muted-foreground">
+            Combined data from: {selectedModules.join(', ')}
+          </p>
+        )}
+      </div>
       <table className="min-w-full border rounded bg-card text-xs">
         <thead>
           <tr>

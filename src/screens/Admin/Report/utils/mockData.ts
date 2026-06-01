@@ -11,10 +11,10 @@ export const mainStats: StatisticData[] = [
 
 export const modules = [
   "Business Permit",
-  // "Building Permit",
-  // "Certificate of Occupancy",
   "Working Permit",
   "Barangay Clearance",
+  "Building Permit",
+  "Certificate of Occupancy",
 ];
 
 export const category = [
@@ -29,7 +29,7 @@ export const dateRange = [
 ];
 
 export const regions = [
-  "R1","R2","R3","R4A","R4B","R5","CAR","R6","R7","R8","R9","R10","R11","R12","R13","BARMM I","BARMM II"
+  "R1","R2","R3","R4A","R4B","R5","CAR","R6","R7","R8","NIR","R9","R10","R11","R12","R13","BARMM I","BARMM II"
 ];
 
 export const regionMapping: Record<string, string> = {
@@ -48,6 +48,8 @@ export const regionMapping: Record<string, string> = {
   "XII": "region12",
   "XIII": "region13",
   "CAR": "CAR",
+  "NCR": "NCR",
+  "NIR": "NIR",
   "BARMM1": "BARMM1",
   "BARMM2": "BARMM2",
 };
@@ -69,6 +71,8 @@ export const regionGroups: Record<string, string> = {
   "XII": "region12",
   "XIII": "region13",
   "CAR": "CAR",
+  "NCR": "NCR",
+  "NIR": "NIR",
   "BARMM I": "BARMM1",
   "BARMM II": "BARMM2",
 };
@@ -89,6 +93,8 @@ export const regionCodeToKey: Record<string, string> = {
   "R12": "region12",
   "R13": "region13",
   "CAR": "CAR",
+  "NCR": "NCR",
+  "NIR": "NIR",
   "BARMM1": "BARMM1",
   "BARMM2": "BARMM2",
 };
@@ -167,8 +173,8 @@ export function useCities() {
 // --- End of city API integration ---
 
 export const islandRegionMap: Record<string, string[]> = {
-  "Luzon": ["I", "II", "III", "IV-A", "IV-B", "V", "CAR"],
-  "Visayas": ["VI", "VII", "VIII"],
+  "Luzon": ["I", "II", "III", "IV-A", "IV-B", "V", "CAR", "NCR"],
+  "Visayas": ["VI", "VII", "VIII", "NIR"],
   "Mindanao": ["IX", "X", "XI", "XII", "XIII", "BARMM1", "BARMM2"],
 };
 

@@ -25,9 +25,10 @@ export interface FilterState {
   selectedRegions: string[];
   selectedProvinces: string[];
   selectedCities: string[];
-  dateRange: { start: Date | null; end: Date | null };
-  selectedDateType?: string; // "Day" | "Month" | "Year" | ""
-  // ...other properties
+  dateRange: { start: string | null; end: string | null };
+  selectedDateType: string;
+  selectedIslands: string[];
+  allRegionsSelected?: boolean;
 }
 
 export interface RegionData {

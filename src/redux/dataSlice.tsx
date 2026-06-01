@@ -6,14 +6,20 @@ interface DataState {
 
 const initialState: DataState = {
   value: {
-  "modules": [], // Initial empty list of modules
-  "locationName": [],
+  "modules":["Business Permit","Working Permit","Barangay Clearance","Building Permit","Certificate of Occupancy"],
+  "selectedTransactionModuleFilter": "All", // New field for transaction module filtering
+  "selectedStatusModuleFilter": "All", // New field for status module filtering
+  "selectedChartFilter_renew": "All", // Chart-specific filter for renew chart
+  "selectedChartFilter_gender": "All", // Chart-specific filter for gender chart
+  "selectedCardModuleFilter": [], // Changed to array for multi-selection
+  "selectedChartModuleFilter": [], // Changed to array for multi-selection
+  "locationName": ["I","II","III","IV-A","V","CAR","NCR","IV-B","VI","VII","VIII","IX","X","XI","XII","XIII","BARMM I","BARMM II", "NIR"], // List of all location names
   "municipalities": [],
   "province": [],
-  "real":[],     // Can be a string or an array of strings
-  "startDate": "",
-  "endDate": "",
-  "selectedDateType": "",
+  "real":["region1","region2","region3","region4a","region5","CAR","NCR","region4b","region6","region7","region8","region9","region10","region11","region12","region13","BARMM1","BARMM2","NIR"],     // Can be a string or an array of strings
+  "startDate": `${new Date().getFullYear()}-01-01`,
+  "endDate": new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }),
+  "selectedDateType": "Month",
 }, // Initial empty list of regions
 };
 

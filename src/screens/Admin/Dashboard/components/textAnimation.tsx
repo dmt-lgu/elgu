@@ -1,67 +1,32 @@
-import React, { useState, useEffect } from 'react';
-import { useSpring, animated } from '@react-spring/web';
+import React from 'react';
 
 type IncreasingTextAnimationProps = {
   text: string;
   delay?: number;
   speed?: number;
   scrambleSpeed?: number;
+  isNumber?: boolean;
 };
 
-const IncreasingTextAnimation: React.FC<IncreasingTextAnimationProps> = ({
-  text,
-  delay = 500,
-  speed = 300,
-  scrambleSpeed = 50,
-}) => {
-  const [displayText, setDisplayText] = useState('');
-  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+const IncreasingTextAnimation: React.FC<IncreasingTextAnimationProps> = ({ text, isNumber = false }) => {
+  const display = isNumber
+    ? (() => { const n = parseInt(String(text).replace(/,/g, '')); return isNaN(n) ? text : n.toLocaleString(); })()
+    : text;
 
-  const spring = useSpring({
-    opacity: 1,
-    from: { opacity: 0 },
-    delay,
-  });
-
-  useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
-    let scrambleTimeoutId: NodeJS.Timeout;
-    let index = 0;
-
-    const revealText = () => {
-      if (index <= text.length) {
-        // Shuffle characters before showing the correct one
-        scrambleTimeoutId = setInterval(() => {
-          const scrambledText = text
-            .split('')
-            .map((char, i) =>
-              i < index
-                ? char
-                : characters[Math.floor(Math.random() * characters.length)]
-            )
-            .join('');
-          setDisplayText(scrambledText);
-        }, scrambleSpeed);
-
-        // Once the scramble is done, show the correct character
-        timeoutId = setTimeout(() => {
-          clearInterval(scrambleTimeoutId);
-          setDisplayText(text.slice(0, index + 1));
-          index++;
-          revealText();
-        }, speed);
-      }
-    };
-
-    revealText();
-
-    return () => {
-      clearTimeout(timeoutId);
-      clearInterval(scrambleTimeoutId);
-    };
-  }, [text, speed, scrambleSpeed]);
-
-  return <animated.span style={spring}>{displayText}</animated.span>;
+  return (
+    <span
+      key={display}
+      style={{ animation: 'fadeInValue 0.35s ease-out both' }}
+    >
+      {display}
+      <style>{`
+        @keyframes fadeInValue {
+          from { opacity: 0; transform: translateY(4px); }
+          to   { opacity: 1; transform: translateY(0);   }
+        }
+      `}</style>
+    </span>
+  );
 };
 
 export default IncreasingTextAnimation;

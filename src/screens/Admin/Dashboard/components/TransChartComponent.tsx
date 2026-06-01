@@ -15,6 +15,7 @@ import {
 import ChartDataLabels from 'chartjs-plugin-datalabels';
 import { useSelector } from 'react-redux';
 import { selectLoad } from '@/redux/loadSlice';
+import { selectData } from '@/redux/dataSlice';
 
 // Register Chart.js components
 ChartJS.register(
@@ -29,15 +30,6 @@ ChartJS.register(
   Legend,
   ChartDataLabels
 );
-
-// Mock data
-// const mockTransactionChartData = [
-//   { name: 'CAR', paidMale: 472, paidFemale: 20, pendingMale: 0, pendingFemale: 1 },
-//   { name: 'Region I', paidMale: 1007, paidFemale: 449, pendingMale: 1, pendingFemale: 0 },
-//   { name: 'Region II', paidMale: 1106, paidFemale: 111, pendingMale: 3, pendingFemale: 6 },
-//   { name: 'Region III', paidMale: 971, paidFemale: 125, pendingMale: 3, pendingFemale: 3 },
-//   { name: 'Region IV-A', paidMale: 528, paidFemale: 46, pendingMale: 1, pendingFemale: 3 },
-// ];
 
 interface TransactionChartProps {
   data?: any[];
@@ -59,56 +51,213 @@ const typeOptions = [
 
 const TransactionChart: React.FC<TransactionChartProps> = ({
   data = [],
-  
   period
 }) => {
+
+
   const [chartType, setChartType] = useState<'bar' | 'line' | 'pie'>('bar');
   const [hidden, setHidden] = useState<boolean[]>([false, false, false, false]);
   const [txnType, setTxnType] = useState<'overall' | 'new' | 'renew'>('overall');
+  
+  const dataState = useSelector(selectData);
 
-  // Massage data based on txnType
+  // Helper function to format selected modules for display
+  const getSelectedModulesDisplay = () => {
+    const moduleFilters = Array.isArray(dataState.selectedChartModuleFilter) ? dataState.selectedChartModuleFilter : [];
+    if (moduleFilters.length === 0) return 'All Modules';
+    if (moduleFilters.length === 1) return moduleFilters[0];
+    if (moduleFilters.length === 2) return `${moduleFilters[0]} & ${moduleFilters[1]}`;
+    return `${moduleFilters.length} Selected Modules`;
+  };
+
+  // Massage data based on txnType and module filter
   const processedData = useMemo(() => {
+    const moduleFilters = Array.isArray(dataState.selectedChartModuleFilter) ? dataState.selectedChartModuleFilter : [];
+    const isAllModules = moduleFilters.length === 0;
+    
     return data.map(item => {
-      if (txnType === 'new') {
-        return {
-          name: item.name,
-          paid: item.newPaid ?? 0,
-          pending: item.newPending ?? 0,
-          paideGov: item.newPaidViaEgov ?? 0,
-          paidLinkBiz: item.newPaidLinkBiz ?? 0,
-        };
-      } else if (txnType === 'renew') {
-        return {
-          name: item.name,
-          paid: item.renewPaid ?? 0,
-          pending: item.renewPending ?? 0,
-          paideGov: item.renewPaidViaEgov ?? 0,
-          paidLinkBiz: item.renewPaidLinkBiz ?? 0,
-        };
+      let baseData = {
+        name: item.name,
+        paid: 0,
+        pending: 0,
+        paideGov: 0,
+        paidLinkBiz: 0,
+      };
+
+      // Helper function to get module data
+      const getModuleData = (moduleType: string) => {
+        let moduleData = { paid: 0, pending: 0, paideGov: 0, paidLinkBiz: 0 };
+        
+        switch (moduleType) {
+          case 'Business Permit':
+            if (txnType === 'new') {
+              moduleData = {
+                paid: item.bpNewPaid ?? 0,
+                pending: item.bpNewPending ?? 0,
+                paideGov: item.bpNewPaidViaEgov ?? 0,
+                paidLinkBiz: item.bpNewPaidLinkBiz ?? 0,
+              };
+            } else if (txnType === 'renew') {
+              moduleData = {
+                paid: item.bpRenewPaid ?? 0,
+                pending: item.bpRenewPending ?? 0,
+                paideGov: item.bpRenewPaidViaEgov ?? 0,
+                paidLinkBiz: item.bpRenewPaidLinkBiz ?? 0,
+              };
+            } else {
+              moduleData = {
+                paid: (item.bpNewPaid ?? 0) + (item.bpRenewPaid ?? 0),
+                pending: (item.bpNewPending ?? 0) + (item.bpRenewPending ?? 0),
+                paideGov: (item.bpNewPaidViaEgov ?? 0) + (item.bpRenewPaidViaEgov ?? 0),
+                paidLinkBiz: (item.bpNewPaidLinkBiz ?? 0) + (item.bpRenewPaidLinkBiz ?? 0),
+              };
+            }
+            break;
+            
+          case 'Working Permit':
+            if (txnType === 'new') {
+              moduleData = {
+                paid: item.wpNewPaid ?? 0,
+                pending: item.wpNewPending ?? 0,
+                paideGov: item.wpNewPaidViaEgov ?? 0,
+                paidLinkBiz: item.wpNewPaidLinkBiz ?? 0,
+              };
+            } else if (txnType === 'renew') {
+              moduleData = {
+                paid: item.wpRenewPaid ?? 0,
+                pending: item.wpRenewPending ?? 0,
+                paideGov: item.wpRenewPaidViaEgov ?? 0,
+                paidLinkBiz: item.wpRenewPaidLinkBiz ?? 0,
+              };
+            } else {
+              moduleData = {
+                paid: (item.wpNewPaid ?? 0) + (item.wpRenewPaid ?? 0),
+                pending: (item.wpNewPending ?? 0) + (item.wpRenewPending ?? 0),
+                paideGov: (item.wpNewPaidViaEgov ?? 0) + (item.wpRenewPaidViaEgov ?? 0),
+                paidLinkBiz: (item.wpNewPaidLinkBiz ?? 0) + (item.wpRenewPaidLinkBiz ?? 0),
+              };
+            }
+            break;
+            
+          case 'Certificate of Occupancy':
+            if (txnType === 'new') {
+              moduleData = {
+                paid: item.bpcoNewPaid ?? 0,
+                pending: item.bpcoNewPending ?? 0,
+                paideGov: item.bpcoNewPaidViaEgov ?? 0,
+                paidLinkBiz: item.bpcoNewPaidLinkBiz ?? 0,
+              };
+            } else if (txnType === 'renew') {
+              moduleData = {
+                paid: item.bpcoRenewPaid ?? 0,
+                pending: item.bpcoRenewPending ?? 0,
+                paideGov: item.bpcoRenewPaidViaEgov ?? 0,
+                paidLinkBiz: item.bpcoRenewPaidLinkBiz ?? 0,
+              };
+            } else {
+              moduleData = {
+                paid: (item.bpcoNewPaid ?? 0) + (item.bpcoRenewPaid ?? 0),
+                pending: (item.bpcoNewPending ?? 0) + (item.bpcoRenewPending ?? 0),
+                paideGov: (item.bpcoNewPaidViaEgov ?? 0) + (item.bpcoRenewPaidViaEgov ?? 0),
+                paidLinkBiz: (item.bpcoNewPaidLinkBiz ?? 0) + (item.bpcoRenewPaidLinkBiz ?? 0),
+              };
+            }
+            break;
+            
+          case 'Building Permit':
+            if (txnType === 'new') {
+              moduleData = {
+                paid: item.bpbpNewPaid ?? 0,
+                pending: item.bpbpNewPending ?? 0,
+                paideGov: item.bpbpNewPaidViaEgov ?? 0,
+                paidLinkBiz: item.bpbpNewPaidLinkBiz ?? 0,
+              };
+            } else if (txnType === 'renew') {
+              moduleData = {
+                paid: item.bpbpRenewPaid ?? 0,
+                pending: item.bpbpRenewPending ?? 0,
+                paideGov: item.bpbpRenewPaidViaEgov ?? 0,
+                paidLinkBiz: item.bpbpRenewPaidLinkBiz ?? 0,
+              };
+            } else {
+              moduleData = {
+                paid: (item.bpbpNewPaid ?? 0) + (item.bpbpRenewPaid ?? 0),
+                pending: (item.bpbpNewPending ?? 0) + (item.bpbpRenewPending ?? 0),
+                paideGov: (item.bpbpNewPaidViaEgov ?? 0) + (item.bpbpRenewPaidViaEgov ?? 0),
+                paidLinkBiz: (item.bpbpNewPaidLinkBiz ?? 0) + (item.bpbpRenewPaidLinkBiz ?? 0),
+              };
+            }
+            break;
+            
+          case 'Barangay Clearance':
+            // BRGY data only has newPaid (mapped from totalCount), no other fields
+            if (txnType === 'new') {
+              moduleData = {
+                paid: item.brgyNewPaid ?? 0,  // This is mapped from totalCount
+                pending: 0,  // Always 0 for BRGY
+                paideGov: 0,  // Always 0 for BRGY
+                paidLinkBiz: 0,  // Always 0 for BRGY
+              };
+            } else if (txnType === 'renew') {
+              moduleData = {
+                paid: 0,  // Always 0 for BRGY
+                pending: 0,  // Always 0 for BRGY
+                paideGov: 0,  // Always 0 for BRGY
+                paidLinkBiz: 0,  // Always 0 for BRGY
+              };
+            } else {
+              // Overall - only newPaid has data for BRGY
+              moduleData = {
+                paid: item.brgyNewPaid ?? 0,  // This is the totalCount
+                pending: 0,  // BRGY doesn't have pending data
+                paideGov: 0,  // BRGY doesn't have eGov data
+                paidLinkBiz: 0,  // BRGY doesn't have linkBiz data
+              };
+            }
+            break;
+        }
+        
+        return moduleData;
+      };
+
+      // Calculate data based on selected modules
+      if (isAllModules) {
+        // All modules - combine all module data
+        const modules = ['Business Permit', 'Working Permit', 'Certificate of Occupancy', 'Building Permit', 'Barangay Clearance'];
+        modules.forEach((moduleType: string) => {
+          const moduleData = getModuleData(moduleType);
+          baseData.paid += moduleData.paid;
+          baseData.pending += moduleData.pending;
+          baseData.paideGov += moduleData.paideGov;
+          baseData.paidLinkBiz += moduleData.paidLinkBiz;
+        });
       } else {
-        // total
-        return {
-          name: item.name,
-          paid: (item.newPaid ?? 0) + (item.renewPaid ?? 0),
-          pending: (item.newPending ?? 0) + (item.renewPending ?? 0),
-          paideGov: (item.newPaidViaEgov ?? 0) + (item.renewPaidViaEgov ?? 0),
-          paidLinkBiz: (item.newPaidLinkBiz ?? 0) + (item.renewPaidLinkBiz ?? 0),
-        };
+        // Selected modules only
+        moduleFilters.forEach((moduleType: string) => {
+          const moduleData = getModuleData(moduleType);
+          baseData.paid += moduleData.paid;
+          baseData.pending += moduleData.pending;
+          baseData.paideGov += moduleData.paideGov;
+          baseData.paidLinkBiz += moduleData.paidLinkBiz;
+        });
       }
+
+      return baseData;
     });
-  }, [data, txnType]);
+  }, [data, txnType, dataState.selectedChartModuleFilter]);
 
   const labels = processedData.map(item => item.name);
 
   // Pie chart labels and values
-  const allPieLabels = ['Paid', 'Pending', 'Paid with eGovPay', 'Paid with LinkBiz'];
+  const allPieLabels = ['Paid (For Issuance to License Issued) ', 'Ongoing (For verification to For Payment) ','License Issued' ,'Paid with eGovPay', 'Paid with LinkBiz'];
   const allPieValues = [
     processedData.reduce((sum, item) => sum + (item.paid ?? 0), 0),
     processedData.reduce((sum, item) => sum + (item.pending ?? 0), 0),
+    processedData.reduce((sum, item) => sum + (item.paid ?? 0) + (item.paideGov ?? 0), 0),
     processedData.reduce((sum, item) => sum + (item.paideGov ?? 0), 0),
     processedData.reduce((sum, item) => sum + (item.paidLinkBiz ?? 0), 0),
   ];
-  const allPieColors = ['#0047CC', '#FFD700', '#DC2626', '#38BDF8'];
+  const allPieColors = ['#0047CC', '#FFD700', '#1ec55a','#DC2626', '#38BDF8'];
 
   // Filter pie data based on legend toggles
   const pieLabels = allPieLabels.filter((_, idx) => !hidden[idx]);
@@ -139,7 +288,7 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
         hidden: hidden[0],
       },
       {
-        label: 'Pending',
+        label: 'Ongoing ',
         data: processedData.map(item => item.pending),
         backgroundColor: '#FFD700',
         borderColor: '#FFD700',
@@ -147,12 +296,20 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
         hidden: hidden[1],
       },
       {
+        label: 'License Issued ',
+        data: processedData.map(item => item.paid + item.paideGov),
+        backgroundColor: '#1ec55a',
+        borderColor: '#0047CC',
+        fill: false,
+        hidden: hidden[2],
+      },
+      {
         label: 'Paid with eGovPay',
         data: processedData.map(item => item.paideGov),
         backgroundColor: '#DC2626',
         borderColor: '#DC2626',
         fill: false,
-        hidden: hidden[2],
+        hidden: hidden[3],
       },
       {
         label: 'Paid with LinkBiz',
@@ -160,7 +317,7 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
         backgroundColor: '#38BDF8',
         borderColor: '#38BDF8',
         fill: false,
-        hidden: hidden[3],
+        hidden: hidden[4],
       },
     ],
   };
@@ -302,11 +459,13 @@ const TransactionChart: React.FC<TransactionChartProps> = ({
         </div>
       )}
       <div className="flex gap-2  justify-between">
-        <p className="font-semibold">
-    {txnType === 'renew' && 'NUMBER OF TRANSACTION PER REGION FOR RENEW APPLICATION'}
-    {txnType === 'new' && 'NUMBER OF TRANSACTION PER REGION FOR NEW APPLICATION'}
-    {txnType === 'overall' && 'NUMBER OF TRANSACTION PER REGION FOR OVERALL APPLICATION'}
-  </p>
+        <div className="flex flex-col gap-2">
+          <p className="font-semibold">
+            {txnType === 'renew' && `NUMBER OF TRANSACTION PER REGION FOR RENEW APPLICATION (${getSelectedModulesDisplay()})`}
+            {txnType === 'new' && `NUMBER OF TRANSACTION PER REGION FOR NEW APPLICATION (${getSelectedModulesDisplay()})`}
+            {txnType === 'overall' && `NUMBER OF TRANSACTION PER REGION FOR OVERALL APPLICATION (${getSelectedModulesDisplay()})`}
+          </p>
+        </div>
         <div className=' gap-2 flex items-center'>
           {chartTypes.map(type => (
             <button

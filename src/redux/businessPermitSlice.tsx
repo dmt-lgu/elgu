@@ -12,6 +12,8 @@ export interface AppliedFilter {
   dateRange: DateRange;
   selectedDateType: string;
   selectedIslands: string[];
+  selectedModules: any[]; // FIX: Added selectedModules to the type definition
+  allRegionsSelected?: boolean; // Optional field to indicate if all regions are selected
   // Add other filter fields if needed
 }
 
