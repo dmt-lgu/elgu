@@ -43,23 +43,6 @@ function DateRangeYear({
   const [to, setTo] = React.useState<YearOnly | null>(null);
   const loading = useSelector(selectLoad);
 
-  // Initialize with Redux values on mount
-  React.useEffect(() => {
-    if (reduxStart && reduxStart !== "") {
-      const startDate = new Date(reduxStart);
-      if (!isNaN(startDate.getTime())) {
-        setFrom({ year: startDate.getFullYear() });
-      }
-    }
-    
-    if (reduxEnd && reduxEnd !== "") {
-      const endDate = new Date(reduxEnd);
-      if (!isNaN(endDate.getTime())) {
-        setTo({ year: endDate.getFullYear() });
-      }
-    }
-  }, [reduxStart, reduxEnd]);
-
   // Sync with value prop (robust to string or Date)
   React.useEffect(() => {
     let startDate: Date | null = null;

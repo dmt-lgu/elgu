@@ -53,6 +53,10 @@ function getRegionSortIndex(regionKey: string): number {
   if (normalized === 'region not specified') return DESIRED_REGION_ORDER.length + 1;
   return DESIRED_REGION_ORDER.length;
 }
+
+function getCitizensServed(lgu: any): number {
+  return Number(lgu?.totalCitizensServed || 0);
+}
 // --- End Region Sorting Helpers ---
 
 interface BrgyCleranceProps {
@@ -99,6 +103,7 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
   const filteredResults = useMemo(() => { return filterTableResults({ apiData, selectedRegions, selectedProvinces, selectedCities, selectedIslands, lguToRegion: completeLguToRegion, dateRange, }); }, [apiData, selectedRegions, selectedProvinces, selectedCities, selectedIslands, completeLguToRegion, dateRange]);
   const normalizedResults = useMemo(() => { type MonthRec = { month: string; totalCount: number }; const byLgu = new Map<string, { lgu: any; monthsMap: Map<string, MonthRec>; hasError?: boolean }>(); for (const entry of filteredResults as any[]) { const lguKey = entry?.lgu || ''; if (!lguKey) continue; if (!byLgu.has(lguKey)) { byLgu.set(lguKey, { lgu: { ...entry, monthlyResults: [] }, monthsMap: new Map(), hasError: entry?.hasError, }); } const bucket = byLgu.get(lguKey)!; if (entry?.hasError) bucket.hasError = true; const monthsArr = Array.isArray(entry?.monthlyResults) ? entry.monthlyResults : []; for (const m of monthsArr) { const mKey = m?.month as string | undefined; if (!mKey) continue; const incoming = Number(m?.totalCount || 0); const existing = bucket.monthsMap.get(mKey); if (!existing) { bucket.monthsMap.set(mKey, { month: mKey, totalCount: incoming }); } else { existing.totalCount = Math.max(existing.totalCount, incoming); bucket.monthsMap.set(mKey, existing); } } } const out: any[] = []; byLgu.forEach(({ lgu, monthsMap, hasError }) => { const monthlyResults = Array.from(monthsMap.values()).sort((a, b) => a.month.localeCompare(b.month)); const months = monthlyResults.map(m => m.month); out.push({ ...lgu, hasError: !!hasError, monthlyResults, months, }); }); return out; }, [filteredResults]);
   const regionMappingGrouped = useMemo(() => groupResultsByRegion(normalizedResults, completeLguToRegion), [normalizedResults, completeLguToRegion]);
+  const grandCitizensServed = useMemo(() => normalizedResults.reduce((total: number, lgu: any) => lgu.hasError ? total : total + getCitizensServed(lgu), 0), [normalizedResults]);
   const grandTotal = useMemo(() => { return normalizedResults.reduce((total: number, lgu: any) => { if (lgu.hasError) return total; const monthlyTotal = (lgu.monthlyResults || []).reduce((mSum: number, month: any) => { const maleFemaleSum = Number(month.malePaid || 0) + Number(month.malePending || 0) + Number(month.femalePaid || 0) + Number(month.femalePending || 0); const used = maleFemaleSum || Number(month.totalCount || 0); return mSum + used; }, 0); return total + monthlyTotal; }, 0); }, [normalizedResults]);
 
   useEffect(() => { onTableDataChange?.(normalizedResults.length > 0); }, [normalizedResults.length, onTableDataChange]);
@@ -116,7 +121,7 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
     sortedRegionKeys.forEach(region => {
       const lguList = regionMappingGrouped[region];
       const isRegionOpen = openRegions.has(region);
-      allRows.push(<TableRow key={`${region}-trigger`}><TableCell colSpan={3} className="text-center p-2 cursor-pointer bg-slate-50 hover:bg-slate-100 font-semibold text-blue-600 text-xs" onClick={() => toggleRegion(region)}>{isRegionOpen ? `▲ Hide ${getRegionCode(region) || region} Data` : `▼ View ${getRegionCode(region) || region} Data`}</TableCell></TableRow>);
+      allRows.push(<TableRow key={`${region}-trigger`}><TableCell colSpan={4} className="text-center p-2 cursor-pointer bg-slate-50 hover:bg-slate-100 font-semibold text-blue-600 text-xs" onClick={() => toggleRegion(region)}>{isRegionOpen ? `▲ Hide ${getRegionCode(region) || region} Data` : `▼ View ${getRegionCode(region) || region} Data`}</TableCell></TableRow>);
       if (isRegionOpen) {
         const rows: React.ReactNode[] = [];
         const isDayMode = selectedDateType === "Day";
@@ -125,10 +130,11 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
 
         lguList.forEach((lgu: any) => {
           if (lgu.hasError) {
-            rows.push(<TableRow key={`${region}-${lgu.lgu}-error`} className="bg-red-50/50">{isFirstRowOfRegion && <TableCell className="p-3 text-center font-bold text-slate-700 align-middle bg-slate-50 border-r text-sm" rowSpan={totalRowsForRegion}>{getRegionCode(region) || region}</TableCell>}<TableCell className="p-3 text-left font-semibold text-slate-800 text-sm">{lgu.lgu}<br /><span className="text-[11px] font-bold text-red-600 mt-0.5 uppercase">{lgu.error || 'NO DATA AVAILABLE'}</span></TableCell><TableCell className="p-3 text-right tabular-nums text-slate-500">-</TableCell></TableRow>);
+            rows.push(<TableRow key={`${region}-${lgu.lgu}-error`} className="bg-red-50/50">{isFirstRowOfRegion && <TableCell className="p-3 text-center font-bold text-slate-700 align-middle bg-slate-50 border-r text-sm" rowSpan={totalRowsForRegion}>{getRegionCode(region) || region}</TableCell>}<TableCell className="p-3 text-left font-semibold text-slate-800 text-sm">{lgu.lgu}<br /><span className="text-[11px] font-bold text-red-600 mt-0.5 uppercase">{lgu.error || 'NO DATA AVAILABLE'}</span></TableCell><TableCell className="p-3 text-right tabular-nums text-slate-500">-</TableCell><TableCell className="p-3 text-right tabular-nums text-slate-500">-</TableCell></TableRow>);
             isFirstRowOfRegion = false; return;
           }
           const dataToRender = isDayMode ? (lgu.monthlyResults?.length > 0 ? lgu.monthlyResults : [{ totalCount: 0 }]) : [ (lgu.monthlyResults || []).reduce((acc: any, current: any) => { acc.totalCount += Number(current.totalCount || 0); return acc; }, { totalCount: 0 })];
+          const lguRowsToRender = dataToRender.length;
           dataToRender.forEach((item: any, itemIdx: number) => {
             const periodLabel = isDayMode ? (item.month ? `(${formatMonthYear(item.month)})` : '') : (lgu.months?.length > 1 ? `(${formatMonthYear(lgu.months[0])} - ${formatMonthYear(lgu.months[lgu.months.length - 1])})` : lgu.months?.length === 1 ? `(${formatMonthYear(lgu.months[0])})` : "");
             
@@ -137,6 +143,7 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
               <TableRow key={`${region}-${lgu.lgu}-${isDayMode ? item.month : 'sum'}-${itemIdx}`} className="hover:bg-blue-50/70 transition-colors duration-200 text-sm">
                 {isFirstRowOfRegion && <TableCell className="p-3 text-center font-bold text-slate-700 align-middle bg-slate-50 border-r text-sm" rowSpan={totalRowsForRegion}>{getRegionCode(region) || region}</TableCell>}
                 <TableCell className="p-3 text-left font-semibold text-slate-800"><div>{lgu.lgu}<span className="text-xs font-medium text-slate-500 ml-1.5">{lgu.province ? `(${lgu.province})` : ""}</span></div><div className="text-[11px] font-semibold text-blue-700 mt-0.5">{periodLabel}</div></TableCell>
+                {itemIdx === 0 && <TableCell className="p-3 text-right tabular-nums text-slate-800 align-middle" rowSpan={lguRowsToRender}>{formatNumber(getCitizensServed(lgu))}</TableCell>}
                 <TableCell className="p-3 text-right font-bold tabular-nums text-slate-800">{formatNumber((Number(item.malePaid||0)+Number(item.malePending||0)+Number(item.femalePaid||0)+Number(item.femalePending||0)) || Number(item.totalCount || 0))}</TableCell>
               </TableRow>
             );
@@ -144,10 +151,11 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
           });
         });
         allRows.push(...rows);
+        const regionCitizensServed = lguList.reduce((total, lgu) => lgu.hasError ? total : total + getCitizensServed(lgu), 0);
         const regionTotal = lguList.reduce((total, lgu) => { if (lgu.hasError) return total; return total + (lgu.monthlyResults || []).reduce((mSum: number, month: any) => { const maleFemaleSum = Number(month.malePaid||0)+Number(month.malePending||0)+Number(month.femalePaid||0)+Number(month.femalePending||0); const used = maleFemaleSum || Number(month.totalCount || 0); return mSum + used; }, 0); }, 0);
         
         // **DESIGN CHANGE**: Cleaner sub-total row
-        allRows.push(<TableRow key={`${region}-subtotal`} className="font-bold text-slate-900"><TableCell className="bg-slate-200 p-3 text-left" colSpan={2}><div className="font-extrabold tracking-wider text-xs">SUB-TOTAL ({getRegionCode(region) || region})</div></TableCell><TableCell className="bg-slate-300 p-3 text-right text-sm tabular-nums">{formatNumber(regionTotal)}</TableCell></TableRow>);
+        allRows.push(<TableRow key={`${region}-subtotal`} className="font-bold text-slate-900"><TableCell className="bg-slate-200 p-3 text-left" colSpan={2}><div className="font-extrabold tracking-wider text-xs">SUB-TOTAL ({getRegionCode(region) || region})</div></TableCell><TableCell className="bg-slate-200 p-3 text-right text-sm tabular-nums">{formatNumber(regionCitizensServed)}</TableCell><TableCell className="bg-slate-300 p-3 text-right text-sm tabular-nums">{formatNumber(regionTotal)}</TableCell></TableRow>);
       }
     });
     return allRows;
@@ -182,6 +190,7 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
               <TableRow>
                 <TableHead className="bg-[#9ec6f7] text-black font-bold p-3 text-center align-middle sticky top-0 z-10 uppercase text-xs border-b border-r border-slate-300">Region</TableHead>
                 <TableHead className="bg-[#9ec6f7] text-black font-bold p-3 text-left align-middle sticky top-0 z-10 uppercase text-xs border-b border-r border-slate-300">LGU</TableHead>
+                <TableHead className="bg-[#9ec6f7] text-black font-bold p-3 text-right align-middle sticky top-0 z-10 uppercase text-xs border-b border-r border-slate-300">Citizens Served</TableHead>
                 <TableHead className="bg-[#9ec6f7] text-black font-bold p-3 text-right align-middle sticky top-0 z-10 uppercase text-xs border-b border-slate-300">Total Issued</TableHead>
               </TableRow>
             </TableHeader>
@@ -191,15 +200,15 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
               {normalizedResults.length > 0 ? (
                 <>
                   {renderTableRows()}
-                  {Object.keys(regionMappingGrouped).length > 1 && <TableRow><TableCell colSpan={3} className="text-center p-2 cursor-pointer bg-slate-100 hover:bg-slate-200 font-bold text-slate-700 text-xs" onClick={toggleAllRegions}>{openRegions.size === Object.keys(regionMappingGrouped).length ? 'Collapse All Regions' : 'Expand All Regions'}</TableCell></TableRow>}
-                  {(loading || isProgressive) && <TableRow><TableCell colSpan={3} className="p-0"><LoaderTable message={isProgressive ? "Please wait for other regions..." : "Updating data..."} /></TableCell></TableRow>}
+                  {Object.keys(regionMappingGrouped).length > 1 && <TableRow><TableCell colSpan={4} className="text-center p-2 cursor-pointer bg-slate-100 hover:bg-slate-200 font-bold text-slate-700 text-xs" onClick={toggleAllRegions}>{openRegions.size === Object.keys(regionMappingGrouped).length ? 'Collapse All Regions' : 'Expand All Regions'}</TableCell></TableRow>}
+                  {(loading || isProgressive) && <TableRow><TableCell colSpan={4} className="p-0"><LoaderTable message={isProgressive ? "Please wait for other regions..." : "Updating data..."} /></TableCell></TableRow>}
                 </>
               ) : loading ? (
-                <TableRow><TableCell colSpan={3} className="text-center py-12"><LoaderTable /></TableCell></TableRow>
+                <TableRow><TableCell colSpan={4} className="text-center py-12"><LoaderTable /></TableCell></TableRow>
               ) : (
                 // **DESIGN CHANGE**: Enhanced "No Results" view
                 <TableRow>
-                  <TableCell colSpan={3} className="text-center py-20 bg-white">
+                  <TableCell colSpan={4} className="text-center py-20 bg-white">
                     <div className='flex flex-col items-center justify-center'>
                       <div className="rounded-full bg-slate-100 p-4"><Search className="h-10 w-10 text-slate-400" /></div>
                       <p className='font-bold text-lg text-slate-600 mt-5'>{hasSearched ? 'No Results Found' : 'Generate a Report'}</p>
@@ -214,6 +223,7 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
               {/* **DESIGN CHANGE**: Sticky footer with uniform background color and styles */}
               <TableRow className="font-bold border-t-4 border-slate-500">
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-left" colSpan={2}><div className="font-extrabold tracking-wider text-base">GRAND TOTAL</div><div className='text-xs font-medium text-slate-300'>({dateRangeLabel})</div></TableCell>
+                <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right text-base tabular-nums">{loading && normalizedResults.length === 0 ? '-' : formatNumber(grandCitizensServed)}</TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right text-base tabular-nums">{loading && normalizedResults.length === 0 ? '-' : formatNumber(grandTotal)}</TableCell>
               </TableRow>
             </tfoot>

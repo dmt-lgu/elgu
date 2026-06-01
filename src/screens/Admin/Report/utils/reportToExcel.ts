@@ -5,6 +5,22 @@ const formatNumber = (num: number | null | undefined): number => {
   return num || 0; // Excel handles formatting, so just return the number or 0
 };
 
+const NEW_LICENSE_KEYS = ['newLicenseIssued', 'newIssued', 'licenseIssuedNew', 'newLicense'];
+const RENEW_LICENSE_KEYS = ['renewLicenseIssued', 'renewIssued', 'licenseIssuedRenewal', 'renewLicense'];
+const BUILDING_LICENSE_KEYS = ['buildingLicenseIssued', 'buildingIssued', 'licenseIssued', 'issued'];
+const CO_LICENSE_KEYS = ['coLicenseIssued', 'coIssued', 'licenseIssued', 'issued'];
+
+const getLicenseIssued = (item: any, keys: string[], fallback: number): number => {
+  for (const key of keys) {
+    const value = item?.[key];
+    if (value !== null && value !== undefined && value !== '') {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+  }
+  return fallback;
+};
+
 const formatMonthYear = (monthStr: string): string => {
   if (!monthStr) return "";
   try {
@@ -21,15 +37,16 @@ const formatMonthYear = (monthStr: string): string => {
  * Generates the worksheet for Barangay Clearance.
  */
 function _generateBrgyClearanceSheet(data: any[], isDayMode: boolean): xlsx.WorkSheet {
-  const headers = ['Region', 'LGU', 'Province', 'Period', 'Total Results'];
+  const headers = ['Region', 'LGU', 'Province', 'Period', 'Citizens Served', 'Total Results'];
   
   const body = data.flatMap(lgu => {
     if (isDayMode) {
-        return (lgu.monthlyResults || []).map((month: any) => ([
+        return (lgu.monthlyResults || []).map((month: any, idx: number) => ([
             lgu.region,
             lgu.lgu,
             lgu.province || '',
             formatMonthYear(month.month),
+            idx === 0 ? formatNumber(lgu.totalCitizensServed) : '',
             formatNumber(month.totalCount)
         ]));
     }
@@ -42,6 +59,7 @@ function _generateBrgyClearanceSheet(data: any[], isDayMode: boolean): xlsx.Work
         lgu.lgu,
         lgu.province || '',
         period,
+        formatNumber(lgu.totalCitizensServed),
         formatNumber(totalCount)
     ]];
   });
@@ -81,24 +99,25 @@ function _generateBrgyClearanceSheet(data: any[], isDayMode: boolean): xlsx.Work
  * [FIXED] Generates the worksheet for Building Permit or Certificate of Occupancy.
  */
 function _generateBuildingPermitSheet(data: any[], moduleLabel: string, isDayMode: boolean): xlsx.WorkSheet {
-  // Include computed "License Issued" = Paid + Paid (eGOV) for both Building and CO
-  const headers = ['Region', 'LGU', 'Province', 'Period', 'License Issued', 'Paid', 'Paid (eGOV)', 'Ongoing', 'Total'];
+  const headers = ['Region', 'LGU', 'Province', 'Period', 'Citizens Served', 'License Issued', 'Paid', 'Paid (eGOV)', 'Ongoing', 'Total'];
   const isBuildingPermit = moduleLabel.includes("Building");
   const paidKey = isBuildingPermit ? 'buildingPaid' : 'coPaid';
   const geoKey = isBuildingPermit ? 'buildingPaidViaEgov' : 'coPaidViaEgov';
   const pendingKey = isBuildingPermit ? 'buildingPending' : 'coPending';
+  const licenseKeys = isBuildingPermit ? BUILDING_LICENSE_KEYS : CO_LICENSE_KEYS;
 
   const body = data.flatMap(lgu => {
     if (isDayMode) {
       // DAY MODE: Create a row for each month and compute license issued per month
-      return (lgu.monthlyResults || []).map((month: any) => {
+      return (lgu.monthlyResults || []).map((month: any, idx: number) => {
         const paid = Number(month[paidKey] || 0);
         const geo = Number(month[geoKey] || 0);
         const pending = Number(month[pendingKey] || 0);
-        const license = paid + geo;
-        const total = license + pending;
+        const license = getLicenseIssued(month, licenseKeys, paid);
+        const total = paid + geo + pending;
         return [
           lgu.region, lgu.lgu, lgu.province || '', formatMonthYear(month.month),
+          idx === 0 ? formatNumber(lgu.totalCitizensServed) : '',
           formatNumber(license), formatNumber(paid), formatNumber(geo), formatNumber(pending), formatNumber(total)
         ];
       });
@@ -110,17 +129,19 @@ function _generateBuildingPermitSheet(data: any[], moduleLabel: string, isDayMod
         acc.paid += Number(month[paidKey] || 0);
         acc.geo += Number(month[geoKey] || 0);
         acc.pending += Number(month[pendingKey] || 0);
+        acc.issued += getLicenseIssued(month, licenseKeys, Number(month[paidKey] || 0));
         return acc;
-      }, { paid: 0, geo: 0, pending: 0 });
+      }, { paid: 0, geo: 0, pending: 0, issued: 0 });
 
-      const license = lguTotals.paid + lguTotals.geo;
+      const license = lguTotals.issued;
       const period = lgu.months?.length > 1
         ? `${formatMonthYear(lgu.months[0])} - ${formatMonthYear(lgu.months[lgu.months.length - 1])}`
         : lgu.months?.length === 1 ? formatMonthYear(lgu.months[0]) : "";
 
       return [[
         lgu.region, lgu.lgu, lgu.province || '', period,
-        formatNumber(license), formatNumber(lguTotals.paid), formatNumber(lguTotals.geo), formatNumber(lguTotals.pending), formatNumber(license + lguTotals.pending)
+        formatNumber(lgu.totalCitizensServed),
+        formatNumber(license), formatNumber(lguTotals.paid), formatNumber(lguTotals.geo), formatNumber(lguTotals.pending), formatNumber(lguTotals.paid + lguTotals.geo + lguTotals.pending)
       ]];
     }
   });
@@ -158,6 +179,7 @@ function _generateBusinessPermitSheet(data: any[], isDayMode: boolean): xlsx.Wor
   // Match UI ordering: License Issued, PAID (For Issuance), PAID (eGOVPay), ONGOING, Total
   const headers = [
     'Region', 'LGU', 'Province', 'Period',
+    'Citizens Served',
     'New - License Issued', 'New - Paid (For Issuance and License Issued)', 'New - Paid (eGOV)', 'New - Ongoing', 'New - Total',
     'Renewal - License Issued', 'Renewal - Paid', 'Renewal - Paid (eGOV)', 'Renewal - Ongoing', 'Renewal - Total',
     'Male - License Issued', 'Male - Paid', 'Male - Ongoing', 'Male - Total',
@@ -168,14 +190,14 @@ function _generateBusinessPermitSheet(data: any[], isDayMode: boolean): xlsx.Wor
       const newPaid = Number(item.newPaid || 0);
       const newGeo = Number(item.newPaidViaEgov || 0);
       const newPending = Number(item.newPending || 0);
-      const newLicense = newPaid + newGeo;
-      const newTotal = newLicense + newPending;
+      const newLicense = getLicenseIssued(item, NEW_LICENSE_KEYS, newPaid);
+      const newTotal = newPaid + newGeo + newPending;
 
       const renewPaid = Number(item.renewPaid || 0);
       const renewGeo = Number(item.renewPaidViaEgov || 0);
       const renewPending = Number(item.renewPending || 0);
-      const renewLicense = renewPaid + renewGeo;
-      const renewTotal = renewLicense + renewPending;
+      const renewLicense = getLicenseIssued(item, RENEW_LICENSE_KEYS, renewPaid);
+      const renewTotal = renewPaid + renewGeo + renewPending;
 
       const malePaid = Number(item.malePaid || 0);
       const malePending = Number(item.malePending || 0);
@@ -197,8 +219,8 @@ function _generateBusinessPermitSheet(data: any[], isDayMode: boolean): xlsx.Wor
 
   const body = data.flatMap(lgu => {
     if (isDayMode) {
-        return (lgu.monthlyResults || []).map((month: any) => ([
-            lgu.region, lgu.lgu, lgu.province || '', formatMonthYear(month.month), ...createRowData(month)
+        return (lgu.monthlyResults || []).map((month: any, idx: number) => ([
+            lgu.region, lgu.lgu, lgu.province || '', formatMonthYear(month.month), idx === 0 ? formatNumber(lgu.totalCitizensServed) : '', ...createRowData(month)
         ]));
     }
     const period = lgu.months?.length > 1
@@ -212,7 +234,7 @@ function _generateBusinessPermitSheet(data: any[], isDayMode: boolean): xlsx.Wor
         return acc;
     }, {});
     
-    return [[ lgu.region, lgu.lgu, lgu.province || '', period, ...createRowData(lguTotals) ]];
+    return [[ lgu.region, lgu.lgu, lgu.province || '', period, formatNumber(lgu.totalCitizensServed), ...createRowData(lguTotals) ]];
   });
 
   const finalData = [headers, ...body];

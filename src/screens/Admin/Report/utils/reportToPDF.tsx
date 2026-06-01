@@ -26,18 +26,6 @@ interface ExportTableReportToPDFParams {
   captureSelector?: string;
 }
 
-// --- CONSTANTS ---
-
-const columnWidths = {
-  bc: ["20%", "40%", "40%"],
-  co: ["20%", "40%", "20%", "20%"],
-  bldg: ["20%", "40%", "20%", "20%"],
-  bp: [
-    "7%", "15%", "5%", "7%", "5%", "7%", "5%", "7%",
-    "5%", "7%", "5%", "5%", "6%", "5%", "5%", "6%",
-  ],
-};
-
 // --- HELPERS ---
 
 const formatMonthYear = (monthStr: string): string => {
@@ -59,6 +47,19 @@ const getMonthRangeLabel = (months?: string[]): string => {
   )})`;
 };
 
+const toFileSlug = (value: string): string =>
+  String(value || "")
+    .toLowerCase()
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+const buildPdfFileName = (moduleLabel: string, dateRangeLabel: string, fallback: string): string => {
+  const moduleSlug = toFileSlug(moduleLabel).replace(/-report$/, "") || toFileSlug(fallback) || "report";
+  const rangeSlug = toFileSlug(dateRangeLabel);
+  return `${moduleSlug}-report${rangeSlug ? `-${rangeSlug}` : ""}.pdf`;
+};
+
 const makeTd = (val: any, opts: any = {}): HTMLTableCellElement => {
     const td = document.createElement("td");
     td.innerHTML = val != null && val !== "" ? String(val) : "0";
@@ -75,6 +76,24 @@ const makeTd = (val: any, opts: any = {}): HTMLTableCellElement => {
     if (opts.colSpan) td.colSpan = opts.colSpan;
     return td;
 };
+
+const NEW_LICENSE_KEYS = ['newLicenseIssued', 'newIssued', 'licenseIssuedNew', 'newLicense'];
+const RENEW_LICENSE_KEYS = ['renewLicenseIssued', 'renewIssued', 'licenseIssuedRenewal', 'renewLicense'];
+const BUILDING_LICENSE_KEYS = ['buildingLicenseIssued', 'buildingIssued', 'licenseIssued', 'issued'];
+const CO_LICENSE_KEYS = ['coLicenseIssued', 'coIssued', 'licenseIssued', 'issued'];
+
+const getLicenseIssued = (item: any, keys: string[], fallback: number): number => {
+  for (const key of keys) {
+    const value = item?.[key];
+    if (value !== null && value !== undefined && value !== '') {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+  }
+  return fallback;
+};
+
+const getCitizensServed = (lgu: any): number => Number(lgu?.totalCitizensServed || 0);
 
 // Try to fetch an image and convert to a data URL to avoid cross-origin tainting
 const fetchImageAsDataUrl = async (url: string): Promise<string | null> => {
@@ -207,8 +226,8 @@ const createReportTableHeader = (
   if (isBC || isCO || isBldg) {
     const headerRow = document.createElement("tr");
     if (isBC) {
-      const labels = ["Region", "LGU", "Total Results"];
-      const widths = columnWidths.bc;
+      const labels = ["Region", "LGU", "Citizens Served", "Total Results"];
+      const widths = ["18%", "38%", "22%", "22%"];
       labels.forEach((label, idx) => {
         const th = document.createElement("th");
         th.textContent = label;
@@ -221,8 +240,8 @@ const createReportTableHeader = (
       });
     } else {
       // For Certificate of Occupancy and Building Permit, include License Issued and eGOV columns
-      const labels = ["Region", "LGU", "License Issued", "PAID", "PAID (eGOVPay)", "ONGOING", "Total"];
-      const widths = ["12%", "30%", "10%", "10%", "10%", "14%", "14%"];
+      const labels = ["Region", "LGU", "Citizens Served", "License Issued", "PAID", "PAID (eGOVPay)", "ONGOING", "Total"];
+      const widths = ["10%", "26%", "10%", "10%", "10%", "10%", "12%", "12%"];
       labels.forEach((label, idx) => {
         const th = document.createElement("th");
         th.textContent = label;
@@ -240,6 +259,7 @@ const createReportTableHeader = (
     const mainHeaders = [
       { label: "Region", rowSpan: 2 },
       { label: "LGU", rowSpan: 2 },
+      { label: "Citizens Served", rowSpan: 2 },
       // Note: include License Issued as an explicit computed column for New and Renewal (colSpan 5)
       { label: "New", colSpan: 5 },
       { label: "Renewal", colSpan: 5 },
@@ -326,13 +346,15 @@ const createReportGrandTotalRow = (
   const commonProps = { bold: true, bg: "#3a4554", color: "#fff", fontSize: "14px" };
 
   if (isBC) {
-    const total = filteredResults.reduce((sum, lgu) => {
+      const citizensServed = filteredResults.reduce((sum, lgu) => sum + getCitizensServed(lgu), 0);
+      const total = filteredResults.reduce((sum, lgu) => {
       if (isDayMode) {
         const monthlySum = (lgu.monthlyResults || []).reduce((mSum: number, month: any) => mSum + (month.totalCount || 0), 0);
         return sum + monthlySum;
       }
       return sum + (lgu.totalCount || 0);
     }, 0);
+    totalTr.appendChild(makeTd(citizensServed, commonProps));
     totalTr.appendChild(makeTd(total, commonProps));
   } else if (isCO || isBldg) {
   const pendingKey = isCO ? "coPending" : "buildingPending";
@@ -353,18 +375,22 @@ const createReportGrandTotalRow = (
     return acc;
   }, { paid: 0, geo: 0, pending: 0 });
 
-  const licenseTotal = (totals.paid || 0) + (totals.geo || 0);
-  const overallTotal = licenseTotal + (totals.pending || 0);
+  const licenseKeys = isCO ? CO_LICENSE_KEYS : BUILDING_LICENSE_KEYS;
+  const licenseTotal = filteredResults.reduce((sum, lgu) => {
+    const dataToSum = isDayMode ? (lgu.monthlyResults || []) : (lgu.sum ? [lgu.sum] : [lgu]);
+    return sum + dataToSum.reduce((innerSum: number, s: any) => innerSum + getLicenseIssued(s, licenseKeys, Number(s[paidKey] || 0)), 0);
+  }, 0);
+  const overallTotal = (totals.paid || 0) + (totals.geo || 0) + (totals.pending || 0);
 
-  // Output: License Issued, Paid, Paid (eGOV), Ongoing, Total
+  const citizensServed = filteredResults.reduce((sum, lgu) => sum + getCitizensServed(lgu), 0);
+  totalTr.appendChild(makeTd(citizensServed, commonProps));
   totalTr.appendChild(makeTd(licenseTotal, commonProps));
   totalTr.appendChild(makeTd(totals.paid, commonProps));
   totalTr.appendChild(makeTd(totals.geo, commonProps));
   totalTr.appendChild(makeTd(totals.pending, commonProps));
   totalTr.appendChild(makeTd(overallTotal, commonProps));
     } else {
-      // Sum the base totals first. Compute license-issued per-entry (paid + eGOV)
-      // to ensure the grand "License Issued" matches the per-row computed value.
+      // Sum the base totals first so grand "License Issued" matches the rendered rows.
       const totals = filteredResults.reduce((acc, lgu) => {
         // Use monthly entries if day mode. Otherwise prefer lgu.sum but fall back
         // to top-level lgu object (some datasets store aggregated sums on the root LGU).
@@ -398,16 +424,24 @@ const createReportGrandTotalRow = (
         renewalPaid: 0, renewalGeo: 0, renewalPending: 0,
         malePaid: 0, malePending: 0, femalePaid: 0, femalePending: 0,
       });
+      const citizensServed = filteredResults.reduce((sum, lgu) => sum + getCitizensServed(lgu), 0);
 
       // Now, calculate the derived totals from the aggregated sums
-      const newLicenseTotal = totals.newPaid + totals.newGeo;
-      const newOverallTotal = newLicenseTotal + totals.newPending;
-      const renewalLicenseTotal = totals.renewalPaid + totals.renewalGeo;
-      const renewalOverallTotal = renewalLicenseTotal + totals.renewalPending;
+      const newLicenseTotal = filteredResults.reduce((sum, lgu) => {
+        const dataToSum = isDayMode ? (lgu.monthlyResults || []) : (lgu.sum ? [lgu.sum] : [lgu]);
+        return sum + dataToSum.reduce((innerSum: number, s: any) => innerSum + getLicenseIssued(s, NEW_LICENSE_KEYS, Number(s.newPaid || s.new_paid || 0)), 0);
+      }, 0);
+      const newOverallTotal = totals.newPaid + totals.newGeo + totals.newPending;
+      const renewalLicenseTotal = filteredResults.reduce((sum, lgu) => {
+        const dataToSum = isDayMode ? (lgu.monthlyResults || []) : (lgu.sum ? [lgu.sum] : [lgu]);
+        return sum + dataToSum.reduce((innerSum: number, s: any) => innerSum + getLicenseIssued(s, RENEW_LICENSE_KEYS, Number(s.renewPaid || s.renew_paid || 0)), 0);
+      }, 0);
+      const renewalOverallTotal = totals.renewalPaid + totals.renewalGeo + totals.renewalPending;
       const maleTotal = totals.malePaid + totals.malePending;
       const femaleTotal = totals.femalePaid + totals.femalePending;
 
       // New group: License Issued, Paid, eGOV, Pending, Total
+      totalTr.appendChild(makeTd(citizensServed, commonProps));
       totalTr.appendChild(makeTd(newLicenseTotal, commonProps));
       totalTr.appendChild(makeTd(totals.newPaid, commonProps));
       totalTr.appendChild(makeTd(totals.newGeo, commonProps));
@@ -445,7 +479,7 @@ const createPageContent = (
   const isWideModule = isBP || isWP;
 
   const desiredWidthPx = isLandscape 
-    ? (isWideModule ? 1500 : 1100) 
+    ? (isWideModule ? 1900 : 1400) 
     : (isSimpleReport ? 1100 : 1000);
 
   wrapperDiv.style.cssText = `display: inline-block; background: #fff; font-family: 'Rubik', sans-serif; padding: 20px; width: ${desiredWidthPx}px;`;
@@ -498,6 +532,7 @@ const createPageContent = (
         ${isDayMode ? `(${formatMonthYear(row.month || "")})` : getMonthRangeLabel(row.lgu?.months)}
       </span>`;
     tr.appendChild(makeTd(lguHtml, { align: "left", striped: isStriped }));
+    tr.appendChild(makeTd(getCitizensServed(row.lgu), { striped: isStriped, fontSize: "14px", bold: true }));
 
     if (isBC) {
       const data = isDayMode ? row.monthData : row.lgu;
@@ -511,8 +546,8 @@ const createPageContent = (
       const paid = Number(src?.[paidKey] ?? 0);
       const geo = Number(src?.[geoKey] ?? 0);
       const pending = Number(src?.[pendingKey] ?? 0);
-      const license = paid + geo;
-      const total = license + pending;
+      const license = getLicenseIssued(src, isCO ? CO_LICENSE_KEYS : BUILDING_LICENSE_KEYS, paid);
+      const total = paid + geo + pending;
 
       tr.appendChild(makeTd(license, { striped: isStriped, fontSize: "14px", bold: true, color: '#0f172a' }));
       tr.appendChild(makeTd(paid, { striped: isStriped, fontSize: "14px", bold: true, color: '#166534' }));
@@ -523,24 +558,22 @@ const createPageContent = (
       const data = isDayMode ? row.monthData : (row.lgu?.sum || {});
         const cellOpts = { striped: isStriped, fontSize: "14px", bold: true };
 
-        // Compute License Issued = paid + eGOV for New
         const newPaid = data?.newPaid ?? 0;
         const newGeo = data?.newPaidViaEgov ?? 0;
         const newPending = data?.newPending ?? 0;
-        const newLicenseIssued = newPaid + newGeo;
-        const newTotal = newLicenseIssued + newPending;
+        const newLicenseIssued = getLicenseIssued(data, NEW_LICENSE_KEYS, Number(newPaid || 0));
+        const newTotal = Number(newPaid || 0) + Number(newGeo || 0) + Number(newPending || 0);
         tr.appendChild(makeTd(newLicenseIssued, cellOpts));
         tr.appendChild(makeTd(newPaid, cellOpts));
         tr.appendChild(makeTd(newGeo, cellOpts));
         tr.appendChild(makeTd(newPending, cellOpts));
         tr.appendChild(makeTd(newTotal, cellOpts));
 
-        // Renewal: License Issued = renewPaid + renewPaidViaEgov
         const renewPaid = data?.renewPaid ?? 0;
         const renewGeo = data?.renewPaidViaEgov ?? 0;
         const renewPending = data?.renewPending ?? 0;
-        const renewLicenseIssued = renewPaid + renewGeo;
-        const renewTotal = renewLicenseIssued + renewPending;
+        const renewLicenseIssued = getLicenseIssued(data, RENEW_LICENSE_KEYS, Number(renewPaid || 0));
+        const renewTotal = Number(renewPaid || 0) + Number(renewGeo || 0) + Number(renewPending || 0);
         tr.appendChild(makeTd(renewLicenseIssued, cellOpts));
         tr.appendChild(makeTd(renewPaid, cellOpts));
         tr.appendChild(makeTd(renewGeo, cellOpts));
@@ -568,7 +601,7 @@ const createPageContent = (
  * Main function to export tabular report data to a PDF file.
  */
 export async function exportTableReportToPDF(params: ExportTableReportToPDFParams): Promise<void> {
-  const { filteredResults, lguToRegion, fileLabel = "report", moduleLabel, selectedDateType } = params;
+  const { filteredResults, lguToRegion, fileLabel = "report", moduleLabel, selectedDateType, dateRangeLabel } = params;
   const generatedAt = new Date();
   const isBC = moduleLabel === "Barangay Clearance";
   const isCO = moduleLabel === "Certificate of Occupancy";
@@ -599,8 +632,8 @@ export async function exportTableReportToPDF(params: ExportTableReportToPDFParam
   }
 
   const isSimpleReport = isBC || isCO || isBldg;
-  // GI-UPDATE: Ang fixed ROWS_PER_PAGE nga logic para consistent ang tanan.
-  const ROWS_PER_PAGE = isSimpleReport ? 15 : 7;
+  // Keep PDF pagination consistent across report modules.
+  const ROWS_PER_PAGE = 20;
   
   const rowChunks: RowData[][] = [];
   if (allRows.length > 0) {
@@ -671,7 +704,8 @@ export async function exportTableReportToPDF(params: ExportTableReportToPDFParam
         try {
           const orientation = (isBP || isWP) ? "landscape" : "portrait";
           const isLandscape = orientation === "landscape";
-          pdf = new jsPDF({ orientation, unit: "pt", format: "a4", compress: true, putOnlyUsedFonts: true } as any);
+          const pdfFormat = isLandscape ? [1190, 842] : "a4";
+          pdf = new jsPDF({ orientation, unit: "pt", format: pdfFormat, compress: true, putOnlyUsedFonts: true } as any);
           const pageWidth = pdf.internal.pageSize.getWidth();
           const pageHeight = pdf.internal.pageSize.getHeight();
           const marginX = isSimpleReport ? 8 : 20;
@@ -759,7 +793,7 @@ export async function exportTableReportToPDF(params: ExportTableReportToPDFParam
             progressLabel.textContent = `100%`;
             await flushFrame();
           }
-          pdf.save(`${fileLabel}.pdf`);
+          pdf.save(buildPdfFileName(moduleLabel || fileLabel, dateRangeLabel, fileLabel));
         } catch (err) {
           console.error("Failed to generate PDF:", err);
           await Swal.fire({ icon: "error", title: "PDF Generation Failed", text: "Please try again or adjust your filters.", timer: 2000, showConfirmButton: false });
