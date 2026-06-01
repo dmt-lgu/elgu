@@ -59,6 +59,8 @@ const getMonthRangeLabel = (months?: string[]): string => {
   )})`;
 };
 
+let defaultBodyFontSize = '11px';
+
 const makeTd = (val: any, opts: any = {}): HTMLTableCellElement => {
     const td = document.createElement("td");
     td.innerHTML = val != null && val !== "" ? String(val) : "0";
@@ -67,7 +69,7 @@ const makeTd = (val: any, opts: any = {}): HTMLTableCellElement => {
     td.style.textAlign = opts.align || "center";
     td.style.fontFamily = "'Rubik', sans-serif";
     td.style.verticalAlign = "middle";
-    td.style.fontSize = opts.fontSize || "11px";
+  td.style.fontSize = opts.fontSize || defaultBodyFontSize;
     if (opts.bold) td.style.fontWeight = "bold";
     if (opts.color) td.style.color = opts.color;
     if (opts.bg) td.style.background = opts.bg;
@@ -220,9 +222,9 @@ const createReportTableHeader = (
         headerRow.appendChild(th);
       });
     } else {
-      // For Certificate of Occupancy and Building Permit, include License Issued and eGOV columns
-      const labels = ["Region", "LGU", "License Issued", "PAID", "PAID (eGOVPay)", "ONGOING", "Total"];
-      const widths = ["12%", "30%", "10%", "10%", "10%", "14%", "14%"];
+      // For Certificate of Occupancy and Building Permit: place Citizens Served before numeric columns
+      const labels = ["Region", "LGU", "Citizens Served", "License Issued", "PAID", "PAID (eGOVPay)", "ONGOING", "Total"];
+      const widths = ["12%", "30%", "8%", "10%", "10%", "10%", "12%", "12%"];
       labels.forEach((label, idx) => {
         const th = document.createElement("th");
         th.textContent = label;
@@ -240,6 +242,7 @@ const createReportTableHeader = (
     const mainHeaders = [
       { label: "Region", rowSpan: 2 },
       { label: "LGU", rowSpan: 2 },
+      { label: "Citizens Served", rowSpan: 2 },
       // Note: include License Issued as an explicit computed column for New and Renewal (colSpan 5)
       { label: "New", colSpan: 5 },
       { label: "Renewal", colSpan: 5 },
@@ -304,6 +307,19 @@ const createReportTableHeader = (
             }
             headerRow2.appendChild(th);
         });
+          // Add final Total Licensed Issued column (rowSpan = 2) to align with UI
+          const finalTh = document.createElement("th");
+          finalTh.textContent = "Total Licensed Issued";
+          finalTh.style.background = "#9ec6f7";
+          finalTh.style.fontWeight = "bold";
+          finalTh.style.textTransform = "uppercase";
+          finalTh.style.letterSpacing = "0.05em";
+          finalTh.style.fontSize = "14px";
+          finalTh.style.padding = "8px";
+          finalTh.style.textAlign = "center";
+          applyCommonStyles(finalTh);
+          finalTh.rowSpan = 2;
+          headerRow1.appendChild(finalTh);
         thead.appendChild(headerRow2);
     }
     return thead;
@@ -341,51 +357,77 @@ const createReportGrandTotalRow = (
   const totals = filteredResults.reduce((acc, lgu) => {
     if (isDayMode) {
       (lgu.monthlyResults || []).forEach((month: any) => {
-        acc.paid += Number(month[paidKey] || 0);
-        acc.geo += Number(month[geoKey] || 0);
-        acc.pending += Number(month[pendingKey] || 0);
+        const licenseIssuedField = Number(month?.newLicenseIssued ?? month?.newIssued ?? month?.licenseIssued ?? 0);
+        const forIssuance = Number(month[paidKey] || month?.newPaid || 0);
+        acc.license += licenseIssuedField;
+        acc.forIssuance += forIssuance;
+        acc.geo += Number(month[geoKey] || month?.newPaidViaEgov || 0);
+        acc.pending += Number(month[pendingKey] || month?.newPending || 0);
       });
     } else {
-      acc.paid += Number(lgu.sum?.[paidKey] || 0);
-      acc.geo += Number(lgu.sum?.[geoKey] || 0);
-      acc.pending += Number(lgu.sum?.[pendingKey] || 0);
+      const sum = lgu.sum || lgu || {};
+      const licenseIssuedField = Number(sum?.newLicenseIssued ?? sum?.newIssued ?? sum?.licenseIssued ?? 0);
+      const forIssuance = Number(sum?.[paidKey] || sum?.newPaid || 0);
+      acc.license += licenseIssuedField;
+      acc.forIssuance += forIssuance;
+      acc.geo += Number(sum?.[geoKey] || sum?.newPaidViaEgov || 0);
+      acc.pending += Number(sum?.[pendingKey] || sum?.newPending || 0);
     }
     return acc;
-  }, { paid: 0, geo: 0, pending: 0 });
+  }, { license: 0, forIssuance: 0, geo: 0, pending: 0 });
 
-  const licenseTotal = (totals.paid || 0) + (totals.geo || 0);
-  const overallTotal = licenseTotal + (totals.pending || 0);
+  const licenseTotal = (totals.license || 0);
+  const paidColTotal = (totals.license || 0) + (totals.forIssuance || 0);
+  const overallTotal = paidColTotal + (totals.geo || 0) + (totals.pending || 0);
 
-  // Output: License Issued, Paid, Paid (eGOV), Ongoing, Total
+  // Compute grand total for Citizens Served first so it appears immediately after LGU column
+  const citizensGrandTotal = filteredResults.reduce((acc: number, lgu: any) => {
+        if (isDayMode) {
+          (lgu.monthlyResults || []).forEach((m: any) => { acc += Number(m?.totalCitizensServed || 0); });
+        } else {
+          const perLgu = Number(lgu?.totalCitizensServed ?? (Array.isArray(lgu?.monthlyResults) && lgu.monthlyResults.length
+            ? lgu.monthlyResults.reduce((s: number, m: any) => s + (Number(m.totalCitizensServed || 0)), 0)
+            : (lgu?.sum?.totalCitizensServed ?? 0)));
+          acc += perLgu;
+        }
+        return acc;
+      }, 0);
+  totalTr.appendChild(makeTd(citizensGrandTotal, commonProps));
+
+  // NOTE: rows swap the displayed values for "License Issued" and "PAID",
+  // so the GRAND TOTAL must follow the same column ordering. Append the
+  // PAID aggregate first (so it appears under the "License Issued" header),
+  // then the explicit License Issued total under the "PAID" header.
+  totalTr.appendChild(makeTd(paidColTotal, commonProps));
   totalTr.appendChild(makeTd(licenseTotal, commonProps));
-  totalTr.appendChild(makeTd(totals.paid, commonProps));
   totalTr.appendChild(makeTd(totals.geo, commonProps));
   totalTr.appendChild(makeTd(totals.pending, commonProps));
   totalTr.appendChild(makeTd(overallTotal, commonProps));
     } else {
-      // Sum the base totals first. Compute license-issued per-entry (paid + eGOV)
-      // to ensure the grand "License Issued" matches the per-row computed value.
+      // Sum the base totals first. Compute explicit license-issued per-entry and
+      // aggregate so that PAID (License Issued + For Issuance) can be derived.
       const totals = filteredResults.reduce((acc, lgu) => {
-        // Use monthly entries if day mode. Otherwise prefer lgu.sum but fall back
-        // to top-level lgu object (some datasets store aggregated sums on the root LGU).
         const dataToSum = isDayMode ? (lgu.monthlyResults || []) : (lgu.sum ? [lgu.sum] : [lgu]);
         dataToSum.forEach((s: any) => {
-          // Defensive access for possible key variations; prefer explicit fields used when rendering rows
           const nPaid = Number(s.newPaid || s.new_paid || 0);
           const nGeo = Number(s.newPaidViaEgov || s.newPaidViaEGov || 0);
           const nPending = Number(s.newPending || s.new_pending || 0);
+          const nLicense = Number(s.newLicenseIssued ?? s.newIssued ?? 0);
 
           const rPaid = Number(s.renewPaid || s.renew_paid || 0);
           const rGeo = Number(s.renewPaidViaEgov || s.renewPaidViaEGov || 0);
           const rPending = Number(s.renewPending || s.renew_pending || 0);
+          const rLicense = Number(s.renewLicenseIssued ?? s.renewIssued ?? s.renewPaid ?? 0);
 
           acc.newPaid += nPaid;
           acc.newGeo += nGeo;
           acc.newPending += nPending;
+          acc.newLicense += nLicense;
 
           acc.renewalPaid += rPaid;
           acc.renewalGeo += rGeo;
           acc.renewalPending += rPending;
+          acc.renewalLicense += rLicense;
 
           acc.malePaid += Number(s.malePaid || s.male_paid || 0);
           acc.malePending += Number(s.malePending || s.male_pending || 0);
@@ -394,29 +436,49 @@ const createReportGrandTotalRow = (
         });
         return acc;
       }, {
-        newPaid: 0, newGeo: 0, newPending: 0,
-        renewalPaid: 0, renewalGeo: 0, renewalPending: 0,
+        newPaid: 0, newGeo: 0, newPending: 0, newLicense: 0,
+        renewalPaid: 0, renewalGeo: 0, renewalPending: 0, renewalLicense: 0,
         malePaid: 0, malePending: 0, femalePaid: 0, femalePending: 0,
       });
 
       // Now, calculate the derived totals from the aggregated sums
-      const newLicenseTotal = totals.newPaid + totals.newGeo;
-      const newOverallTotal = newLicenseTotal + totals.newPending;
-      const renewalLicenseTotal = totals.renewalPaid + totals.renewalGeo;
-      const renewalOverallTotal = renewalLicenseTotal + totals.renewalPending;
+      // Also compute Citizens Served grand total for complex modules
+      const citizensGrandTotal = filteredResults.reduce((acc: number, lgu: any) => {
+          if (isDayMode) {
+            (lgu.monthlyResults || []).forEach((m: any) => { acc += Number(m?.totalCitizensServed || 0); });
+          } else {
+            const perLgu = Number(lgu?.totalCitizensServed ?? (Array.isArray(lgu?.monthlyResults) && lgu.monthlyResults.length
+              ? lgu.monthlyResults.reduce((s: number, m: any) => s + (Number(m.totalCitizensServed || 0)), 0)
+              : (lgu?.sum?.totalCitizensServed ?? 0)));
+            acc += perLgu;
+          }
+          return acc;
+        }, 0);
+      // Prepend Citizens Served grand total so it aligns right after LGU column
+      totalTr.appendChild(makeTd(citizensGrandTotal, commonProps));
+
+      // Now compute numeric derived totals
+      const newPaidCol = totals.newLicense + totals.newPaid; // License Issued + For Issuance
+      const newOverallTotal = newPaidCol + totals.newGeo + totals.newPending;
+      const renewalPaidCol = totals.renewalLicense + totals.renewalPaid;
+      const renewalOverallTotal = renewalPaidCol + totals.renewalGeo + totals.renewalPending;
       const maleTotal = totals.malePaid + totals.malePending;
       const femaleTotal = totals.femalePaid + totals.femalePending;
 
-      // New group: License Issued, Paid, eGOV, Pending, Total
-      totalTr.appendChild(makeTd(newLicenseTotal, commonProps));
-      totalTr.appendChild(makeTd(totals.newPaid, commonProps));
+      // The row cells show PAID (LicenseIssued + ForIssuance) under the
+      // "License Issued" header and the explicit License Issued under the
+      // "PAID" header. Mirror that ordering for GRAND TOTAL so headers stay
+      // aligned with their column data.
+      // New group: (PAID aggregate first, then explicit License Issued)
+      totalTr.appendChild(makeTd(newPaidCol, commonProps));
+      totalTr.appendChild(makeTd(totals.newLicense, commonProps));
       totalTr.appendChild(makeTd(totals.newGeo, commonProps));
       totalTr.appendChild(makeTd(totals.newPending, commonProps));
       totalTr.appendChild(makeTd(newOverallTotal, commonProps));
 
-      // Renewal group: License Issued, Paid, eGOV, Pending, Total
-      totalTr.appendChild(makeTd(renewalLicenseTotal, commonProps));
-      totalTr.appendChild(makeTd(totals.renewalPaid, commonProps));
+      // Renewal group: (PAID aggregate first, then explicit License Issued)
+      totalTr.appendChild(makeTd(renewalPaidCol, commonProps));
+      totalTr.appendChild(makeTd(totals.renewalLicense, commonProps));
       totalTr.appendChild(makeTd(totals.renewalGeo, commonProps));
       totalTr.appendChild(makeTd(totals.renewalPending, commonProps));
       totalTr.appendChild(makeTd(renewalOverallTotal, commonProps));
@@ -428,6 +490,8 @@ const createReportGrandTotalRow = (
       totalTr.appendChild(makeTd(totals.femalePaid, commonProps));
       totalTr.appendChild(makeTd(totals.femalePending, commonProps));
       totalTr.appendChild(makeTd(femaleTotal, commonProps));
+        // Append GRAND TOTAL for Total Licensed Issued (explicit license-issued fields)
+        totalTr.appendChild(makeTd(totals.newLicense + totals.renewalLicense, commonProps));
   }
   if (!isLastPage) totalTr.style.visibility = "hidden";
   return totalTr;
@@ -456,10 +520,14 @@ const createPageContent = (
   const tableChunk = document.createElement("table");
   tableChunk.setAttribute("style", `width: 100%; font-size: 16px; font-family: Rubik, sans-serif; border-collapse: collapse; table-layout: fixed;`);
   
+  // Increase body font size for landscape (wide) modules
+  defaultBodyFontSize = isLandscape ? '13px' : '11px';
   const thead = createReportTableHeader(moduleLabel, isCO, isBldg, isBC);
   const tbodyChunk = document.createElement("tbody");
 
-  if (isSimpleReport && !isLastPage) {
+  // Apply the same fixed layout for simple reports on every page
+  // so the last page design matches the earlier pages.
+  if (isSimpleReport) {
     wrapperDiv.style.height = isLandscape ? '720px' : '1050px';
     wrapperDiv.style.display = 'flex';
     wrapperDiv.style.flexDirection = 'column';
@@ -503,49 +571,70 @@ const createPageContent = (
       const data = isDayMode ? row.monthData : row.lgu;
       tr.appendChild(makeTd((data?.totalCount ?? 0), { striped: isStriped, fontSize: "14px", bold: true }));
     } else if (isCO || isBldg) {
-      const src = isDayMode ? row.monthData : (row.lgu?.sum ?? row.lgu ?? {});
-      const pendingKey = isCO ? "coPending" : "buildingPending";
-      const paidKey = isCO ? "coPaid" : "buildingPaid";
-      const geoKey = isCO ? "coPaidViaEgov" : "buildingPaidViaEgov";
+        const src = isDayMode ? row.monthData : (row.lgu?.sum ?? row.lgu ?? {});
+        const pendingKey = isCO ? "coPending" : "buildingPending";
+        const paidKey = isCO ? "coPaid" : "buildingPaid";
+        const geoKey = isCO ? "coPaidViaEgov" : "buildingPaidViaEgov";
 
-      const paid = Number(src?.[paidKey] ?? 0);
-      const geo = Number(src?.[geoKey] ?? 0);
-      const pending = Number(src?.[pendingKey] ?? 0);
-      const license = paid + geo;
-      const total = license + pending;
+        // Prefer explicit `license issued` fields when available, otherwise fall back
+        // to provided paid-like fields. PAID column should include both License Issued
+        // and For Issuance (per request).
+        const licenseIssuedField = Number(src?.newLicenseIssued ?? src?.newIssued ?? src?.licenseIssued ?? 0);
+        const forIssuance = Number(src?.[paidKey] ?? src?.newPaid ?? 0);
+        const geo = Number(src?.[geoKey] ?? src?.newPaidViaEgov ?? 0);
+        const pending = Number(src?.[pendingKey] ?? src?.newPending ?? 0);
 
-      tr.appendChild(makeTd(license, { striped: isStriped, fontSize: "14px", bold: true, color: '#0f172a' }));
-      tr.appendChild(makeTd(paid, { striped: isStriped, fontSize: "14px", bold: true, color: '#166534' }));
-      tr.appendChild(makeTd(geo, { striped: isStriped, fontSize: "14px", bold: true, color: '#0ea5a4' }));
-      tr.appendChild(makeTd(pending, { striped: isStriped, fontSize: "14px", bold: true, color: '#1d4ed8' }));
-      tr.appendChild(makeTd(total, { striped: isStriped, fontSize: "14px", bold: true, color: '#0b1220' }));
+        const paidCol = licenseIssuedField + forIssuance; // PAID shows License Issued + For Issuance
+        const total = paidCol + geo + pending;
+
+        // Citizens Served column: prefer per-month value in Day mode, otherwise per-LGU total
+        const citizensServedValue = isDayMode ? Number(src?.totalCitizensServed ?? 0) : Number(row.lgu?.totalCitizensServed ?? row.lgu?.sum?.totalCitizensServed ?? 0);
+        tr.appendChild(makeTd(citizensServedValue, { striped: isStriped, fontSize: "14px", bold: true }));
+        // Swap: show PAID value in the License Issued column, and show License Issued
+        // value in the PAID column (headers remain unchanged). Append numeric columns after Citizens Served.
+        tr.appendChild(makeTd(paidCol, { striped: isStriped, fontSize: "14px", bold: true, color: '#166534' }));
+        tr.appendChild(makeTd(licenseIssuedField, { striped: isStriped, fontSize: "14px", bold: true, color: '#0f172a' }));
+        tr.appendChild(makeTd(geo, { striped: isStriped, fontSize: "14px", bold: true, color: '#0ea5a4' }));
+        tr.appendChild(makeTd(pending, { striped: isStriped, fontSize: "14px", bold: true, color: '#1d4ed8' }));
+        tr.appendChild(makeTd(total, { striped: isStriped, fontSize: "14px", bold: true, color: '#0b1220' }));
     } else {
       const data = isDayMode ? row.monthData : (row.lgu?.sum || {});
         const cellOpts = { striped: isStriped, fontSize: "14px", bold: true };
+          // Prefer explicit license-issued values when available.
+          const newLicenseIssuedField = Number(data?.newLicenseIssued ?? data?.newIssued ?? 0);
+          const newForIssuance = Number(data?.newPaid ?? 0);
+          const newGeo = Number(data?.newPaidViaEgov ?? 0);
+          const newPending = Number(data?.newPending ?? 0);
 
-        // Compute License Issued = paid + eGOV for New
-        const newPaid = data?.newPaid ?? 0;
-        const newGeo = data?.newPaidViaEgov ?? 0;
-        const newPending = data?.newPending ?? 0;
-        const newLicenseIssued = newPaid + newGeo;
-        const newTotal = newLicenseIssued + newPending;
-        tr.appendChild(makeTd(newLicenseIssued, cellOpts));
-        tr.appendChild(makeTd(newPaid, cellOpts));
-        tr.appendChild(makeTd(newGeo, cellOpts));
-        tr.appendChild(makeTd(newPending, cellOpts));
-        tr.appendChild(makeTd(newTotal, cellOpts));
+          const newPaidCol = newLicenseIssuedField + newForIssuance; // PAID = License Issued + For Issuance
+          const newTotal = newPaidCol + newGeo + newPending;
 
-        // Renewal: License Issued = renewPaid + renewPaidViaEgov
-        const renewPaid = data?.renewPaid ?? 0;
-        const renewGeo = data?.renewPaidViaEgov ?? 0;
-        const renewPending = data?.renewPending ?? 0;
-        const renewLicenseIssued = renewPaid + renewGeo;
-        const renewTotal = renewLicenseIssued + renewPending;
-        tr.appendChild(makeTd(renewLicenseIssued, cellOpts));
-        tr.appendChild(makeTd(renewPaid, cellOpts));
-        tr.appendChild(makeTd(renewGeo, cellOpts));
-        tr.appendChild(makeTd(renewPending, cellOpts));
-        tr.appendChild(makeTd(renewTotal, cellOpts));
+          // Citizens Served column for Business/Working Permit: prefer per-month value in Day mode, otherwise per-LGU
+          const citizensVal = isDayMode ? Number(data?.totalCitizensServed ?? 0) : Number(row.lgu?.totalCitizensServed ?? row.lgu?.sum?.totalCitizensServed ?? 0);
+          tr.appendChild(makeTd(citizensVal, cellOpts));
+
+          // Swap: put PAID (LicenseIssued + ForIssuance) under the License Issued header,
+          // and show the explicit License Issued field under the PAID header.
+          tr.appendChild(makeTd(newPaidCol, cellOpts));
+          tr.appendChild(makeTd(newLicenseIssuedField, cellOpts));
+          tr.appendChild(makeTd(newGeo, cellOpts));
+          tr.appendChild(makeTd(newPending, cellOpts));
+          tr.appendChild(makeTd(newTotal, cellOpts));
+
+          // Renewal: prefer explicit license-issued field when present (fall back to renewPaid)
+          const renewLicenseIssuedField = Number(data?.renewLicenseIssued ?? data?.renewIssued ?? data?.renewPaid ?? 0);
+          const renewForIssuance = Number(data?.renewPaid ?? 0);
+          const renewGeo = Number(data?.renewPaidViaEgov ?? 0);
+          const renewPending = Number(data?.renewPending ?? 0);
+
+          const renewPaidCol = renewLicenseIssuedField + renewForIssuance;
+          const renewTotal = renewPaidCol + renewGeo + renewPending;
+
+          tr.appendChild(makeTd(renewPaidCol, cellOpts));
+          tr.appendChild(makeTd(renewLicenseIssuedField, cellOpts));
+          tr.appendChild(makeTd(renewGeo, cellOpts));
+          tr.appendChild(makeTd(renewPending, cellOpts));
+          tr.appendChild(makeTd(renewTotal, cellOpts));
 
         // Male / Female groups remain the same
         tr.appendChild(makeTd(data?.malePaid ?? 0, cellOpts));
@@ -554,6 +643,8 @@ const createPageContent = (
         tr.appendChild(makeTd(data?.femalePaid ?? 0, cellOpts));
         tr.appendChild(makeTd(data?.femalePending ?? 0, cellOpts));
         tr.appendChild(makeTd((data?.femalePaid ?? 0) + (data?.femalePending ?? 0), cellOpts));
+        // Append Total Licensed Issued (New License Issued + Renewal License Issued)
+        tr.appendChild(makeTd(newLicenseIssuedField + renewLicenseIssuedField, cellOpts));
     }
     tbodyChunk.appendChild(tr);
   });
@@ -570,6 +661,8 @@ const createPageContent = (
 export async function exportTableReportToPDF(params: ExportTableReportToPDFParams): Promise<void> {
   const { filteredResults, lguToRegion, fileLabel = "report", moduleLabel, selectedDateType } = params;
   const generatedAt = new Date();
+  const dateRangeLabelForName = params.dateRangeLabel || '';
+  const sanitizeForFilename = (s: string) => s ? String(s).replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').trim() : s;
   const isBC = moduleLabel === "Barangay Clearance";
   const isCO = moduleLabel === "Certificate of Occupancy";
   const isBldg = moduleLabel === "Building Permit";
@@ -671,7 +764,9 @@ export async function exportTableReportToPDF(params: ExportTableReportToPDFParam
         try {
           const orientation = (isBP || isWP) ? "landscape" : "portrait";
           const isLandscape = orientation === "landscape";
-          pdf = new jsPDF({ orientation, unit: "pt", format: "a4", compress: true, putOnlyUsedFonts: true } as any);
+          // Use A3 for wide (landscape) modules to give more horizontal space
+          const pdfFormat: any = (isBP || isWP) ? 'a3' : 'a4';
+          pdf = new jsPDF({ orientation, unit: "pt", format: pdfFormat, compress: true, putOnlyUsedFonts: true } as any);
           const pageWidth = pdf.internal.pageSize.getWidth();
           const pageHeight = pdf.internal.pageSize.getHeight();
           const marginX = isSimpleReport ? 8 : 20;
@@ -759,7 +854,12 @@ export async function exportTableReportToPDF(params: ExportTableReportToPDFParam
             progressLabel.textContent = `100%`;
             await flushFrame();
           }
-          pdf.save(`${fileLabel}.pdf`);
+          // Build filename like: "business-permit-report(January 01, 2025 - January 31, 2025).pdf"
+          const moduleSlug = moduleLabel ? `${moduleLabel.toLowerCase().replace(/\s+/g, '-')}-report` : (fileLabel || 'report');
+          const datePart = dateRangeLabelForName ? `(${dateRangeLabelForName})` : '';
+          const rawFilename = `${moduleSlug}${datePart}`;
+          const safeFilename = sanitizeForFilename(rawFilename) || (fileLabel || 'report');
+          pdf.save(`${safeFilename}.pdf`);
         } catch (err) {
           console.error("Failed to generate PDF:", err);
           await Swal.fire({ icon: "error", title: "PDF Generation Failed", text: "Please try again or adjust your filters.", timer: 2000, showConfirmButton: false });
