@@ -81,6 +81,8 @@ const NEW_LICENSE_KEYS = ['newLicenseIssued', 'newIssued', 'licenseIssuedNew', '
 const RENEW_LICENSE_KEYS = ['renewLicenseIssued', 'renewIssued', 'licenseIssuedRenewal', 'renewLicense'];
 const BUILDING_LICENSE_KEYS = ['buildingLicenseIssued', 'buildingIssued', 'licenseIssued', 'issued'];
 const CO_LICENSE_KEYS = ['coLicenseIssued', 'coIssued', 'licenseIssued', 'issued'];
+const BUILDING_FOR_ISSUANCE_KEYS = ['buildingForIssuance', 'forIssuance'];
+const CO_FOR_ISSUANCE_KEYS = ['coForIssuance', 'forIssuance'];
 
 const getLicenseIssued = (item: any, keys: string[], fallback: number): number => {
   for (const key of keys) {
@@ -91,6 +93,32 @@ const getLicenseIssued = (item: any, keys: string[], fallback: number): number =
     }
   }
   return fallback;
+};
+
+const getExplicitNumber = (item: any, keys: string[]): number | null => {
+  for (const key of keys) {
+    const value = item?.[key];
+    if (value !== null && value !== undefined && value !== '') {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+  }
+  return null;
+};
+
+const getSimplePermitCounts = (item: any, isCO: boolean) => {
+  const paidKey = isCO ? "coPaid" : "buildingPaid";
+  const geoKey = isCO ? "coPaidViaEgov" : "buildingPaidViaEgov";
+  const pendingKey = isCO ? "coPending" : "buildingPending";
+  const licenseKeys = isCO ? CO_LICENSE_KEYS : BUILDING_LICENSE_KEYS;
+  const forIssuanceKeys = isCO ? CO_FOR_ISSUANCE_KEYS : BUILDING_FOR_ISSUANCE_KEYS;
+  const fallbackPaid = Number(item?.[paidKey] || 0);
+  const forIssuance = getExplicitNumber(item, forIssuanceKeys);
+  const license = getLicenseIssued(item, licenseKeys, fallbackPaid);
+  const paid = forIssuance === null ? fallbackPaid : forIssuance;
+  const geo = Number(item?.[geoKey] || 0);
+  const pending = Number(item?.[pendingKey] || 0);
+  return { license, paid, geo, pending };
 };
 
 const getCitizensServed = (lgu: any): number => Number(lgu?.totalCitizensServed || 0);
@@ -240,7 +268,7 @@ const createReportTableHeader = (
       });
     } else {
       // For Certificate of Occupancy and Building Permit, include License Issued and eGOV columns
-      const labels = ["Region", "LGU", "Citizens Served", "License Issued", "PAID", "PAID (eGOVPay)", "ONGOING", "Total"];
+      const labels = ["Region", "LGU", "Citizens Served", "License Issued", "PAID (For Issuance and License Issued)", "PAID (eGOVPay)", "ONGOING", "Total"];
       const widths = ["10%", "26%", "10%", "10%", "10%", "10%", "12%", "12%"];
       labels.forEach((label, idx) => {
         const th = document.createElement("th");
@@ -357,34 +385,22 @@ const createReportGrandTotalRow = (
     totalTr.appendChild(makeTd(citizensServed, commonProps));
     totalTr.appendChild(makeTd(total, commonProps));
   } else if (isCO || isBldg) {
-  const pendingKey = isCO ? "coPending" : "buildingPending";
-  const paidKey = isCO ? "coPaid" : "buildingPaid";
-  const geoKey = isCO ? "coPaidViaEgov" : "buildingPaidViaEgov";
   const totals = filteredResults.reduce((acc, lgu) => {
-    if (isDayMode) {
-      (lgu.monthlyResults || []).forEach((month: any) => {
-        acc.paid += Number(month[paidKey] || 0);
-        acc.geo += Number(month[geoKey] || 0);
-        acc.pending += Number(month[pendingKey] || 0);
-      });
-    } else {
-      acc.paid += Number(lgu.sum?.[paidKey] || 0);
-      acc.geo += Number(lgu.sum?.[geoKey] || 0);
-      acc.pending += Number(lgu.sum?.[pendingKey] || 0);
-    }
-    return acc;
-  }, { paid: 0, geo: 0, pending: 0 });
-
-  const licenseKeys = isCO ? CO_LICENSE_KEYS : BUILDING_LICENSE_KEYS;
-  const licenseTotal = filteredResults.reduce((sum, lgu) => {
     const dataToSum = isDayMode ? (lgu.monthlyResults || []) : (lgu.sum ? [lgu.sum] : [lgu]);
-    return sum + dataToSum.reduce((innerSum: number, s: any) => innerSum + getLicenseIssued(s, licenseKeys, Number(s[paidKey] || 0)), 0);
-  }, 0);
+    dataToSum.forEach((s: any) => {
+      const counts = getSimplePermitCounts(s, isCO);
+      acc.license += counts.license;
+      acc.paid += counts.paid;
+      acc.geo += counts.geo;
+      acc.pending += counts.pending;
+    });
+    return acc;
+  }, { license: 0, paid: 0, geo: 0, pending: 0 });
   const overallTotal = (totals.paid || 0) + (totals.geo || 0) + (totals.pending || 0);
 
   const citizensServed = filteredResults.reduce((sum, lgu) => sum + getCitizensServed(lgu), 0);
   totalTr.appendChild(makeTd(citizensServed, commonProps));
-  totalTr.appendChild(makeTd(licenseTotal, commonProps));
+  totalTr.appendChild(makeTd(totals.license, commonProps));
   totalTr.appendChild(makeTd(totals.paid, commonProps));
   totalTr.appendChild(makeTd(totals.geo, commonProps));
   totalTr.appendChild(makeTd(totals.pending, commonProps));
@@ -539,14 +555,7 @@ const createPageContent = (
       tr.appendChild(makeTd((data?.totalCount ?? 0), { striped: isStriped, fontSize: "14px", bold: true }));
     } else if (isCO || isBldg) {
       const src = isDayMode ? row.monthData : (row.lgu?.sum ?? row.lgu ?? {});
-      const pendingKey = isCO ? "coPending" : "buildingPending";
-      const paidKey = isCO ? "coPaid" : "buildingPaid";
-      const geoKey = isCO ? "coPaidViaEgov" : "buildingPaidViaEgov";
-
-      const paid = Number(src?.[paidKey] ?? 0);
-      const geo = Number(src?.[geoKey] ?? 0);
-      const pending = Number(src?.[pendingKey] ?? 0);
-      const license = getLicenseIssued(src, isCO ? CO_LICENSE_KEYS : BUILDING_LICENSE_KEYS, paid);
+      const { license, paid, geo, pending } = getSimplePermitCounts(src, isCO);
       const total = paid + geo + pending;
 
       tr.appendChild(makeTd(license, { striped: isStriped, fontSize: "14px", bold: true, color: '#0f172a' }));

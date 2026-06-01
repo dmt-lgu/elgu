@@ -9,6 +9,8 @@ const NEW_LICENSE_KEYS = ['newLicenseIssued', 'newIssued', 'licenseIssuedNew', '
 const RENEW_LICENSE_KEYS = ['renewLicenseIssued', 'renewIssued', 'licenseIssuedRenewal', 'renewLicense'];
 const BUILDING_LICENSE_KEYS = ['buildingLicenseIssued', 'buildingIssued', 'licenseIssued', 'issued'];
 const CO_LICENSE_KEYS = ['coLicenseIssued', 'coIssued', 'licenseIssued', 'issued'];
+const BUILDING_FOR_ISSUANCE_KEYS = ['buildingForIssuance', 'forIssuance'];
+const CO_FOR_ISSUANCE_KEYS = ['coForIssuance', 'forIssuance'];
 
 const getLicenseIssued = (item: any, keys: string[], fallback: number): number => {
   for (const key of keys) {
@@ -19,6 +21,32 @@ const getLicenseIssued = (item: any, keys: string[], fallback: number): number =
     }
   }
   return fallback;
+};
+
+const getExplicitNumber = (item: any, keys: string[]): number | null => {
+  for (const key of keys) {
+    const value = item?.[key];
+    if (value !== null && value !== undefined && value !== '') {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+  }
+  return null;
+};
+
+const getSimplePermitCounts = (item: any, isBuildingPermit: boolean) => {
+  const paidKey = isBuildingPermit ? 'buildingPaid' : 'coPaid';
+  const geoKey = isBuildingPermit ? 'buildingPaidViaEgov' : 'coPaidViaEgov';
+  const pendingKey = isBuildingPermit ? 'buildingPending' : 'coPending';
+  const licenseKeys = isBuildingPermit ? BUILDING_LICENSE_KEYS : CO_LICENSE_KEYS;
+  const forIssuanceKeys = isBuildingPermit ? BUILDING_FOR_ISSUANCE_KEYS : CO_FOR_ISSUANCE_KEYS;
+  const fallbackPaid = Number(item?.[paidKey] || 0);
+  const forIssuance = getExplicitNumber(item, forIssuanceKeys);
+  const license = getLicenseIssued(item, licenseKeys, fallbackPaid);
+  const paid = forIssuance === null ? fallbackPaid : forIssuance;
+  const geo = Number(item?.[geoKey] || 0);
+  const pending = Number(item?.[pendingKey] || 0);
+  return { license, paid, geo, pending };
 };
 
 const formatMonthYear = (monthStr: string): string => {
@@ -99,21 +127,14 @@ function _generateBrgyClearanceSheet(data: any[], isDayMode: boolean): xlsx.Work
  * [FIXED] Generates the worksheet for Building Permit or Certificate of Occupancy.
  */
 function _generateBuildingPermitSheet(data: any[], moduleLabel: string, isDayMode: boolean): xlsx.WorkSheet {
-  const headers = ['Region', 'LGU', 'Province', 'Period', 'Citizens Served', 'License Issued', 'Paid', 'Paid (eGOV)', 'Ongoing', 'Total'];
+  const headers = ['Region', 'LGU', 'Province', 'Period', 'Citizens Served', 'License Issued', 'Paid (For Issuance and License Issued)', 'Paid (eGOV)', 'Ongoing', 'Total'];
   const isBuildingPermit = moduleLabel.includes("Building");
-  const paidKey = isBuildingPermit ? 'buildingPaid' : 'coPaid';
-  const geoKey = isBuildingPermit ? 'buildingPaidViaEgov' : 'coPaidViaEgov';
-  const pendingKey = isBuildingPermit ? 'buildingPending' : 'coPending';
-  const licenseKeys = isBuildingPermit ? BUILDING_LICENSE_KEYS : CO_LICENSE_KEYS;
 
   const body = data.flatMap(lgu => {
     if (isDayMode) {
       // DAY MODE: Create a row for each month and compute license issued per month
       return (lgu.monthlyResults || []).map((month: any, idx: number) => {
-        const paid = Number(month[paidKey] || 0);
-        const geo = Number(month[geoKey] || 0);
-        const pending = Number(month[pendingKey] || 0);
-        const license = getLicenseIssued(month, licenseKeys, paid);
+        const { license, paid, geo, pending } = getSimplePermitCounts(month, isBuildingPermit);
         const total = paid + geo + pending;
         return [
           lgu.region, lgu.lgu, lgu.province || '', formatMonthYear(month.month),
@@ -126,10 +147,11 @@ function _generateBuildingPermitSheet(data: any[], moduleLabel: string, isDayMod
       if (!lgu.monthlyResults || lgu.monthlyResults.length === 0) return [];
 
       const lguTotals = lgu.monthlyResults.reduce((acc: any, month: any) => {
-        acc.paid += Number(month[paidKey] || 0);
-        acc.geo += Number(month[geoKey] || 0);
-        acc.pending += Number(month[pendingKey] || 0);
-        acc.issued += getLicenseIssued(month, licenseKeys, Number(month[paidKey] || 0));
+        const counts = getSimplePermitCounts(month, isBuildingPermit);
+        acc.paid += counts.paid;
+        acc.geo += counts.geo;
+        acc.pending += counts.pending;
+        acc.issued += counts.license;
         return acc;
       }, { paid: 0, geo: 0, pending: 0, issued: 0 });
 

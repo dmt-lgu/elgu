@@ -100,6 +100,10 @@ const NEW_LICENSE_KEYS = ['newLicenseIssued', 'newIssued', 'licenseIssuedNew', '
 const RENEW_LICENSE_KEYS = ['renewLicenseIssued', 'renewIssued', 'licenseIssuedRenewal', 'renewLicense'];
 const MALE_LICENSE_KEYS = ['maleLicenseIssued', 'maleIssued'];
 const FEMALE_LICENSE_KEYS = ['femaleLicenseIssued', 'femaleIssued'];
+const BUILDING_LICENSE_KEYS = ['buildingLicenseIssued', 'buildingIssued', 'licenseIssued', 'issued'];
+const BUILDING_FOR_ISSUANCE_KEYS = ['buildingForIssuance', 'forIssuance'];
+const CO_LICENSE_KEYS = ['coLicenseIssued', 'coIssued', 'licenseIssued', 'issued'];
+const CO_FOR_ISSUANCE_KEYS = ['coForIssuance', 'forIssuance'];
 
 const getLicenseIssued = (item: any, keys: string[], fallback: number): number => {
   for (const key of keys) {
@@ -110,6 +114,31 @@ const getLicenseIssued = (item: any, keys: string[], fallback: number): number =
     }
   }
   return fallback;
+};
+
+const getExplicitNumber = (item: any, keys: string[]): number | null => {
+  for (const key of keys) {
+    const value = item?.[key];
+    if (value !== null && value !== undefined && value !== '') {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+  }
+  return null;
+};
+
+const getSimplePermitCounts = (item: any, moduleLabel: string) => {
+  const isBuilding = moduleLabel === 'Building Permit';
+  const paidKey = isBuilding ? 'buildingPaid' : 'coPaid';
+  const pendingKey = isBuilding ? 'buildingPending' : 'coPending';
+  const licenseKeys = isBuilding ? BUILDING_LICENSE_KEYS : CO_LICENSE_KEYS;
+  const forIssuanceKeys = isBuilding ? BUILDING_FOR_ISSUANCE_KEYS : CO_FOR_ISSUANCE_KEYS;
+  const fallbackPaid = Number(item?.[paidKey] || 0);
+  const forIssuance = getExplicitNumber(item, forIssuanceKeys);
+  const licenseIssued = getLicenseIssued(item, licenseKeys, fallbackPaid);
+  const paid = forIssuance === null ? fallbackPaid : forIssuance;
+  const pending = Number(item?.[pendingKey] || 0);
+  return { licenseIssued, paid, pending };
 };
 
 const getCitizensServed = (lgu: any): number => Number(lgu?.totalCitizensServed || 0);
@@ -149,7 +178,7 @@ const calculateGrandTotals = (data: any[], moduleLabel: string) => {
     renewalIssued: 0, renewalPaid: 0, renewalGeoPay: 0, renewalPending: 0,
     maleIssued: 0, malePaid: 0, malePending: 0,
     femaleIssued: 0, femalePaid: 0, femalePending: 0,
-    paid: 0, pending: 0, totalCount: 0, citizensServed: 0
+    paid: 0, pending: 0, totalCount: 0, citizensServed: 0, licenseIssued: 0
   };
 
   for (const lgu of data) {
@@ -159,10 +188,10 @@ const calculateGrandTotals = (data: any[], moduleLabel: string) => {
       if (moduleLabel === 'Barangay Clearance') {
         totals.totalCount += item.totalCount || 0;
       } else if (moduleLabel === 'Building Permit' || moduleLabel === 'Certificate of Occupancy') {
-        const paidKey = moduleLabel === 'Building Permit' ? 'buildingPaid' : 'coPaid';
-        const pendingKey = moduleLabel === 'Building Permit' ? 'buildingPending' : 'coPending';
-        totals.paid += item[paidKey] || 0;
-        totals.pending += item[pendingKey] || 0;
+        const counts = getSimplePermitCounts(item, moduleLabel);
+        totals.licenseIssued += counts.licenseIssued;
+        totals.paid += counts.paid;
+        totals.pending += counts.pending;
       } else {
         const newIssued = getLicenseIssued(item, NEW_LICENSE_KEYS, Number(item.newPaid || 0));
         const renewalIssued = getLicenseIssued(item, RENEW_LICENSE_KEYS, Number(item.renewPaid || 0));
@@ -208,9 +237,13 @@ const normalizeReportData = (rawData: any[], moduleLabel: string): any[] => {
         existing.totalCount = Math.max(Number(existing.totalCount || 0), Number(m?.totalCount || 0));
       } else if (moduleLabel === 'Building Permit') {
         existing.buildingPaid = Math.max(Number(existing.buildingPaid || 0), Number(m?.buildingPaid || 0));
+        existing.buildingForIssuance = Math.max(Number(existing.buildingForIssuance || 0), getExplicitNumber(m, BUILDING_FOR_ISSUANCE_KEYS) ?? 0);
+        existing.buildingLicenseIssued = Math.max(Number(existing.buildingLicenseIssued || 0), getLicenseIssued(m, BUILDING_LICENSE_KEYS, Number(m?.buildingPaid || 0)));
         existing.buildingPending = Math.max(Number(existing.buildingPending || 0), Number(m?.buildingPending || 0));
       } else if (moduleLabel === 'Certificate of Occupancy') {
         existing.coPaid = Number(m?.coPaid || 0);
+        existing.coForIssuance = getExplicitNumber(m, CO_FOR_ISSUANCE_KEYS) ?? 0;
+        existing.coLicenseIssued = getLicenseIssued(m, CO_LICENSE_KEYS, Number(m?.coPaid || 0));
         existing.coPending = Number(m?.coPending || 0);
       } else {
         Object.keys(m).forEach(field => {
@@ -381,11 +414,8 @@ export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal)
         } else if (moduleLabel === 'Barangay Clearance') {
             dataCells.push(formatNumberForDisplay(itemToDisplay.totalCount));
         } else {
-            const paidKey = moduleLabel === 'Building Permit' ? 'buildingPaid' : 'coPaid';
-            const pendingKey = moduleLabel === 'Building Permit' ? 'buildingPending' : 'coPending';
-            const paid = Number(itemToDisplay[paidKey] || 0);
-            const pending = Number(itemToDisplay[pendingKey] || 0);
-            dataCells.push(formatNumberForDisplay(paid), formatNumberForDisplay(paid), formatNumberForDisplay(pending), { content: formatNumberForDisplay(paid + pending), styles: { fontStyle: 'bold', fillColor: '#f1f5f9' } });
+            const { licenseIssued, paid, pending } = getSimplePermitCounts(itemToDisplay, moduleLabel);
+            dataCells.push(formatNumberForDisplay(licenseIssued), formatNumberForDisplay(paid), formatNumberForDisplay(pending), { content: formatNumberForDisplay(paid + pending), styles: { fontStyle: 'bold', fillColor: '#f1f5f9' } });
         }
         dataRows.push([{ content: regionDisplay, styles: { valign: 'middle' } }, { content: lguText, styles: { halign: 'left' } }, formatNumberForDisplay(getCitizensServed(lguInfo)), ...dataCells]);
     });
@@ -406,7 +436,7 @@ export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal)
         } else if (moduleLabel === 'Barangay Clearance') {
             grandTotalRow = [{ content: `GRAND TOTAL\n(${dateRangeLabel})`, colSpan: 2 }, formatNumberForDisplay(totals.citizensServed), formatNumberForDisplay(totals.totalCount)];
         } else {
-            grandTotalRow = [{ content: `GRAND TOTAL\n(${dateRangeLabel})`, colSpan: 2 }, formatNumberForDisplay(totals.citizensServed), formatNumberForDisplay(totals.paid), formatNumberForDisplay(totals.paid), formatNumberForDisplay(totals.pending), formatNumberForDisplay(totals.paid + totals.pending)];
+            grandTotalRow = [{ content: `GRAND TOTAL\n(${dateRangeLabel})`, colSpan: 2 }, formatNumberForDisplay(totals.citizensServed), formatNumberForDisplay(totals.licenseIssued), formatNumberForDisplay(totals.paid), formatNumberForDisplay(totals.pending), formatNumberForDisplay(totals.paid + totals.pending)];
         }
     }
 
@@ -555,7 +585,7 @@ export const exportReportToExcel = (params: ExcelParams, signal?: AbortSignal) =
             moduleLabel === 'Barangay Clearance'
                 ? ['Region', 'LGU', 'Citizens Served', 'Total Results']
                 : (moduleLabel === 'Building Permit' || moduleLabel === 'Certificate of Occupancy')
-                    ? ['Region', 'LGU', 'Citizens Served', 'License Issued', 'Paid\n(For Issuance to License Issued)', 'Ongoing\n(For verification to For Payment)', 'Total']
+                    ? ['Region', 'LGU', 'Citizens Served', 'License Issued', 'Paid\n(For Issuance and License Issued)', 'Ongoing\n(For verification to For Payment)', 'Total']
                     : ['Region', 'LGU', 'Paid\n(For Issuance to License Issued)', 'Ongoing\n(For verification to For Payment)']
         ];
     }
@@ -593,11 +623,8 @@ export const exportReportToExcel = (params: ExcelParams, signal?: AbortSignal) =
         } else if (moduleLabel === 'Barangay Clearance') {
             row.push(formatNumberForExcel(itemToDisplay.totalCount));
         } else if (moduleLabel === 'Building Permit' || moduleLabel === 'Certificate of Occupancy') {
-            const paidKey = moduleLabel === 'Building Permit' ? 'buildingPaid' : 'coPaid';
-            const pendingKey = moduleLabel === 'Building Permit' ? 'buildingPending' : 'coPending';
-            const paid = Number(itemToDisplay[paidKey] || 0);
-            const pending = Number(itemToDisplay[pendingKey] || 0);
-            row.push(formatNumberForExcel(paid), formatNumberForExcel(paid), formatNumberForExcel(pending), paid + pending);
+            const { licenseIssued, paid, pending } = getSimplePermitCounts(itemToDisplay, moduleLabel);
+            row.push(formatNumberForExcel(licenseIssued), formatNumberForExcel(paid), formatNumberForExcel(pending), paid + pending);
         } else {
             const paidKey = moduleLabel === 'Building Permit' ? 'buildingPaid' : 'coPaid';
             const pendingKey = moduleLabel === 'Building Permit' ? 'buildingPending' : 'coPending';
@@ -621,7 +648,7 @@ export const exportReportToExcel = (params: ExcelParams, signal?: AbortSignal) =
             if (moduleLabel === 'Barangay Clearance') {
                 totalRow = ['GRAND TOTAL', null, totals.citizensServed, totals.totalCount];
             } else if (moduleLabel === 'Building Permit' || moduleLabel === 'Certificate of Occupancy') {
-                totalRow = [ 'GRAND TOTAL', null, totals.citizensServed, totals.paid, totals.paid, totals.pending, (totals.paid + totals.pending) ];
+                totalRow = [ 'GRAND TOTAL', null, totals.citizensServed, totals.licenseIssued, totals.paid, totals.pending, (totals.paid + totals.pending) ];
             } else {
                 totalRow = ['GRAND TOTAL', null, totals.paid, totals.pending];
             }
