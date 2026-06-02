@@ -1,0 +1,1 @@
+import{a as o}from"./axios-d38a9b1d.js";const e="/elgu/assets/dict-logo-559ee157.png",{Axios:s,AxiosError:r,CanceledError:t,isCancel:i,CancelToken:n,VERSION:l,all:c,Cancel:g,isAxiosError:d,spread:p,toFormData:x,AxiosHeaders:C,HttpStatusCode:m,formToJSON:A,getAdapter:E,mergeConfig:f}=o;export{e as L,i as a,d as i};
