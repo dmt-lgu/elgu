@@ -100,9 +100,7 @@ const NEW_LICENSE_KEYS = ['newLicenseIssued', 'newIssued', 'licenseIssuedNew', '
 const RENEW_LICENSE_KEYS = ['renewLicenseIssued', 'renewIssued', 'licenseIssuedRenewal', 'renewLicense'];
 const MALE_LICENSE_KEYS = ['maleLicenseIssued', 'maleIssued'];
 const FEMALE_LICENSE_KEYS = ['femaleLicenseIssued', 'femaleIssued'];
-const BUILDING_LICENSE_KEYS = ['buildingLicenseIssued', 'buildingIssued', 'licenseIssued', 'issued'];
 const BUILDING_FOR_ISSUANCE_KEYS = ['buildingForIssuance', 'forIssuance'];
-const CO_LICENSE_KEYS = ['coLicenseIssued', 'coIssued', 'licenseIssued', 'issued'];
 const CO_FOR_ISSUANCE_KEYS = ['coForIssuance', 'forIssuance'];
 
 const getLicenseIssued = (item: any, keys: string[], fallback: number): number => {
@@ -129,14 +127,12 @@ const getExplicitNumber = (item: any, keys: string[]): number | null => {
 
 const getSimplePermitCounts = (item: any, moduleLabel: string) => {
   const isBuilding = moduleLabel === 'Building Permit';
-  const paidKey = isBuilding ? 'buildingPaid' : 'coPaid';
   const pendingKey = isBuilding ? 'buildingPending' : 'coPending';
-  const licenseKeys = isBuilding ? BUILDING_LICENSE_KEYS : CO_LICENSE_KEYS;
-  const forIssuanceKeys = isBuilding ? BUILDING_FOR_ISSUANCE_KEYS : CO_FOR_ISSUANCE_KEYS;
-  const fallbackPaid = Number(item?.[paidKey] || 0);
-  const forIssuance = getExplicitNumber(item, forIssuanceKeys);
-  const licenseIssued = getLicenseIssued(item, licenseKeys, fallbackPaid);
-  const paid = forIssuance === null ? fallbackPaid : forIssuance;
+  const licenseKey = isBuilding ? 'buildingLicenseIssued' : 'coLicenseIssued';
+  const forIssuanceKey = isBuilding ? 'buildingForIssuance' : 'coForIssuance';
+  const licenseIssued = Number(item?.[licenseKey] || 0);
+  const forIssuance = Number(item?.[forIssuanceKey] || 0);
+  const paid = forIssuance + licenseIssued;
   const pending = Number(item?.[pendingKey] || 0);
   return { licenseIssued, paid, pending };
 };
@@ -238,12 +234,12 @@ const normalizeReportData = (rawData: any[], moduleLabel: string): any[] => {
       } else if (moduleLabel === 'Building Permit') {
         existing.buildingPaid = Math.max(Number(existing.buildingPaid || 0), Number(m?.buildingPaid || 0));
         existing.buildingForIssuance = Math.max(Number(existing.buildingForIssuance || 0), getExplicitNumber(m, BUILDING_FOR_ISSUANCE_KEYS) ?? 0);
-        existing.buildingLicenseIssued = Math.max(Number(existing.buildingLicenseIssued || 0), getLicenseIssued(m, BUILDING_LICENSE_KEYS, Number(m?.buildingPaid || 0)));
+        existing.buildingLicenseIssued = Math.max(Number(existing.buildingLicenseIssued || 0), Number(m?.buildingLicenseIssued || 0));
         existing.buildingPending = Math.max(Number(existing.buildingPending || 0), Number(m?.buildingPending || 0));
       } else if (moduleLabel === 'Certificate of Occupancy') {
         existing.coPaid = Number(m?.coPaid || 0);
         existing.coForIssuance = getExplicitNumber(m, CO_FOR_ISSUANCE_KEYS) ?? 0;
-        existing.coLicenseIssued = getLicenseIssued(m, CO_LICENSE_KEYS, Number(m?.coPaid || 0));
+        existing.coLicenseIssued = Number(m?.coLicenseIssued || 0);
         existing.coPending = Number(m?.coPending || 0);
       } else {
         Object.keys(m).forEach(field => {
@@ -339,7 +335,7 @@ export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal)
 
     const isComplex = ['Business Permit', 'Working Permit'].includes(moduleLabel);
     const orientation = isComplex ? 'landscape' : 'portrait';
-    const pdfFormat = isComplex ? [1190, 842] : 'a4';
+    const pdfFormat = isComplex ? [1400, 842] : 'a4';
     const doc = new jsPDF({ orientation, unit: 'pt', format: pdfFormat });
 
     let head: any[][] = [];
@@ -349,6 +345,7 @@ export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal)
     if (isComplex) {
         head = [
             [
+                { content: '#', rowSpan: 2, styles: commonRowSpanStyles },
                 { content: 'REGION', rowSpan: 2, styles: commonRowSpanStyles },
                 { content: 'LGU', rowSpan: 2, styles: { ...commonRowSpanStyles, halign: 'left' } },
                 { content: 'CITIZENS SERVED', rowSpan: 2, styles: commonRowSpanStyles },
@@ -367,21 +364,22 @@ export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal)
         ];
     } else if (moduleLabel === 'Barangay Clearance') {
         head = [[
+            { content: '#', styles: commonRowSpanStyles },
             { content: 'REGION', styles: commonRowSpanStyles },
             { content: 'LGU', styles: { ...commonRowSpanStyles, halign: 'left' } },
-            { content: 'CITIZENS SERVED', styles: { ...commonRowSpanStyles, halign: 'right' } },
             { content: 'TOTAL ISSUED', styles: { ...commonRowSpanStyles, halign: 'right' } }
         ]];
     } else {
         const title = moduleLabel === 'Building Permit' ? 'BUILDING PERMITS' : 'CERTIFICATE OF OCCUPANCY';
         head = [
             [
+                { content: '#', rowSpan: 2, styles: commonRowSpanStyles },
                 { content: 'REGION', rowSpan: 2, styles: commonRowSpanStyles },
                 { content: 'LGU', rowSpan: 2, styles: { ...commonRowSpanStyles, halign: 'left' } },
                 { content: 'CITIZENS SERVED', rowSpan: 2, styles: commonRowSpanStyles },
                 { content: title, colSpan: 4, styles: commonColSpanStyles },
             ],
-            ['PAID\n(Paid and License Issued)', 'FOR ISSUANCE', 'ONGOING\n(For Payment)', 'Total']
+            ['License Issued', 'PAID\n(For Issuance and License Issued)', 'ONGOING\n(For Payment)', 'Total']
         ];
     }
 
@@ -397,7 +395,7 @@ export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal)
 
     const totals = calculateGrandTotals(sortedData, moduleLabel);
     const dataRows: any[] = [];
-    allRows.forEach((rowData: any) => {
+    allRows.forEach((rowData: any, index: number) => {
         const { lguInfo, itemToDisplay, periodLabel } = rowData;
         const lguText = `${lguInfo.lgu}\n${periodLabel}`;
         const regionDisplay = getRegionDisplayName(normalizeRegionKey(lguInfo.region));
@@ -419,7 +417,11 @@ export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal)
             const { licenseIssued, paid, pending } = getSimplePermitCounts(itemToDisplay, moduleLabel);
             dataCells.push(formatNumberForDisplay(licenseIssued), formatNumberForDisplay(paid), formatNumberForDisplay(pending), { content: formatNumberForDisplay(paid + pending), styles: { fontStyle: 'bold', fillColor: '#f1f5f9' } });
         }
-        dataRows.push([{ content: regionDisplay, styles: { valign: 'middle' } }, { content: lguText, styles: { halign: 'left' } }, formatNumberForDisplay(getCitizensServed(lguInfo)), ...dataCells]);
+        if (moduleLabel === 'Barangay Clearance') {
+            dataRows.push([formatNumberForDisplay(index + 1), { content: regionDisplay, styles: { valign: 'middle' } }, { content: lguText, styles: { halign: 'left' } }, ...dataCells]);
+        } else {
+            dataRows.push([formatNumberForDisplay(index + 1), { content: regionDisplay, styles: { valign: 'middle' } }, { content: lguText, styles: { halign: 'left' } }, formatNumberForDisplay(getCitizensServed(lguInfo)), ...dataCells]);
+        }
     });
 
     let grandTotalRow: any[] | null = null;
@@ -428,7 +430,7 @@ export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal)
       // Prefer explicit issued totals when available; otherwise use the paid count.
       const licenseIssuedNewTotal = totals.newIssued;
       const licenseIssuedRenewalTotal = totals.renewalIssued;
-            grandTotalRow = [ { content: `GRAND TOTAL\n(${dateRangeLabel})`, colSpan: 2 },
+            grandTotalRow = [ { content: `GRAND TOTAL\n(${dateRangeLabel})`, colSpan: 3 },
                 formatNumberForDisplay(totals.citizensServed),
                 formatNumberForDisplay(licenseIssuedNewTotal + licenseIssuedRenewalTotal),
                 formatNumberForDisplay(licenseIssuedNewTotal), formatNumberForDisplay(totals.newPaid + totals.newGeoPay), formatNumberForDisplay(totals.newGeoPay), formatNumberForDisplay(totals.newPending), formatNumberForDisplay(totals.newPaid + totals.newGeoPay + totals.newPending),
@@ -437,9 +439,9 @@ export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal)
                 formatNumberForDisplay(totals.femaleIssued), formatNumberForDisplay(totals.femalePaid), formatNumberForDisplay(totals.femalePending), formatNumberForDisplay(totals.femalePaid + totals.femalePending)
             ];
         } else if (moduleLabel === 'Barangay Clearance') {
-            grandTotalRow = [{ content: `GRAND TOTAL\n(${dateRangeLabel})`, colSpan: 2 }, formatNumberForDisplay(totals.citizensServed), formatNumberForDisplay(totals.totalCount)];
+            grandTotalRow = [{ content: `GRAND TOTAL\n(${dateRangeLabel})`, colSpan: 3 }, formatNumberForDisplay(totals.totalCount)];
         } else {
-            grandTotalRow = [{ content: `GRAND TOTAL\n(${dateRangeLabel})`, colSpan: 2 }, formatNumberForDisplay(totals.citizensServed), formatNumberForDisplay(totals.licenseIssued), formatNumberForDisplay(totals.paid), formatNumberForDisplay(totals.pending), formatNumberForDisplay(totals.paid + totals.pending)];
+            grandTotalRow = [{ content: `GRAND TOTAL\n(${dateRangeLabel})`, colSpan: 3 }, formatNumberForDisplay(totals.citizensServed), formatNumberForDisplay(totals.licenseIssued), formatNumberForDisplay(totals.paid), formatNumberForDisplay(totals.pending), formatNumberForDisplay(totals.paid + totals.pending)];
         }
     }
 
@@ -458,24 +460,24 @@ export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal)
             theme: 'grid',
             margin: { top: 90, left: 30, right: 30 },
             tableWidth: 'auto',
-            styles: { font: 'helvetica', fontSize: 7, cellPadding: { top: 4, right: 5, bottom: 4, left: 5 }, lineWidth: 0.4, lineColor: '#e2e8f0', overflow: 'linebreak' },
-            headStyles: { fontStyle: 'bold', fillColor: '#9ec6f7', textColor: '#000000', lineWidth: 0.5, lineColor: '#a5b4fc', halign: 'center', valign: 'middle', fontSize: 7.5 },
+            styles: { font: 'helvetica', fontSize: isComplex ? 8 : 7, cellPadding: { top: isComplex ? 4.5 : 4, right: 5, bottom: isComplex ? 4.5 : 4, left: 5 }, lineWidth: 0.4, lineColor: '#e2e8f0', overflow: 'linebreak' },
+            headStyles: { fontStyle: 'bold', fillColor: '#9ec6f7', textColor: '#000000', lineWidth: 0.5, lineColor: '#a5b4fc', halign: 'center', valign: 'middle', fontSize: isComplex ? 8.2 : 7.5 },
             bodyStyles: { fillColor: '#FFFFFF', textColor: '#111827' },
             alternateRowStyles: { fillColor: '#f8fafc' },
       columnStyles: {
-    // Keep REGION narrow and give LGU more room for complex modules (Business/Working Permit)
-    0: { cellWidth: 60, halign: 'center' },
-    1: isComplex ? { cellWidth: 115, halign: 'left', fontStyle: 'bold' } : { fontStyle: 'bold' },
+    0: { cellWidth: 28, halign: 'center' },
+    1: { cellWidth: 55, halign: 'center' },
+    2: isComplex ? { cellWidth: 140, halign: 'left', fontStyle: 'bold' } : { cellWidth: 150, halign: 'left', fontStyle: 'bold' },
       },
             didParseCell: (data: any) => {
                 const isGrandTotalRow = data.row?.raw?.[0]?.content?.startsWith('GRAND TOTAL');
                 if (data.section === 'head') {
                     if (data.row.index === 1) {
                         data.cell.styles.fillColor = '#dbeafe'; // bg-blue-100
-                        data.cell.styles.fontSize = 6.5;
+                        data.cell.styles.fontSize = isComplex ? 7.2 : 6.5;
                         data.cell.styles.cellPadding = 3;
                     }
-                    if (data.column.index >= 2) data.cell.styles.halign = 'center';
+                    if (data.column.index >= 3) data.cell.styles.halign = 'center';
                 } else if (data.section === 'body') {
                     if (isGrandTotalRow) {
                         data.cell.styles.fillColor = '#1e293b';
@@ -485,14 +487,28 @@ export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal)
                         if (data.column.index === 0) data.cell.styles.halign = 'left';
                         else data.cell.styles.halign = 'right';
                     } else {
-                        if (data.column.index === 0) data.cell.styles.fillColor = '#FFFFFF';
-                        if (data.column.index === 1) data.cell.styles.halign = 'left';
-                        if (data.column.index >= 2) data.cell.styles.halign = 'right';
+                        if (data.column.index === 1) data.cell.styles.fillColor = '#FFFFFF';
+                        if (data.column.index === 2) data.cell.styles.halign = 'left';
+                        if (data.column.index !== 2) data.cell.styles.halign = 'right';
+                        const importantBlueColumns = moduleLabel === 'Barangay Clearance'
+                            ? [3]
+                            : isComplex
+                                ? [4]
+                                : [4, 7];
+                        const importantGreenColumns = !isComplex && moduleLabel !== 'Barangay Clearance' ? [5] : [];
+                        if (importantBlueColumns.includes(data.column.index)) {
+                            data.cell.styles.fillColor = '#eff6ff';
+                            data.cell.styles.fontStyle = 'bold';
+                        }
+                        if (importantGreenColumns.includes(data.column.index)) {
+                            data.cell.styles.fillColor = '#ecfdf5';
+                            data.cell.styles.fontStyle = 'bold';
+                        }
                     }
                 }
             },
             willDrawCell: (data: any) => {
-              if (data.section !== 'body' || data.column.index !== 0 || (data.cell.colSpan && data.cell.colSpan > 1)) return;
+              if (data.section !== 'body' || data.column.index !== 1 || (data.cell.colSpan && data.cell.colSpan > 1)) return;
               data.cell.styles.fillColor = WHITE;
               (data.cell.styles as any).lineWidth = { top: 0, right: 0.5, bottom: 0, left: 0.5 };
               (data.cell.styles as any).lineColor = lineColor;
@@ -501,7 +517,7 @@ export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal)
               data.cell.text = [''];
             },
             didDrawCell: (data: any) => {
-              if (data.section !== 'body' || data.column.index !== 0 || (data.cell.colSpan && data.cell.colSpan > 1)) return;
+              if (data.section !== 'body' || data.column.index !== 1 || (data.cell.colSpan && data.cell.colSpan > 1)) return;
               const page = data.table.pageNumber as number;
               const raw = data.cell.raw as any;
               const text: string = (raw && raw._regionText) || (raw && raw.content) || '';
@@ -580,20 +596,20 @@ export const exportReportToExcel = (params: ExcelParams, signal?: AbortSignal) =
 
     if (isComplex) {
         headers = [
-            ['Region', 'LGU', 'Citizens Served', 'Total License Issued\n(New & Renew)', 'New', null, null, null, null, 'Renewal', null, null, null, null, 'Male', null, null, null, 'Female', null, null, null],
-            [null, null, null, null, 'License Issued', 'PAID\n(For Issuance to License Issued)', 'PAID (eGOVPay)\n', 'ONGOING\n(For verification to For Payment)', 'Total', 'License Issued', 'PAID\n(For Issuance to License Issued)', 'PAID (eGOVPay)\n', 'ONGOING\n(For verification to For Payment)', 'Total', 'License Issued', 'PAID\n(For Issuance to License Issued)', 'ONGOING\n(For verification to For Payment)', 'Total', 'License Issued', 'PAID\n(For Issuance to License Issued)', 'ONGOING\n(For verification to For Payment)', 'Total']
+            ['#', 'Region', 'LGU', 'Citizens Served', 'Total License Issued\n(New & Renew)', 'New', null, null, null, null, 'Renewal', null, null, null, null, 'Male', null, null, null, 'Female', null, null, null],
+            [null, null, null, null, null, 'License Issued', 'PAID\n(For Issuance and License Issued)', 'PAID (eGOVPay)\n', 'ONGOING\n(For Payment)', 'Total', 'License Issued', 'PAID\n(For Issuance and License Issued)', 'PAID (eGOVPay)\n', 'ONGOING\n(For Payment)', 'Total', 'License Issued', 'PAID\n(For Issuance and License Issued)', 'ONGOING\n(For Payment)', 'Total', 'License Issued', 'PAID\n(For Issuance and License Issued)', 'ONGOING\n(For Payment)', 'Total']
         ];
     } else if (moduleLabel === 'Building Permit' || moduleLabel === 'Certificate of Occupancy') {
         const title = moduleLabel === 'Building Permit' ? 'Building Permits' : 'Certificate of Occupancy';
         headers = [
-            ['Region', 'LGU', 'Citizens Served', title, null, null, null],
-            [null, null, null, 'PAID\n(Paid and License Issued)', 'FOR ISSUANCE', 'ONGOING\n(For Payment)', 'Total']
+            ['#', 'Region', 'LGU', 'Citizens Served', title, null, null, null],
+            [null, null, null, null, 'License Issued', 'PAID\n(For Issuance and License Issued)', 'ONGOING\n(For Payment)', 'Total']
         ];
     } else {
         headers = [
             moduleLabel === 'Barangay Clearance'
-                ? ['Region', 'LGU', 'Citizens Served', 'Total Results']
-                : ['Region', 'LGU', 'Paid\n(For Issuance to License Issued)', 'Ongoing\n(For verification to For Payment)']
+                ? ['#', 'Region', 'LGU', 'Total Issued']
+                : ['#', 'Region', 'LGU', 'Paid\n(For Issuance and License Issued)', 'Ongoing\n(For Payment)']
         ];
     }
 
@@ -601,12 +617,13 @@ export const exportReportToExcel = (params: ExcelParams, signal?: AbortSignal) =
     let lastRegion: string | null = null;
     let regionStartIndex = currentRowIndex;
 
-    allRows.forEach((rowData: any) => {
+    allRows.forEach((rowData: any, index: number) => {
         const { lguInfo, itemToDisplay, periodLabel } = rowData;
         let row: any[] = [];
         const canonicalRegion = normalizeRegionKey(lguInfo.region);
+        row.push(index + 1);
         if (canonicalRegion !== lastRegion) {
-            if (lastRegion !== null && currentRowIndex > regionStartIndex + 1) { merges.push({ s: { r: regionStartIndex, c: 0 }, e: { r: currentRowIndex - 1, c: 0 } }); }
+            if (lastRegion !== null && currentRowIndex > regionStartIndex + 1) { merges.push({ s: { r: regionStartIndex, c: 1 }, e: { r: currentRowIndex - 1, c: 1 } }); }
             lastRegion = canonicalRegion;
             regionStartIndex = currentRowIndex;
             row.push(getRegionDisplayName(canonicalRegion));
@@ -614,7 +631,9 @@ export const exportReportToExcel = (params: ExcelParams, signal?: AbortSignal) =
             row.push(null);
         }
         row.push(`${lguInfo.lgu} ${periodLabel}`);
-        row.push(formatNumberForExcel(getCitizensServed(lguInfo)));
+        if (moduleLabel !== 'Barangay Clearance') {
+            row.push(formatNumberForExcel(getCitizensServed(lguInfo)));
+        }
 
         if (isComplex) {
             const newIssued = getLicenseIssued(itemToDisplay, NEW_LICENSE_KEYS, Number(itemToDisplay.newPaid || 0));
@@ -642,7 +661,7 @@ export const exportReportToExcel = (params: ExcelParams, signal?: AbortSignal) =
         currentRowIndex++;
     });
 
-    if (lastRegion !== null && currentRowIndex > regionStartIndex + 1) { merges.push({ s: { r: regionStartIndex, c: 0 }, e: { r: currentRowIndex - 1, c: 0 } }); }
+    if (lastRegion !== null && currentRowIndex > regionStartIndex + 1) { merges.push({ s: { r: regionStartIndex, c: 1 }, e: { r: currentRowIndex - 1, c: 1 } }); }
 
     if (allRows.length > 0) {
         let totalRow: any[];
@@ -650,36 +669,37 @@ export const exportReportToExcel = (params: ExcelParams, signal?: AbortSignal) =
       // Use the same issued totals shown in the rows for grand totals.
       const licenseIssuedNewTotal = totals.newIssued;
       const licenseIssuedRenewalTotal = totals.renewalIssued;
-            totalRow = [ 'GRAND TOTAL', null, totals.citizensServed, licenseIssuedNewTotal + licenseIssuedRenewalTotal, licenseIssuedNewTotal, totals.newPaid + totals.newGeoPay, totals.newGeoPay, totals.newPending, (totals.newPaid + totals.newGeoPay + totals.newPending), licenseIssuedRenewalTotal, totals.renewalPaid + totals.renewalGeoPay, totals.renewalGeoPay, totals.renewalPending, (totals.renewalPaid + totals.renewalGeoPay + totals.renewalPending), totals.maleIssued, totals.malePaid, totals.malePending, (totals.malePaid + totals.malePending), totals.femaleIssued, totals.femalePaid, totals.femalePending, (totals.femalePaid + totals.femalePending) ];
-            merges.push({ s: { r: currentRowIndex, c: 0 }, e: { r: currentRowIndex, c: 1 } });
+            totalRow = [ 'GRAND TOTAL', null, null, totals.citizensServed, licenseIssuedNewTotal + licenseIssuedRenewalTotal, licenseIssuedNewTotal, totals.newPaid + totals.newGeoPay, totals.newGeoPay, totals.newPending, (totals.newPaid + totals.newGeoPay + totals.newPending), licenseIssuedRenewalTotal, totals.renewalPaid + totals.renewalGeoPay, totals.renewalGeoPay, totals.renewalPending, (totals.renewalPaid + totals.renewalGeoPay + totals.renewalPending), totals.maleIssued, totals.malePaid, totals.malePending, (totals.malePaid + totals.malePending), totals.femaleIssued, totals.femalePaid, totals.femalePending, (totals.femalePaid + totals.femalePending) ];
+            merges.push({ s: { r: currentRowIndex, c: 0 }, e: { r: currentRowIndex, c: 2 } });
         } else {
             if (moduleLabel === 'Barangay Clearance') {
-                totalRow = ['GRAND TOTAL', null, totals.citizensServed, totals.totalCount];
+                totalRow = ['GRAND TOTAL', null, null, totals.totalCount];
             } else if (moduleLabel === 'Building Permit' || moduleLabel === 'Certificate of Occupancy') {
-                totalRow = [ 'GRAND TOTAL', null, totals.citizensServed, totals.licenseIssued, totals.paid, totals.pending, (totals.paid + totals.pending) ];
+                totalRow = [ 'GRAND TOTAL', null, null, totals.citizensServed, totals.licenseIssued, totals.paid, totals.pending, (totals.paid + totals.pending) ];
             } else {
-                totalRow = ['GRAND TOTAL', null, totals.paid, totals.pending];
+                totalRow = ['GRAND TOTAL', null, null, totals.paid, totals.pending];
             }
-            merges.push({ s: { r: currentRowIndex, c: 0 }, e: { r: currentRowIndex, c: 1 } });
+            merges.push({ s: { r: currentRowIndex, c: 0 }, e: { r: currentRowIndex, c: 2 } });
         }
         body.push(totalRow);
     }
 
     const ws = xlsx.utils.aoa_to_sheet([...headers, ...body]);
     if (isComplex) {
-        merges.push({ s: { r: 0, c: 0 }, e: { r: 1, c: 0 } }, { s: { r: 0, c: 1 }, e: { r: 1, c: 1 } }, { s: { r: 0, c: 2 }, e: { r: 1, c: 2 } }, { s: { r: 0, c: 3 }, e: { r: 1, c: 3 } }, { s: { r: 0, c: 4 }, e: { r: 0, c: 8 } }, { s: { r: 0, c: 9 }, e: { r: 0, c: 13 } }, { s: { r: 0, c: 14 }, e: { r: 0, c: 17 } }, { s: { r: 0, c: 18 }, e: { r: 0, c: 21 } });
+        merges.push({ s: { r: 0, c: 0 }, e: { r: 1, c: 0 } }, { s: { r: 0, c: 1 }, e: { r: 1, c: 1 } }, { s: { r: 0, c: 2 }, e: { r: 1, c: 2 } }, { s: { r: 0, c: 3 }, e: { r: 1, c: 3 } }, { s: { r: 0, c: 4 }, e: { r: 1, c: 4 } }, { s: { r: 0, c: 5 }, e: { r: 0, c: 9 } }, { s: { r: 0, c: 10 }, e: { r: 0, c: 14 } }, { s: { r: 0, c: 15 }, e: { r: 0, c: 18 } }, { s: { r: 0, c: 19 }, e: { r: 0, c: 22 } });
     } else if (moduleLabel === 'Building Permit' || moduleLabel === 'Certificate of Occupancy') {
         merges.push(
             { s: { r: 0, c: 0 }, e: { r: 1, c: 0 } },
             { s: { r: 0, c: 1 }, e: { r: 1, c: 1 } },
             { s: { r: 0, c: 2 }, e: { r: 1, c: 2 } },
-            { s: { r: 0, c: 3 }, e: { r: 0, c: 6 } }
+            { s: { r: 0, c: 3 }, e: { r: 1, c: 3 } },
+            { s: { r: 0, c: 4 }, e: { r: 0, c: 7 } }
         );
     }
     ws['!merges'] = merges;
     const lastHeaderRow = headers[headers.length - 1];
   // Make LGU column wider in Excel output only for complex modules (Business/Working Permit)
-  ws['!cols'] = lastHeaderRow.map((_c: any, idx: number) => ({ wch: idx === 0 ? 22 : idx === 1 ? (isComplex ? 40 : 24) : 24 }));
+  ws['!cols'] = lastHeaderRow.map((_c: any, idx: number) => ({ wch: idx === 0 ? 8 : idx === 1 ? 14 : idx === 2 ? (isComplex ? 40 : 30) : 24 }));
 
     const wb = xlsx.utils.book_new();
     xlsx.utils.book_append_sheet(wb, ws, 'Report');
