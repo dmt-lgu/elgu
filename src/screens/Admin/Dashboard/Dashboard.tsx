@@ -920,7 +920,7 @@ const scrollToStatusChart = () => {
   const bpbpRawProp      = bpbpSelected && !bpcoSelected ? bpcoBreakdown : [];
 
   return (
-    <div className="p-6 md:p-4 sm:p-3 max-w-[1200px] mx-auto bg-background min-w-0">
+    <div className="p-6 md:p-4 sm:p-3 min-w-0">
       <FilterSection />
       
       {/* Toggle Controls Section */}

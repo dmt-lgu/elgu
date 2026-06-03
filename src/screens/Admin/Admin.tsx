@@ -3,7 +3,6 @@ import {
   BarChart3Icon,
   MenuIcon,
   XIcon,
-
   FileTextIcon,
   BriefcaseIcon,
   HomeIcon,
@@ -12,13 +11,16 @@ import {
   ChevronRightIcon,
   HistoryIcon,
   LogOutIcon,
+  UserCircleIcon,
+  EyeIcon,
+  EyeOffIcon,
 } from "lucide-react";
 import DashboardProgressIndicator from './Dashboard/components/DashboardProgressIndicator';
 import { useLocation, useNavigate } from "react-router-dom";
 import Logo from './../../assets/logo/dict-logo.png'
 import { useEffect, useRef, useState } from "react";
 
-import eLGULogo from "./../../assets/logo/lgu-logo.png";
+import eLGULogo from "./../../assets/logo/eLGU-Logo-white.png";
 import { Link, Outlet } from "react-router-dom";
 import { ThemeProvider } from "@/components/theme-provider";
 import { isCancel } from "axios";
@@ -578,8 +580,56 @@ function Admin() {
 
   const data = useSelector(selectData);
 
+  const currentUser = (() => {
+    try { return JSON.parse(localStorage.getItem('user') || '{}'); } catch { return {}; }
+  })();
+  const displayName = [currentUser.first_name, currentUser.last_name].filter(Boolean).join(' ') || currentUser.email || 'Admin';
+  const displayEmail = currentUser.email || '';
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
+
+  const [showProfile, setShowProfile] = useState(false);
+  const [profileForm, setProfileForm] = useState({ first_name: '', last_name: '', email: '', password: '' });
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileError, setProfileError] = useState('');
+  const [profileSuccess, setProfileSuccess] = useState('');
+  const [showProfilePw, setShowProfilePw] = useState(false);
+
+  const openProfile = () => {
+    setProfileForm({ first_name: currentUser.first_name || '', last_name: currentUser.last_name || '', email: currentUser.email || '', password: '' });
+    setProfileError('');
+    setProfileSuccess('');
+    setShowProfilePw(false);
+    setShowProfile(true);
+  };
+
+  const saveProfile = async () => {
+    if (!profileForm.first_name.trim() || !profileForm.last_name.trim() || !profileForm.email.trim()) {
+      setProfileError('First name, last name, and email are required.');
+      return;
+    }
+    setProfileSaving(true);
+    setProfileError('');
+    setProfileSuccess('');
+    try {
+      const payload: Record<string, string> = {
+        first_name: profileForm.first_name,
+        last_name: profileForm.last_name,
+        email: profileForm.email,
+      };
+      if (profileForm.password.trim()) payload.password = profileForm.password;
+      const backendUrl = (import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_URL || '').replace(/\/$/, '');
+      const res = await axios.put(`${backendUrl}/api/v1/users/me/`, payload);
+      localStorage.setItem('user', JSON.stringify({ ...currentUser, ...res.data }));
+      setProfileSuccess('Profile updated successfully.');
+    } catch (err: any) {
+      const detail = err?.response?.data;
+      setProfileError(typeof detail === 'string' ? detail : detail?.detail || JSON.stringify(detail));
+    } finally {
+      setProfileSaving(false);
+    }
+  };
 
   const controllerRef = useRef<AbortController | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -965,243 +1015,180 @@ function Admin() {
     loadModulesSequentially();
   }, []);
   
-  return (
-    <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme">
-      <div className="flex h-screen">
-        {/* Sidebar */}
-        <aside className="md:hidden flex w-[300px]  bg-card border-r border-border flex-col">
-          <div className="flex justify-center items-center mt-5 border-border">
-            <img src={eLGULogo} className="w-[140px]" alt="" />
-          </div>
-          <nav className="flex flex-col mt-10  ">
-            <Link
-              to="/elgu/admin/dashboard"
-              className={`flex items-center gap-2 ${
-                location.pathname === "/elgu/admin/dashboard"
-                  ? "text-white bg-[#282b30] font-medium w-full p-2  pl-10 py-5"
-                  : "text-secondary-foreground w-full p-2  pl-10 py-5"
-              }`}
-            >
-              <LucideLayoutDashboard className="w-5 h-5" />
-              <span>Dashboard</span>
-            </Link>
+  const logout = () => {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('user');
+    navigate('/elgu/login');
+  };
 
-            <Link
-              to="/elgu/admin/report"
-              className={`flex items-center gap-2 ${
-                location.pathname === "/elgu/admin/report"
-                  ? "text-white bg-[#282b30] font-medium w-full p-2  pl-10 py-5 "
-                  : "text-secondary-foreground w-full p-2  pl-10 py-5 "
-              }`}
-            >
-              <BarChart3Icon className="w-5 h-5" />
-              <span>Reports</span>
-            </Link>
-            <div className="mt-6 mx-4 border-t border-border" />
-            <button
-              type="button"
-              onClick={() => setManageOpen((p) => !p)}
-              className="mt-2 w-full flex items-center justify-between px-4 py-3 bg-slate-100 hover:bg-slate-200 transition-colors"
-            >
-              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-500">
-                <Settings2Icon className="w-3.5 h-3.5" />
-                <span>Manage</span>
-              </div>
-              <ChevronRightIcon className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${manageOpen ? 'rotate-90' : ''}`} />
-            </button>
-            {manageOpen && [
-              { to: '/elgu/admin/manage/general',  code: 'GEN',  label: 'General',                             Icon: FileTextIcon },
-              { to: '/elgu/admin/manage/epayment', code: 'EPAY', label: 'ePayment',                          Icon: FileTextIcon },
-              { to: '/elgu/admin/manage/bp1',  code: 'BP1',  label: 'Business Permit',                    Icon: FileTextIcon },
-              { to: '/elgu/admin/manage/wp',   code: 'WP',   label: 'Working Permit',                     Icon: BriefcaseIcon },
-              { to: '/elgu/admin/manage/bc',   code: 'BC',   label: 'Barangay Clearance',                 Icon: HomeIcon },
-              { to: '/elgu/admin/manage/bpco', code: 'BPCO', label: 'Cert. of Occupancy & Bldg. Permit',  Icon: BuildingIcon },
-            ].map(({ to, code, label, Icon }) => {
+  const manageItems = [
+    { to: '/elgu/admin/manage/general',  label: 'General',                            Icon: FileTextIcon },
+    { to: '/elgu/admin/manage/epayment', label: 'ePayment',                           Icon: FileTextIcon },
+    { to: '/elgu/admin/manage/bp1',      label: 'Business Permit',                    Icon: FileTextIcon },
+    { to: '/elgu/admin/manage/wp',       label: 'Working Permit',                     Icon: BriefcaseIcon },
+    { to: '/elgu/admin/manage/bc',       label: 'Barangay Clearance',                 Icon: HomeIcon },
+    { to: '/elgu/admin/manage/bpco',     label: 'Cert. of Occupancy & Bldg. Permit',  Icon: BuildingIcon },
+  ];
+
+  const navItem = (to: string, label: string, Icon: React.ElementType, onClick?: () => void) => {
+    const active = location.pathname === to;
+    return (
+      <Link key={to} to={to} onClick={onClick}
+        className={`flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] transition-all duration-150 ${
+          active
+            ? 'bg-blue-500/20 text-blue-300 font-semibold'
+            : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.05]'
+        }`}
+      >
+        <Icon className={`w-[15px] h-[15px] shrink-0 transition-colors ${active ? 'text-blue-400' : ''}`} />
+        <span className="truncate flex-1">{label}</span>
+        {active && <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />}
+      </Link>
+    );
+  };
+
+  const Sidebar = ({ onClose }: { onClose?: () => void }) => (
+    <>
+      {/* Brand */}
+      <div className="flex items-center w-full  gap-3 px-4 h-14 my-10  shrink-0">
+        <div className="flex items-center justify-center rounded-lg py-2  bg-blue-500/20 shrink-0">
+          <img src={eLGULogo} className=" h-10 object-contain" alt="" />
+        </div>
+        <div className="min-w-0 flex-1 gap-3">
+          <p className="text-[15px] font-semibold text-white tracking-tight leading-tight">Data</p>
+          <p className="text-[15px] text-slate-500 leading-tight">Monitoring <br /> Tool</p>
+        </div>
+        {onClose && (
+          <button onClick={onClose} className="p-1.5 rounded-md text-slate-500 hover:text-white hover:bg-white/10 transition-colors shrink-0">
+            <XIcon className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+
+      {/* Nav */}
+      <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-0.5">
+        {navItem('/elgu/admin/dashboard', 'Dashboard', LucideLayoutDashboard, onClose)}
+        {navItem('/elgu/admin/report',    'Reports',   BarChart3Icon, onClose)}
+
+        <div className="pt-4 pb-1 px-1">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-600 px-2">Data</p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setManageOpen(p => !p)}
+          className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] transition-all duration-150 ${
+            manageOpen ? 'text-slate-200 bg-white/[0.05]' : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.05]'
+          }`}
+        >
+          <Settings2Icon className={`w-[15px] h-[15px] shrink-0 transition-colors ${manageOpen ? 'text-blue-400' : ''}`} />
+          <span className="flex-1 text-left">Manage</span>
+          <ChevronRightIcon className={`w-3.5 h-3.5 text-slate-600 transition-transform duration-200 ${manageOpen ? 'rotate-90' : ''}`} />
+        </button>
+
+        {manageOpen && (
+          <div className="ml-4 pl-3 border-l border-white/[0.08] space-y-0.5 mt-0.5">
+            {manageItems.map(({ to, label, Icon }) => {
               const active = location.pathname === to;
               return (
-                <Link
-                  key={to}
-                  to={to}
-                  className={`relative flex items-center gap-3 w-full pl-8 pr-3 py-3 transition-colors ${
-                    active
-                      ? 'bg-primary/10 text-primary font-semibold'
-                      : 'text-secondary-foreground hover:bg-slate-100 hover:text-foreground'
+                <Link key={to} to={to} onClick={onClose}
+                  className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[12px] transition-all duration-150 ${
+                    active ? 'bg-blue-500/15 text-blue-300 font-medium' : 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.05]'
                   }`}
                 >
-                  {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-primary rounded-r-full" />}
-                  <Icon className="w-4 h-4 shrink-0" />
-                  <div className="flex flex-col min-w-0">
-                    <span className="text-sm leading-snug truncate">{label}</span>
-                    <span className={`text-[10px] font-normal ${active ? 'text-primary/70' : 'text-slate-400'}`}>{code}</span>
-                  </div>
-                  {active && <ChevronRightIcon className="w-3.5 h-3.5 ml-auto shrink-0 text-primary/60" />}
+                  <Icon className={`w-[13px] h-[13px] shrink-0 ${active ? 'text-blue-400' : ''}`} />
+                  <span className="truncate">{label}</span>
                 </Link>
               );
             })}
-            <div className="mt-6 mx-4 border-t border-border" />
-            <Link
-              to="/elgu/admin/audit-trail"
-              className={`flex items-center gap-2 ${
-                location.pathname === "/elgu/admin/audit-trail"
-                  ? "text-white bg-[#282b30] font-medium w-full p-2 pl-10 py-5"
-                  : "text-secondary-foreground w-full p-2 pl-10 py-5"
-              }`}
-            >
-              <HistoryIcon className="w-5 h-5" />
-              <span>Audit Trail</span>
-            </Link>
-          </nav>
-
-          <div className="mt-auto">
-            <div className="px-4 pb-2">
-              <button
-                onClick={() => {
-                  localStorage.removeItem('auth_token');
-                  localStorage.removeItem('user');
-                  navigate('/elgu/login');
-                }}
-                className="flex items-center gap-2 w-full px-4 py-2.5 rounded-md text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
-              >
-                <LogOutIcon className="w-4 h-4" />
-                <span>Logout</span>
-              </button>
-            </div>
-            <footer className="p-4 border-t border-border text-sm text-secondary-foreground flex flex-col gap-2 font-medium text-start content-center items-center">
-              <p>Developed by:</p>
-              <img src={Logo} className="w-[140px] object-contain" alt="" />
-            </footer>
-          </div>
-        </aside>
-
-        {/* Sidebar for mobile */}
-        {sidebarOpen && (
-          <div className="fixed inset-0 z-[999] md:flex hidden">
-            <div className="w-[250px] bg-card border-r border-border flex flex-col h-full">
-              <div className="flex justify-between items-center mt-5 px-4">
-                <img src={eLGULogo} className="w-[120px]" alt="" />
-                <button
-                  className="p-2"
-                  onClick={() => setSidebarOpen(false)}
-                  aria-label="Close sidebar"
-                >
-                  <XIcon className="w-6 h-6" />
-                </button>
-              </div>
-              <nav className="flex flex-col mt-10 gap-6 ml-10">
-                <Link
-                  to="/elgu/admin/dashboard"
-                  className={`flex items-center gap-2 ${
-                    location.pathname === "/elgu/admin/dashboard"
-                      ? "text-primary"
-                      : "text-secondary-foreground"
-                  }`}
-                  onClick={() => setSidebarOpen(false)}
-                >
-                  <LucideLayoutDashboard className="w-5 h-5" />
-                  <span>Dashboard</span>
-                </Link>
-                <Link
-                  to="/elgu/admin/report"
-                  className={`flex items-center gap-2 ${
-                    location.pathname === "/elgu/admin/report"
-                      ? "text-primary"
-                      : "text-secondary-foreground"
-                  }`}
-                  onClick={() => setSidebarOpen(false)}
-                >
-                  <BarChart3Icon className="w-5 h-5" />
-                  <span>Reports</span>
-                </Link>
-                <div className="border-t border-border pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setManageOpen((p) => !p)}
-                    className="w-full flex items-center justify-between px-2 py-2.5 rounded-lg hover:bg-slate-100 transition-colors mb-1"
-                  >
-                    <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-500">
-                      <Settings2Icon className="w-3.5 h-3.5" />
-                      <span>Manage</span>
-                    </div>
-                    <ChevronRightIcon className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${manageOpen ? 'rotate-90' : ''}`} />
-                  </button>
-                  {manageOpen && [
-                    { to: '/elgu/admin/manage/general',  code: 'GEN',  label: 'General',                            Icon: FileTextIcon },
-                    { to: '/elgu/admin/manage/epayment', code: 'EPAY', label: 'ePayment',                         Icon: FileTextIcon },
-                    { to: '/elgu/admin/manage/bp1',  code: 'BP1',  label: 'Business Permit',                   Icon: FileTextIcon },
-                    { to: '/elgu/admin/manage/wp',   code: 'WP',   label: 'Working Permit',                    Icon: BriefcaseIcon },
-                    { to: '/elgu/admin/manage/bc',   code: 'BC',   label: 'Barangay Clearance',                Icon: HomeIcon },
-                    { to: '/elgu/admin/manage/bpco', code: 'BPCO', label: 'Cert. of Occupancy & Bldg. Permit', Icon: BuildingIcon },
-                  ].map(({ to, code, label, Icon }) => {
-                    const active = location.pathname === to;
-                    return (
-                      <Link
-                        key={to}
-                        to={to}
-                        onClick={() => setSidebarOpen(false)}
-                        className={`flex items-center gap-3 py-2 px-3 rounded-lg transition-colors mb-1 ${
-                          active ? 'bg-primary/10 text-primary font-semibold' : 'text-secondary-foreground hover:bg-slate-100'
-                        }`}
-                      >
-                        <Icon className="w-4 h-4 shrink-0" />
-                        <div className="flex flex-col min-w-0">
-                          <span className="text-sm leading-snug font-medium truncate">{label}</span>
-                          <span className="text-[10px] text-slate-400">{code}</span>
-                        </div>
-                      </Link>
-                    );
-                  })}
-                </div>
-                <div className="border-t border-border mt-2 pt-2">
-                  <Link
-                    to="/elgu/admin/audit-trail"
-                    onClick={() => setSidebarOpen(false)}
-                    className={`flex items-center gap-2 py-2 px-3 rounded-lg transition-colors ${
-                      location.pathname === '/elgu/admin/audit-trail'
-                        ? 'text-primary font-semibold'
-                        : 'text-secondary-foreground hover:bg-slate-100'
-                    }`}
-                  >
-                    <HistoryIcon className="w-5 h-5" />
-                    <span>Audit Trail</span>
-                  </Link>
-                </div>
-                <div className="px-3 pb-2 pt-2 border-t border-border mt-2">
-                  <button
-                    onClick={() => {
-                      localStorage.removeItem('auth_token');
-                      localStorage.removeItem('user');
-                      navigate('/elgu/login');
-                    }}
-                    className="flex items-center gap-2 w-full px-3 py-2 rounded-md text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
-                  >
-                    <LogOutIcon className="w-4 h-4" />
-                    <span>Logout</span>
-                  </button>
-                </div>
-              </nav>
-            </div>
-            <div
-              className="flex-1 bg-black bg-opacity-40"
-              onClick={() => setSidebarOpen(false)}
-            />
           </div>
         )}
 
-        <div className="flex flex-col flex-1 overflow-hidden">
-          <header className="bg-card border-b h-[50px] border-border">
-            <div className="flex justify-between items-center h-full gap-4 mr-5 px-4">
+        <div className="pt-4 pb-1 px-1">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-600 px-2">Logs</p>
+        </div>
+        {navItem('/elgu/admin/audit-trail', 'Audit Trail', HistoryIcon, onClose)}
+      </nav>
+
+
+  <div className="flex justify-center  gap-1.5 bg-[#fafafa] py-2">
+             <a href="https://dict.gov.ph" className="flex items-center gap-1.5">
+               <img src={Logo} className="h-20 object-contain " alt="" />
+             </a>
+          </div>
+      {/* Footer */}
+      <div className="border-t border-white/[0.08] shrink-0">
+        <button
+          onClick={openProfile}
+          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/[0.05] transition-colors text-left border-b border-white/[0.05]"
+        >
+          <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold shrink-0 select-none">
+            {displayName.charAt(0).toUpperCase()}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-[12px] font-medium text-slate-200 truncate leading-tight">{displayName}</p>
+            <p className="text-[11px] text-slate-500 truncate leading-tight">{displayEmail}</p>
+          </div>
+        </button>
+        <div className="flex  flex-col  px-4 py-2.5">
+          <button
+            onClick={() => { onClose?.(); logout(); }}
+            className="flex items-center gap-2 text-[12px] text-slate-500 hover:text-red-400 transition-colors"
+          >
+            <LogOutIcon className="w-[13px] h-[13px]" />
+            Sign out
+          </button>
+        
+        </div>
+      </div>
+    </>
+  );
+
+  return (
+    <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme">
+      <div className="flex h-screen bg-background">
+
+        {/* Desktop Sidebar */}
+        <aside className="md:hidden w-[17rem] bg-[#0f172a] flex flex-col shrink-0">
+          <Sidebar />
+        </aside>
+
+        {/* Mobile Sidebar */}
+        {sidebarOpen && (
+          <div className="fixed inset-0 z-[999] md:flex hidden">
+            <div className="w-64 bg-[#0f172a] flex flex-col h-full">
+              <Sidebar onClose={() => setSidebarOpen(false)} />
+            </div>
+            <div className="flex-1 bg-black/50 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
+          </div>
+        )}
+
+        {/* Main */}
+        <div className="flex flex-col flex-1 overflow-hidden min-w-0">
+          <header className="bg-white border-b border-slate-200 h-14 shrink-0">
+            <div className="flex items-center h-full px-5 gap-3">
               <button
-                className="hidden md:flex p-2"
+                className="hidden md:flex p-1.5 -ml-1.5 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
                 onClick={() => setSidebarOpen(true)}
-                aria-label="Open sidebar"
               >
-                <MenuIcon className="w-6 h-6" />
+                <MenuIcon className="w-5 h-5" />
               </button>
-              <div className="flex-1 flex justify-end items-center gap-3">
-              </div>
+              <div className="flex-1" />
+              <button
+                onClick={openProfile}
+                className="flex items-center gap-2.5 pl-1.5 pr-3 py-1.5 rounded-lg border border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition-all duration-150"
+              >
+                <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-white text-[11px] font-bold shrink-0 select-none">
+                  {displayName.charAt(0).toUpperCase()}
+                </div>
+                <div className="text-left leading-tight">
+                  <p className="text-[13px] font-medium text-slate-800 truncate max-w-[140px]">{displayName}</p>
+                  {displayEmail && <p className="text-[11px] text-slate-400 truncate max-w-[140px]">{displayEmail}</p>}
+                </div>
+              </button>
             </div>
           </header>
-          <div className="flex-1 overflow-y-auto bg-background">
+          <div className="flex-1 overflow-y-auto">
             <Outlet />
           </div>
         </div>
@@ -1226,6 +1213,62 @@ function Admin() {
       }}
     />
   )}
+  {/* Edit Profile Modal */}
+  {showProfile && (
+    <div
+      className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+      onClick={e => { if (e.target === e.currentTarget) setShowProfile(false); }}
+    >
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-xl w-full max-w-sm">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-3">
+          <UserCircleIcon className="w-6 h-6 text-gray-400" />
+          <h3 className="font-semibold text-gray-900">Edit Profile</h3>
+          <button onClick={() => setShowProfile(false)} className="ml-auto rounded-lg border border-gray-200 px-2.5 py-1 text-sm text-gray-500 hover:bg-gray-50 transition">✕</button>
+        </div>
+        <div className="p-6 space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <label className="flex flex-col gap-1.5 text-sm font-medium text-gray-700">
+              First Name
+              <input value={profileForm.first_name} onChange={e => setProfileForm(f => ({ ...f, first_name: e.target.value }))}
+                className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+            </label>
+            <label className="flex flex-col gap-1.5 text-sm font-medium text-gray-700">
+              Last Name
+              <input value={profileForm.last_name} onChange={e => setProfileForm(f => ({ ...f, last_name: e.target.value }))}
+                className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+            </label>
+          </div>
+          <label className="flex flex-col gap-1.5 text-sm font-medium text-gray-700">
+            Email
+            <input type="email" value={profileForm.email} onChange={e => setProfileForm(f => ({ ...f, email: e.target.value }))}
+              className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+          </label>
+          <label className="flex flex-col gap-1.5 text-sm font-medium text-gray-700">
+            New Password <span className="text-xs font-normal text-gray-400">(leave blank to keep current)</span>
+            <div className="relative">
+              <input type={showProfilePw ? 'text' : 'password'} value={profileForm.password}
+                onChange={e => setProfileForm(f => ({ ...f, password: e.target.value }))}
+                placeholder="Leave blank to keep current"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+              <button type="button" onClick={() => setShowProfilePw(s => !s)}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                {showProfilePw ? <EyeOffIcon className="w-4 h-4" /> : <EyeIcon className="w-4 h-4" />}
+              </button>
+            </div>
+          </label>
+          {profileError && <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">{profileError}</div>}
+          {profileSuccess && <div className="rounded-lg bg-green-50 border border-green-200 px-3 py-2 text-sm text-green-700">{profileSuccess}</div>}
+        </div>
+        <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50/60 rounded-b-2xl">
+          <button onClick={() => setShowProfile(false)} className="border border-gray-200 text-gray-600 hover:bg-gray-100 text-sm font-medium px-4 py-2 rounded-lg transition-colors">Cancel</button>
+          <button onClick={saveProfile} disabled={profileSaving} className="bg-[#2464e8] hover:bg-blue-700 text-white text-sm font-semibold px-5 py-2 rounded-lg transition-colors disabled:opacity-60">
+            {profileSaving ? 'Saving…' : 'Save Changes'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )}
+
     </ThemeProvider>
   );
 }
