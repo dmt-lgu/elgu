@@ -206,8 +206,8 @@ const CertificateOfOccupancyReport = forwardRef<HTMLDivElement, CertificateOfOcc
                 <TableHead colSpan={4} className="bg-[#9ec6f7] text-black font-bold p-3 text-center sticky top-0 z-20 uppercase tracking-wider text-xs border-b border-r border-slate-300">Certificate of Occupancy</TableHead>
               </TableRow>
               <TableRow>
-                <TableHead className="bg-blue-100 text-black p-2 sticky top-[49px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">License Issued</TableHead>
-                <TableHead className="bg-blue-100 text-black p-2 sticky top-[49px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">PAID <br /><span className='font-normal'>(For Issuance and License Issued)</span></TableHead>
+                <TableHead className="bg-blue-100 text-black p-2 sticky top-[49px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">PAID <br /> <span className='font-normal'>(Paid and License Issued)</span></TableHead>
+                <TableHead className="bg-blue-100 text-black p-2 sticky top-[49px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">FOR ISSUANCE </TableHead>
                 <TableHead className="bg-blue-100 text-black p-2 sticky top-[49px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">ONGOING <br /><span className='font-normal'>(For Payment)</span></TableHead>
                 <TableHead className="bg-blue-200 text-black p-2 sticky top-[49px] z-20 text-center font-bold uppercase text-[10px] border-b border-slate-300">Total</TableHead>
               </TableRow>

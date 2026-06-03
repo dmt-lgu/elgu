@@ -123,6 +123,11 @@ function useReportData({
     // This allows users to refresh the page and still see the results they previously
     // fetched without needing to click Search again.
     const globalRequestKey = `${moduleKey}:${requestKey}`;
+    if (abortSignal?.aborted) {
+      moduleRequestState.set(globalRequestKey, { active: false, completed: false });
+      setLoading(false);
+      return;
+    }
     const canUseCachedData = refreshKey === 0 || completedRequestKey.current === requestKey || moduleRequestState.get(globalRequestKey)?.completed;
     if (canUseCachedData && reduxTableData && reduxAppliedFilter && currentFilterKey === JSON.stringify(reduxAppliedFilter)) {
       setData(reduxTableData); setLoading(false); return;
@@ -176,9 +181,14 @@ function useReportData({
               }
             } catch (err: any) {
               if (err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED' || err?.message === 'canceled') {
-                break;
+                moduleRequestState.set(globalRequestKey, { active: false, completed: false });
+                return;
               }
               // otherwise continue to next region
+            }
+            if (abortSignal?.aborted) {
+              moduleRequestState.set(globalRequestKey, { active: false, completed: false });
+              return;
             }
             // call parent-updater via a custom event so Reports can update its progressState (since hook is inside same module)
             try {
@@ -198,6 +208,10 @@ function useReportData({
             }
             // Small delay to keep UI responsive
           }
+          if (abortSignal?.aborted) {
+            moduleRequestState.set(globalRequestKey, { active: false, completed: false });
+            return;
+          }
           const final = { results: aggregated, lguCount: aggregated.length };
           setData(final);
           setReduxTableData(final);
@@ -206,6 +220,10 @@ function useReportData({
           moduleRequestState.set(globalRequestKey, { active: false, completed: true });
         } else {
           const response = await axios.post(apiUrl, payload, { signal: abortSignal });
+          if (abortSignal?.aborted) {
+            moduleRequestState.set(globalRequestKey, { active: false, completed: false });
+            return;
+          }
           // --- START OF FIX ---
           const rawData = response.data;
           let cleanedData = rawData;
@@ -289,6 +307,7 @@ const Reports: React.FC = () => {
   const [lguRegionLoading, setLguRegionLoading] = useState(true);
   const searchAbortController = useRef<AbortController | null>(null);
   const exportAbortController = useRef<AbortController | null>(null);
+  const lguRegionAbortController = useRef<AbortController | null>(null);
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const [isProgressiveLoading, setIsProgressiveLoading] = useState(false);
   const [progressiveData, setProgressiveData] = useState<ProgressiveDataState>({ [BP]: null, [WP]: null, [BC]: null, [BLDG]: null, [CO]: null });
@@ -332,9 +351,13 @@ const Reports: React.FC = () => {
 
   useEffect(() => {
     const fetchLguToRegion = async () => {
+      if (lguRegionAbortController.current) lguRegionAbortController.current.abort();
+      lguRegionAbortController.current = new AbortController();
+      const signal = lguRegionAbortController.current.signal;
       setLguRegionLoading(true);
       try {
-        const res = await axios.get(`${import.meta.env.VITE_URL}/api/bp/lgu-list`);
+        const res = await axios.get(`${import.meta.env.VITE_URL}/api/bp/lgu-list`, { signal });
+        if (signal.aborted) return;
         const mapping: Record<string, string> = {};
         Object.entries(res.data).forEach(([regionKey, lguList]) => {
           (lguList as string[]).forEach(lguName => {
@@ -342,13 +365,18 @@ const Reports: React.FC = () => {
           });
         });
         setLguToRegion(mapping);
-      } catch {
-        setLguToRegion({});
+      } catch (err: any) {
+        if (!(err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED' || err?.message === 'canceled')) {
+          setLguToRegion({});
+        }
       } finally {
-        setLguRegionLoading(false);
+        if (!signal.aborted) setLguRegionLoading(false);
       }
     };
     fetchLguToRegion();
+    return () => {
+      if (lguRegionAbortController.current) lguRegionAbortController.current.abort();
+    };
   }, []);
 
   const isSelectAll = !!appliedFilter.allRegionsSelected;
@@ -356,6 +384,8 @@ const Reports: React.FC = () => {
   useEffect(() => {
     if (!hasSearched || !isSelectAll) return;
     const progressiveKey = `${searchRefreshKey}:${JSON.stringify(appliedFilter)}`;
+    const signal = searchAbortController.current?.signal;
+    if (signal?.aborted) return;
     if (progressiveRequestCache.key === progressiveKey) {
       setProgressiveData({ ...progressiveRequestCache.data });
       setProgressState({ ...progressiveRequestCache.progress });
@@ -371,6 +401,7 @@ const Reports: React.FC = () => {
       return '';
     };
     const fetchSequentially = async () => {
+      if (signal?.aborted) return;
       progressiveRequestCache.key = progressiveKey;
       progressiveRequestCache.loading = true;
       progressiveRequestCache.data = { [BP]: null, [WP]: null, [BC]: null, [BLDG]: null, [CO]: null };
@@ -398,12 +429,14 @@ const Reports: React.FC = () => {
 
       await Promise.all(selectedModules.map(async moduleKey => {
         const url = getModuleUrl(moduleKey);
-        if (!url) return;
+        if (!url || signal?.aborted) return;
         for (let i = 0; i < sortedRegions.length; i++) {
+          if (signal?.aborted) return;
           const region = sortedRegions[i];
           const payload = { locationName: [region], startDate: formatLocalDate(ensureDate(appliedFilter.dateRange.start)), endDate: formatLocalDate(ensureDate(appliedFilter.dateRange.end)) };
           try {
-            const res = await axios.post(url, payload);
+            const res = await axios.post(url, payload, { signal });
+            if (signal?.aborted) return;
             if (res.data?.results) {
               const nextModuleData = { results: [...(progressiveRequestCache.data[moduleKey]?.results || []), ...res.data.results] };
               progressiveRequestCache.data = { ...progressiveRequestCache.data, [moduleKey]: nextModuleData };
@@ -415,10 +448,14 @@ const Reports: React.FC = () => {
               if (moduleKey === CO) dispatch(setcertificateOfOccupancy(nextModuleData));
             }
           } catch (err: any) {
+            if (err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED' || err?.message === 'canceled' || signal?.aborted) {
+              return;
+            }
             if (err.name !== 'CanceledError') {
               console.error(`Failed to fetch ${moduleKey} for ${region}`);
             }
           } finally {
+            if (signal?.aborted) return;
             const nextProgress = { currentRegion: region, currentIndex: i + 1, totalRegions: sortedRegions.length };
             progressiveRequestCache.progress = { ...progressiveRequestCache.progress, [moduleKey]: nextProgress };
             setProgressState(prev => ({ ...prev, [moduleKey]: nextProgress }));
@@ -426,11 +463,18 @@ const Reports: React.FC = () => {
           }
         }
       }));
+      if (signal?.aborted) return;
       progressiveRequestCache.loading = false;
       setIsProgressiveLoading(false);
       notifyProgressiveSubscribers();
     };
-    fetchSequentially();
+    void fetchSequentially().finally(() => {
+      if (signal?.aborted) {
+        progressiveRequestCache.loading = false;
+        setIsProgressiveLoading(false);
+        notifyProgressiveSubscribers();
+      }
+    });
   }, [hasSearched, isSelectAll, JSON.stringify(appliedFilter), searchRefreshKey]);
   
   const setBpTableData = useCallback((data:any) => dispatch(setTableData(data)), [dispatch]);
@@ -565,6 +609,12 @@ const Reports: React.FC = () => {
     // Ensure search state is inactive
     setIsSearchActive(false);
     setProgressState({});
+    if (searchAbortController.current) searchAbortController.current.abort();
+    if (lguRegionAbortController.current) lguRegionAbortController.current.abort();
+    moduleRequestState.clear();
+    progressiveRequestCache.loading = false;
+    progressiveRequestCache.progress = {};
+    notifyProgressiveSubscribers();
     const keys: (keyof FilterState)[] = ['selectedRegions', 'selectedProvinces', 'selectedCities', 'selectedIslands', 'selectedModules'];
     keys.forEach(key => dispatch(updateFilterField({ key, value: [] })));
   dispatch(updateFilterField({ key: 'dateRange', value: { start: null, end: null } }));
@@ -588,8 +638,15 @@ const Reports: React.FC = () => {
     setIsSearchActive(false);
     setProgressState({});
     if (searchAbortController.current) searchAbortController.current.abort();
+    if (lguRegionAbortController.current) lguRegionAbortController.current.abort();
+    moduleRequestState.clear();
+    progressiveRequestCache.loading = false;
+    progressiveRequestCache.progress = {};
+    progressiveRequestCache.key = null;
+    notifyProgressiveSubscribers();
     setHasSearched(false);
     setCancelled(true);
+    setLguRegionLoading(false);
     setIsProgressiveLoading(false);
     Swal.fire({ icon: "info", title: "Search Cancelled", timer: 1200, showConfirmButton: false });
   };
@@ -730,7 +787,7 @@ const Reports: React.FC = () => {
 
   return (
     <div ref={tableContainerRef} style={{ position: "relative", marginTop: 24, height: "88vh", overflow: "auto" }}>
-      <div className='p-6 max-w-[1200px] mx-auto bg-background flex flex-col gap-6'>
+      <div className='p-6  mx-auto bg-background flex flex-col gap-6'>
         <FilterSection
           onSearch={handleSearch}
           onDownload={handleDownload}

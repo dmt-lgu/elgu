@@ -352,6 +352,7 @@ export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal)
                 { content: 'REGION', rowSpan: 2, styles: commonRowSpanStyles },
                 { content: 'LGU', rowSpan: 2, styles: { ...commonRowSpanStyles, halign: 'left' } },
                 { content: 'CITIZENS SERVED', rowSpan: 2, styles: commonRowSpanStyles },
+                { content: 'TOTAL LICENSE ISSUED\n(NEW & RENEW)', rowSpan: 2, styles: commonRowSpanStyles },
                 { content: 'NEW', colSpan: 5, styles: commonColSpanStyles },
                 { content: 'RENEWAL', colSpan: 5, styles: commonColSpanStyles },
                 { content: 'MALE', colSpan: 4, styles: commonColSpanStyles },
@@ -380,7 +381,7 @@ export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal)
                 { content: 'CITIZENS SERVED', rowSpan: 2, styles: commonRowSpanStyles },
                 { content: title, colSpan: 4, styles: commonColSpanStyles },
             ],
-            ['License Issued', 'PAID\n(For Issuance and License Issued)', 'ONGOING\n(For Payment)', 'Total']
+            ['PAID\n(Paid and License Issued)', 'FOR ISSUANCE', 'ONGOING\n(For Payment)', 'Total']
         ];
     }
 
@@ -405,9 +406,10 @@ export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal)
         if (isComplex) {
             const newIssued = getLicenseIssued(itemToDisplay, NEW_LICENSE_KEYS, Number(itemToDisplay.newPaid || 0));
             const newPaidWithEgov = (itemToDisplay.newPaid || 0) + (itemToDisplay.newPaidViaEgov || 0);
-            dataCells.push(formatNumberForDisplay(newIssued), formatNumberForDisplay(newPaidWithEgov), formatNumberForDisplay(itemToDisplay.newPaidViaEgov), formatNumberForDisplay(itemToDisplay.newPending), { content: formatNumberForDisplay(newPaidWithEgov + (itemToDisplay.newPending || 0)), styles: { fontStyle: 'bold', fillColor: '#f1f5f9' } });
             const renewIssued = getLicenseIssued(itemToDisplay, RENEW_LICENSE_KEYS, Number(itemToDisplay.renewPaid || 0));
             const renewPaidWithEgov = (itemToDisplay.renewPaid || 0) + (itemToDisplay.renewPaidViaEgov || 0);
+            dataCells.push(formatNumberForDisplay(newIssued + renewIssued));
+            dataCells.push(formatNumberForDisplay(newIssued), formatNumberForDisplay(newPaidWithEgov), formatNumberForDisplay(itemToDisplay.newPaidViaEgov), formatNumberForDisplay(itemToDisplay.newPending), { content: formatNumberForDisplay(newPaidWithEgov + (itemToDisplay.newPending || 0)), styles: { fontStyle: 'bold', fillColor: '#f1f5f9' } });
             dataCells.push(formatNumberForDisplay(renewIssued), formatNumberForDisplay(renewPaidWithEgov), formatNumberForDisplay(itemToDisplay.renewPaidViaEgov), formatNumberForDisplay(itemToDisplay.renewPending), { content: formatNumberForDisplay(renewPaidWithEgov + (itemToDisplay.renewPending || 0)), styles: { fontStyle: 'bold', fillColor: '#f1f5f9' } });
             dataCells.push(formatNumberForDisplay(getLicenseIssued(itemToDisplay, MALE_LICENSE_KEYS, Number(itemToDisplay.malePaid || 0))), formatNumberForDisplay(itemToDisplay.malePaid), formatNumberForDisplay(itemToDisplay.malePending), { content: formatNumberForDisplay((itemToDisplay.malePaid || 0) + (itemToDisplay.malePending || 0)), styles: { fontStyle: 'bold', fillColor: '#f1f5f9' } });
             dataCells.push(formatNumberForDisplay(getLicenseIssued(itemToDisplay, FEMALE_LICENSE_KEYS, Number(itemToDisplay.femalePaid || 0))), formatNumberForDisplay(itemToDisplay.femalePaid), formatNumberForDisplay(itemToDisplay.femalePending), { content: formatNumberForDisplay((itemToDisplay.femalePaid || 0) + (itemToDisplay.femalePending || 0)), styles: { fontStyle: 'bold', fillColor: '#f1f5f9' } });
@@ -428,6 +430,7 @@ export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal)
       const licenseIssuedRenewalTotal = totals.renewalIssued;
             grandTotalRow = [ { content: `GRAND TOTAL\n(${dateRangeLabel})`, colSpan: 2 },
                 formatNumberForDisplay(totals.citizensServed),
+                formatNumberForDisplay(licenseIssuedNewTotal + licenseIssuedRenewalTotal),
                 formatNumberForDisplay(licenseIssuedNewTotal), formatNumberForDisplay(totals.newPaid + totals.newGeoPay), formatNumberForDisplay(totals.newGeoPay), formatNumberForDisplay(totals.newPending), formatNumberForDisplay(totals.newPaid + totals.newGeoPay + totals.newPending),
                 formatNumberForDisplay(licenseIssuedRenewalTotal), formatNumberForDisplay(totals.renewalPaid + totals.renewalGeoPay), formatNumberForDisplay(totals.renewalGeoPay), formatNumberForDisplay(totals.renewalPending), formatNumberForDisplay(totals.renewalPaid + totals.renewalGeoPay + totals.renewalPending),
                 formatNumberForDisplay(totals.maleIssued), formatNumberForDisplay(totals.malePaid), formatNumberForDisplay(totals.malePending), formatNumberForDisplay(totals.malePaid + totals.malePending),
@@ -577,16 +580,20 @@ export const exportReportToExcel = (params: ExcelParams, signal?: AbortSignal) =
 
     if (isComplex) {
         headers = [
-            ['Region', 'LGU', 'Citizens Served', 'New', null, null, null, null, 'Renewal', null, null, null, null, 'Male', null, null, null, 'Female', null, null, null],
-            [null, null, null, 'License Issued', 'PAID\n(For Issuance to License Issued)', 'PAID (eGOVPay)\n', 'ONGOING\n(For verification to For Payment)', 'Total', 'License Issued', 'PAID\n(For Issuance to License Issued)', 'PAID (eGOVPay)\n', 'ONGOING\n(For verification to For Payment)', 'Total', 'License Issued', 'PAID\n(For Issuance to License Issued)', 'ONGOING\n(For verification to For Payment)', 'Total', 'License Issued', 'PAID\n(For Issuance to License Issued)', 'ONGOING\n(For verification to For Payment)', 'Total']
+            ['Region', 'LGU', 'Citizens Served', 'Total License Issued\n(New & Renew)', 'New', null, null, null, null, 'Renewal', null, null, null, null, 'Male', null, null, null, 'Female', null, null, null],
+            [null, null, null, null, 'License Issued', 'PAID\n(For Issuance to License Issued)', 'PAID (eGOVPay)\n', 'ONGOING\n(For verification to For Payment)', 'Total', 'License Issued', 'PAID\n(For Issuance to License Issued)', 'PAID (eGOVPay)\n', 'ONGOING\n(For verification to For Payment)', 'Total', 'License Issued', 'PAID\n(For Issuance to License Issued)', 'ONGOING\n(For verification to For Payment)', 'Total', 'License Issued', 'PAID\n(For Issuance to License Issued)', 'ONGOING\n(For verification to For Payment)', 'Total']
+        ];
+    } else if (moduleLabel === 'Building Permit' || moduleLabel === 'Certificate of Occupancy') {
+        const title = moduleLabel === 'Building Permit' ? 'Building Permits' : 'Certificate of Occupancy';
+        headers = [
+            ['Region', 'LGU', 'Citizens Served', title, null, null, null],
+            [null, null, null, 'PAID\n(Paid and License Issued)', 'FOR ISSUANCE', 'ONGOING\n(For Payment)', 'Total']
         ];
     } else {
         headers = [
             moduleLabel === 'Barangay Clearance'
                 ? ['Region', 'LGU', 'Citizens Served', 'Total Results']
-                : (moduleLabel === 'Building Permit' || moduleLabel === 'Certificate of Occupancy')
-                    ? ['Region', 'LGU', 'Citizens Served', 'License Issued', 'Paid\n(For Issuance and License Issued)', 'Ongoing\n(For verification to For Payment)', 'Total']
-                    : ['Region', 'LGU', 'Paid\n(For Issuance to License Issued)', 'Ongoing\n(For verification to For Payment)']
+                : ['Region', 'LGU', 'Paid\n(For Issuance to License Issued)', 'Ongoing\n(For verification to For Payment)']
         ];
     }
 
@@ -612,9 +619,10 @@ export const exportReportToExcel = (params: ExcelParams, signal?: AbortSignal) =
         if (isComplex) {
             const newIssued = getLicenseIssued(itemToDisplay, NEW_LICENSE_KEYS, Number(itemToDisplay.newPaid || 0));
             const newPaidWithEgov = (itemToDisplay.newPaid || 0) + (itemToDisplay.newPaidViaEgov || 0);
-            row.push(formatNumberForExcel(newIssued), formatNumberForExcel(newPaidWithEgov), formatNumberForExcel(itemToDisplay.newPaidViaEgov), formatNumberForExcel(itemToDisplay.newPending), newPaidWithEgov + (itemToDisplay.newPending || 0));
             const renewIssued = getLicenseIssued(itemToDisplay, RENEW_LICENSE_KEYS, Number(itemToDisplay.renewPaid || 0));
             const renewPaidWithEgov = (itemToDisplay.renewPaid || 0) + (itemToDisplay.renewPaidViaEgov || 0);
+            row.push(formatNumberForExcel(newIssued + renewIssued));
+            row.push(formatNumberForExcel(newIssued), formatNumberForExcel(newPaidWithEgov), formatNumberForExcel(itemToDisplay.newPaidViaEgov), formatNumberForExcel(itemToDisplay.newPending), newPaidWithEgov + (itemToDisplay.newPending || 0));
             row.push(formatNumberForExcel(renewIssued), formatNumberForExcel(renewPaidWithEgov), formatNumberForExcel(itemToDisplay.renewPaidViaEgov), formatNumberForExcel(itemToDisplay.renewPending), renewPaidWithEgov + (itemToDisplay.renewPending || 0));
             const maleIssued = getLicenseIssued(itemToDisplay, MALE_LICENSE_KEYS, Number(itemToDisplay.malePaid || 0));
             row.push(formatNumberForExcel(maleIssued), formatNumberForExcel(itemToDisplay.malePaid), formatNumberForExcel(itemToDisplay.malePending), (itemToDisplay.malePaid || 0) + (itemToDisplay.malePending || 0));
@@ -642,7 +650,7 @@ export const exportReportToExcel = (params: ExcelParams, signal?: AbortSignal) =
       // Use the same issued totals shown in the rows for grand totals.
       const licenseIssuedNewTotal = totals.newIssued;
       const licenseIssuedRenewalTotal = totals.renewalIssued;
-            totalRow = [ 'GRAND TOTAL', null, totals.citizensServed, licenseIssuedNewTotal, totals.newPaid + totals.newGeoPay, totals.newGeoPay, totals.newPending, (totals.newPaid + totals.newGeoPay + totals.newPending), licenseIssuedRenewalTotal, totals.renewalPaid + totals.renewalGeoPay, totals.renewalGeoPay, totals.renewalPending, (totals.renewalPaid + totals.renewalGeoPay + totals.renewalPending), totals.maleIssued, totals.malePaid, totals.malePending, (totals.malePaid + totals.malePending), totals.femaleIssued, totals.femalePaid, totals.femalePending, (totals.femalePaid + totals.femalePending) ];
+            totalRow = [ 'GRAND TOTAL', null, totals.citizensServed, licenseIssuedNewTotal + licenseIssuedRenewalTotal, licenseIssuedNewTotal, totals.newPaid + totals.newGeoPay, totals.newGeoPay, totals.newPending, (totals.newPaid + totals.newGeoPay + totals.newPending), licenseIssuedRenewalTotal, totals.renewalPaid + totals.renewalGeoPay, totals.renewalGeoPay, totals.renewalPending, (totals.renewalPaid + totals.renewalGeoPay + totals.renewalPending), totals.maleIssued, totals.malePaid, totals.malePending, (totals.malePaid + totals.malePending), totals.femaleIssued, totals.femalePaid, totals.femalePending, (totals.femalePaid + totals.femalePending) ];
             merges.push({ s: { r: currentRowIndex, c: 0 }, e: { r: currentRowIndex, c: 1 } });
         } else {
             if (moduleLabel === 'Barangay Clearance') {
@@ -659,7 +667,14 @@ export const exportReportToExcel = (params: ExcelParams, signal?: AbortSignal) =
 
     const ws = xlsx.utils.aoa_to_sheet([...headers, ...body]);
     if (isComplex) {
-        merges.push({ s: { r: 0, c: 0 }, e: { r: 1, c: 0 } }, { s: { r: 0, c: 1 }, e: { r: 1, c: 1 } }, { s: { r: 0, c: 2 }, e: { r: 1, c: 2 } }, { s: { r: 0, c: 3 }, e: { r: 0, c: 7 } }, { s: { r: 0, c: 8 }, e: { r: 0, c: 12 } }, { s: { r: 0, c: 13 }, e: { r: 0, c: 16 } }, { s: { r: 0, c: 17 }, e: { r: 0, c: 20 } });
+        merges.push({ s: { r: 0, c: 0 }, e: { r: 1, c: 0 } }, { s: { r: 0, c: 1 }, e: { r: 1, c: 1 } }, { s: { r: 0, c: 2 }, e: { r: 1, c: 2 } }, { s: { r: 0, c: 3 }, e: { r: 1, c: 3 } }, { s: { r: 0, c: 4 }, e: { r: 0, c: 8 } }, { s: { r: 0, c: 9 }, e: { r: 0, c: 13 } }, { s: { r: 0, c: 14 }, e: { r: 0, c: 17 } }, { s: { r: 0, c: 18 }, e: { r: 0, c: 21 } });
+    } else if (moduleLabel === 'Building Permit' || moduleLabel === 'Certificate of Occupancy') {
+        merges.push(
+            { s: { r: 0, c: 0 }, e: { r: 1, c: 0 } },
+            { s: { r: 0, c: 1 }, e: { r: 1, c: 1 } },
+            { s: { r: 0, c: 2 }, e: { r: 1, c: 2 } },
+            { s: { r: 0, c: 3 }, e: { r: 0, c: 6 } }
+        );
     }
     ws['!merges'] = merges;
     const lastHeaderRow = headers[headers.length - 1];
