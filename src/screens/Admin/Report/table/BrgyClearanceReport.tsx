@@ -53,6 +53,7 @@ function getRegionSortIndex(regionKey: string): number {
   if (normalized === 'region not specified') return DESIRED_REGION_ORDER.length + 1;
   return DESIRED_REGION_ORDER.length;
 }
+
 // --- End Region Sorting Helpers ---
 
 interface BrgyCleranceProps {
@@ -112,11 +113,12 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
   const renderTableRows = () => {
     const allRows: React.ReactNode[] = [];
     const sortedRegionKeys = Object.keys(regionMappingGrouped).sort((a, b) => getRegionSortIndex(a) - getRegionSortIndex(b) || a.localeCompare(b));
+    let rowNumber = 1;
 
     sortedRegionKeys.forEach(region => {
       const lguList = regionMappingGrouped[region];
       const isRegionOpen = openRegions.has(region);
-      allRows.push(<TableRow key={`${region}-trigger`}><TableCell colSpan={3} className="text-center p-2 cursor-pointer bg-slate-50 hover:bg-slate-100 font-semibold text-blue-600 text-xs" onClick={() => toggleRegion(region)}>{isRegionOpen ? `▲ Hide ${getRegionCode(region) || region} Data` : `▼ View ${getRegionCode(region) || region} Data`}</TableCell></TableRow>);
+      allRows.push(<TableRow key={`${region}-trigger`}><TableCell colSpan={4} className="text-center p-2 cursor-pointer bg-slate-50 hover:bg-slate-100 font-semibold text-blue-600 text-xs" onClick={() => toggleRegion(region)}>{isRegionOpen ? `▲ Hide ${getRegionCode(region) || region} Data` : `▼ View ${getRegionCode(region) || region} Data`}</TableCell></TableRow>);
       if (isRegionOpen) {
         const rows: React.ReactNode[] = [];
         const isDayMode = selectedDateType === "Day";
@@ -125,7 +127,7 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
 
         lguList.forEach((lgu: any) => {
           if (lgu.hasError) {
-            rows.push(<TableRow key={`${region}-${lgu.lgu}-error`} className="bg-red-50/50">{isFirstRowOfRegion && <TableCell className="p-3 text-center font-bold text-slate-700 align-middle bg-slate-50 border-r text-sm" rowSpan={totalRowsForRegion}>{getRegionCode(region) || region}</TableCell>}<TableCell className="p-3 text-left font-semibold text-slate-800 text-sm">{lgu.lgu}<br /><span className="text-[11px] font-bold text-red-600 mt-0.5 uppercase">{lgu.error || 'NO DATA AVAILABLE'}</span></TableCell><TableCell className="p-3 text-right tabular-nums text-slate-500">-</TableCell></TableRow>);
+            rows.push(<TableRow key={`${region}-${lgu.lgu}-error`} className="bg-red-50/50"><TableCell className="p-3 text-center font-semibold text-slate-500 tabular-nums">{rowNumber++}</TableCell>{isFirstRowOfRegion && <TableCell className="p-3 text-center font-bold text-slate-700 align-middle bg-slate-50 border-r text-sm" rowSpan={totalRowsForRegion}>{getRegionCode(region) || region}</TableCell>}<TableCell className="p-3 text-left font-semibold text-slate-800 text-sm">{lgu.lgu}<br /><span className="text-[11px] font-bold text-red-600 mt-0.5 uppercase">{lgu.error || 'NO DATA AVAILABLE'}</span></TableCell><TableCell className="p-3 text-right tabular-nums text-slate-500">-</TableCell></TableRow>);
             isFirstRowOfRegion = false; return;
           }
           const dataToRender = isDayMode ? (lgu.monthlyResults?.length > 0 ? lgu.monthlyResults : [{ totalCount: 0 }]) : [ (lgu.monthlyResults || []).reduce((acc: any, current: any) => { acc.totalCount += Number(current.totalCount || 0); return acc; }, { totalCount: 0 })];
@@ -135,9 +137,10 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
             // **DESIGN CHANGE**: Padded, aligned, and styled cells
             rows.push(
               <TableRow key={`${region}-${lgu.lgu}-${isDayMode ? item.month : 'sum'}-${itemIdx}`} className="hover:bg-blue-50/70 transition-colors duration-200 text-sm">
+                <TableCell className="p-3 text-center font-semibold text-slate-500 tabular-nums">{rowNumber++}</TableCell>
                 {isFirstRowOfRegion && <TableCell className="p-3 text-center font-bold text-slate-700 align-middle bg-slate-50 border-r text-sm" rowSpan={totalRowsForRegion}>{getRegionCode(region) || region}</TableCell>}
                 <TableCell className="p-3 text-left font-semibold text-slate-800"><div>{lgu.lgu}<span className="text-xs font-medium text-slate-500 ml-1.5">{lgu.province ? `(${lgu.province})` : ""}</span></div><div className="text-[11px] font-semibold text-blue-700 mt-0.5">{periodLabel}</div></TableCell>
-                <TableCell className="p-3 text-right font-bold tabular-nums text-slate-800">{formatNumber((Number(item.malePaid||0)+Number(item.malePending||0)+Number(item.femalePaid||0)+Number(item.femalePending||0)) || Number(item.totalCount || 0))}</TableCell>
+                <TableCell className="p-3 text-right font-bold tabular-nums text-slate-900 bg-blue-50">{formatNumber((Number(item.malePaid||0)+Number(item.malePending||0)+Number(item.femalePaid||0)+Number(item.femalePending||0)) || Number(item.totalCount || 0))}</TableCell>
               </TableRow>
             );
             isFirstRowOfRegion = false;
@@ -147,7 +150,7 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
         const regionTotal = lguList.reduce((total, lgu) => { if (lgu.hasError) return total; return total + (lgu.monthlyResults || []).reduce((mSum: number, month: any) => { const maleFemaleSum = Number(month.malePaid||0)+Number(month.malePending||0)+Number(month.femalePaid||0)+Number(month.femalePending||0); const used = maleFemaleSum || Number(month.totalCount || 0); return mSum + used; }, 0); }, 0);
         
         // **DESIGN CHANGE**: Cleaner sub-total row
-        allRows.push(<TableRow key={`${region}-subtotal`} className="font-bold text-slate-900"><TableCell className="bg-slate-200 p-3 text-left" colSpan={2}><div className="font-extrabold tracking-wider text-xs">SUB-TOTAL ({getRegionCode(region) || region})</div></TableCell><TableCell className="bg-slate-300 p-3 text-right text-sm tabular-nums">{formatNumber(regionTotal)}</TableCell></TableRow>);
+        allRows.push(<TableRow key={`${region}-subtotal`} className="font-bold text-slate-900"><TableCell className="bg-slate-200 p-3 text-left" colSpan={3}><div className="font-extrabold tracking-wider text-xs">SUB-TOTAL ({getRegionCode(region) || region})</div></TableCell><TableCell className="bg-blue-100 p-3 text-right text-sm tabular-nums">{formatNumber(regionTotal)}</TableCell></TableRow>);
       }
     });
     return allRows;
@@ -180,9 +183,10 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
             <TableHeader>
               {/* **DESIGN CHANGE**: Header with requested colors and styles */}
               <TableRow>
+                <TableHead className="bg-[#9ec6f7] text-black font-bold p-3 text-center align-middle sticky top-0 z-10 uppercase text-xs border-b border-r border-slate-300 w-16">#</TableHead>
                 <TableHead className="bg-[#9ec6f7] text-black font-bold p-3 text-center align-middle sticky top-0 z-10 uppercase text-xs border-b border-r border-slate-300">Region</TableHead>
                 <TableHead className="bg-[#9ec6f7] text-black font-bold p-3 text-left align-middle sticky top-0 z-10 uppercase text-xs border-b border-r border-slate-300">LGU</TableHead>
-                <TableHead className="bg-[#9ec6f7] text-black font-bold p-3 text-right align-middle sticky top-0 z-10 uppercase text-xs border-b border-slate-300">Total Issued</TableHead>
+                <TableHead className="bg-blue-200 text-black font-bold p-3 text-right align-middle sticky top-0 z-10 uppercase text-xs border-b border-slate-300">Total Issued</TableHead>
               </TableRow>
             </TableHeader>
             
@@ -191,15 +195,15 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
               {normalizedResults.length > 0 ? (
                 <>
                   {renderTableRows()}
-                  {Object.keys(regionMappingGrouped).length > 1 && <TableRow><TableCell colSpan={3} className="text-center p-2 cursor-pointer bg-slate-100 hover:bg-slate-200 font-bold text-slate-700 text-xs" onClick={toggleAllRegions}>{openRegions.size === Object.keys(regionMappingGrouped).length ? 'Collapse All Regions' : 'Expand All Regions'}</TableCell></TableRow>}
-                  {(loading || isProgressive) && <TableRow><TableCell colSpan={3} className="p-0"><LoaderTable message={isProgressive ? "Please wait for other regions..." : "Updating data..."} /></TableCell></TableRow>}
+                  {Object.keys(regionMappingGrouped).length > 1 && <TableRow><TableCell colSpan={4} className="text-center p-2 cursor-pointer bg-slate-100 hover:bg-slate-200 font-bold text-slate-700 text-xs" onClick={toggleAllRegions}>{openRegions.size === Object.keys(regionMappingGrouped).length ? 'Collapse All Regions' : 'Expand All Regions'}</TableCell></TableRow>}
+                  {(loading || isProgressive) && <TableRow><TableCell colSpan={4} className="p-0"><LoaderTable message={isProgressive ? "Please wait for other regions..." : "Updating data..."} /></TableCell></TableRow>}
                 </>
               ) : loading ? (
-                <TableRow><TableCell colSpan={3} className="text-center py-12"><LoaderTable /></TableCell></TableRow>
+                <TableRow><TableCell colSpan={4} className="text-center py-12"><LoaderTable /></TableCell></TableRow>
               ) : (
                 // **DESIGN CHANGE**: Enhanced "No Results" view
                 <TableRow>
-                  <TableCell colSpan={3} className="text-center py-20 bg-white">
+                  <TableCell colSpan={4} className="text-center py-20 bg-white">
                     <div className='flex flex-col items-center justify-center'>
                       <div className="rounded-full bg-slate-100 p-4"><Search className="h-10 w-10 text-slate-400" /></div>
                       <p className='font-bold text-lg text-slate-600 mt-5'>{hasSearched ? 'No Results Found' : 'Generate a Report'}</p>
@@ -213,7 +217,7 @@ const BrgyClearanceReport = forwardRef<HTMLDivElement, BrgyCleranceProps>(({
             <tfoot>
               {/* **DESIGN CHANGE**: Sticky footer with uniform background color and styles */}
               <TableRow className="font-bold border-t-4 border-slate-500">
-                <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-left" colSpan={2}><div className="font-extrabold tracking-wider text-base">GRAND TOTAL</div><div className='text-xs font-medium text-slate-300'>({dateRangeLabel})</div></TableCell>
+                <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-left" colSpan={3}><div className="font-extrabold tracking-wider text-base">GRAND TOTAL</div><div className='text-xs font-medium text-slate-300'>({dateRangeLabel})</div></TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right text-base tabular-nums">{loading && normalizedResults.length === 0 ? '-' : formatNumber(grandTotal)}</TableCell>
               </TableRow>
             </tfoot>

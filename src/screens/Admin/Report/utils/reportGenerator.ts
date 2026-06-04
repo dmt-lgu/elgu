@@ -96,6 +96,62 @@ const formatNumberForExcel = (num: number | null | undefined): number => {
   return num || 0;
 };
 
+const NEW_LICENSE_KEYS = ['newLicenseIssued', 'newIssued', 'licenseIssuedNew', 'newLicense'];
+const RENEW_LICENSE_KEYS = ['renewLicenseIssued', 'renewIssued', 'licenseIssuedRenewal', 'renewLicense'];
+const MALE_LICENSE_KEYS = ['maleLicenseIssued', 'maleIssued'];
+const FEMALE_LICENSE_KEYS = ['femaleLicenseIssued', 'femaleIssued'];
+const BUILDING_FOR_ISSUANCE_KEYS = ['buildingForIssuance', 'forIssuance'];
+const CO_FOR_ISSUANCE_KEYS = ['coForIssuance', 'forIssuance'];
+
+const getLicenseIssued = (item: any, keys: string[], fallback: number): number => {
+  for (const key of keys) {
+    const value = item?.[key];
+    if (value !== null && value !== undefined && value !== '') {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+  }
+  return fallback;
+};
+
+const getExplicitNumber = (item: any, keys: string[]): number | null => {
+  for (const key of keys) {
+    const value = item?.[key];
+    if (value !== null && value !== undefined && value !== '') {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+  }
+  return null;
+};
+
+const getSimplePermitCounts = (item: any, moduleLabel: string) => {
+  const isBuilding = moduleLabel === 'Building Permit';
+  const pendingKey = isBuilding ? 'buildingPending' : 'coPending';
+  const licenseKey = isBuilding ? 'buildingLicenseIssued' : 'coLicenseIssued';
+  const forIssuanceKey = isBuilding ? 'buildingForIssuance' : 'coForIssuance';
+  const licenseIssued = Number(item?.[licenseKey] || 0);
+  const forIssuance = Number(item?.[forIssuanceKey] || 0);
+  const paid = forIssuance + licenseIssued;
+  const pending = Number(item?.[pendingKey] || 0);
+  return { licenseIssued, paid, pending };
+};
+
+const getCitizensServed = (lgu: any): number => Number(lgu?.totalCitizensServed || 0);
+
+const toFileSlug = (value: string): string =>
+  String(value || '')
+    .toLowerCase()
+    .replace(/&/g, 'and')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+const buildReportFileName = (moduleLabel: string, dateRangeLabel: string, extension: 'pdf' | 'xlsx'): string => {
+  const moduleSlug = toFileSlug(moduleLabel).replace(/-report$/, '') || 'report';
+  const rangeSlug = toFileSlug(dateRangeLabel);
+  return `${moduleSlug}-report${rangeSlug ? `-${rangeSlug}` : ''}.${extension}`;
+};
+
 const formatMonthYear = (monthStr: string): string => {
   if (!monthStr) return "";
   try {
@@ -116,104 +172,37 @@ const calculateGrandTotals = (data: any[], moduleLabel: string) => {
   const totals = {
     newIssued: 0, newPaid: 0, newGeoPay: 0, newPending: 0,
     renewalIssued: 0, renewalPaid: 0, renewalGeoPay: 0, renewalPending: 0,
-    newLicenseIssued: 0, renewalLicenseIssued: 0,
     maleIssued: 0, malePaid: 0, malePending: 0,
     femaleIssued: 0, femalePaid: 0, femalePending: 0,
-    // licenseIssued used for Building Permit / CO grand totals (displayed in 'License Issued' column)
-    licenseIssued: 0,
-    // For complex modules (Business/Working Permit) track explicit license-issued counts separately
-    licenseIssuedNew: 0,
-    licenseIssuedRenewal: 0,
-    paid: 0, pending: 0, totalCount: 0,
-    // Sum of per-LGU totalCitizensServed (for Building Permit / Certificate of Occupancy)
-    totalCitizensServed: 0
+    paid: 0, pending: 0, totalCount: 0, citizensServed: 0, licenseIssued: 0
   };
 
   for (const lgu of data) {
-      // Accumulate per-LGU 'totalCitizensServed' once per LGU for all modules.
-      // Prefer a top-level `totalCitizensServed` when present; otherwise
-      // fall back to `sum.totalCitizensServed` or sum `monthlyResults` values.
-      const perLguCitizens = Number(lgu?.totalCitizensServed ?? (Array.isArray(lgu?.monthlyResults) && lgu.monthlyResults.length
-        ? lgu.monthlyResults.reduce((s: number, m: any) => s + (Number(m.totalCitizensServed || 0)), 0)
-        : (lgu?.sum?.totalCitizensServed ?? 0)));
-      totals.totalCitizensServed += perLguCitizens;
+    totals.citizensServed += getCitizensServed(lgu);
     const itemsToSum = lgu.monthlyResults || [];
-    const hasMonthly = Array.isArray(lgu.monthlyResults) && lgu.monthlyResults.length > 0;
-    const isComplexModule = moduleLabel === 'Business Permit' || moduleLabel === 'Working Permit';
-    // If no monthlyResults are present, attempt to read aggregated totals from lgu or lgu.sum
-    if (!hasMonthly) {
-      if (moduleLabel === 'Barangay Clearance') {
-        // already handled above via top-level totalCount
-      } else if (moduleLabel === 'Building Permit' || moduleLabel === 'Certificate of Occupancy') {
-        const src = lgu.sum ?? lgu;
-        const paidKey = moduleLabel === 'Building Permit' ? 'buildingPaid' : 'coPaid';
-        const pendingKey = moduleLabel === 'Building Permit' ? 'buildingPending' : 'coPending';
-        const licenseIssued = Number(src.newLicenseIssued ?? src.newIssued ?? src.newPaid ?? src[paidKey] ?? 0);
-        const forIssuance = Number(src.newPaid ?? src[paidKey] ?? 0);
-        const egov = Number(src.newPaidViaEgov ?? 0);
-        const paidOnly = forIssuance + egov;
-        totals.licenseIssued += licenseIssued;
-        totals.paid += paidOnly;
-        totals.pending += Number(src[pendingKey] ?? src.newPending ?? 0);
-      } else if (isComplexModule) {
-        const src = lgu.sum ?? lgu;
-        totals.newLicenseIssued += Number(src.newLicenseIssued ?? src.newIssued ?? src.newPaid ?? 0);
-        totals.newPaid += Number(src.newPaid ?? 0);
-        totals.newGeoPay += Number(src.newPaidViaEgov ?? 0);
-        totals.newPending += Number(src.newPending ?? 0);
-        totals.renewalLicenseIssued += Number(src.renewLicenseIssued ?? src.renewIssued ?? src.renewPaid ?? 0);
-        totals.renewalPaid += Number(src.renewPaid ?? 0);
-        totals.renewalGeoPay += Number(src.renewPaidViaEgov ?? 0);
-        totals.renewalPending += Number(src.renewPending ?? 0);
-        totals.maleIssued += Number(src.malePaid ?? 0);
-        totals.malePaid += Number(src.malePaid ?? 0);
-        totals.malePending += Number(src.malePending ?? 0);
-        totals.femaleIssued += Number(src.femalePaid ?? 0);
-        totals.femalePaid += Number(src.femalePaid ?? 0);
-        totals.femalePending += Number(src.femalePending ?? 0);
-      }
-    }
-    // If there are no monthlyResults for Barangay Clearance, allow a top-level
-    // `totalCount` (or `sum.totalCount`) to be used as the per-LGU value.
-    if (moduleLabel === 'Barangay Clearance' && (!Array.isArray(lgu.monthlyResults) || lgu.monthlyResults.length === 0)) {
-      totals.totalCount += Number(lgu?.totalCount ?? lgu?.sum?.totalCount ?? 0);
-    }
     for (const item of itemsToSum) {
       if (moduleLabel === 'Barangay Clearance') {
         totals.totalCount += item.totalCount || 0;
       } else if (moduleLabel === 'Building Permit' || moduleLabel === 'Certificate of Occupancy') {
-          const paidKey = moduleLabel === 'Building Permit' ? 'buildingPaid' : 'coPaid';
-          const pendingKey = moduleLabel === 'Building Permit' ? 'buildingPending' : 'coPending';
-          // Separate License Issued from PAID (For Issuance + eGOV) to avoid double-counting
-          const licenseIssued = Number(item.newLicenseIssued ?? item.newIssued ?? item.newPaid ?? item[paidKey] ?? 0);
-          const forIssuance = Number(item.newPaid ?? item[paidKey] ?? 0);
-          const egov = Number(item.newPaidViaEgov ?? 0);
-          const paidOnly = forIssuance + egov; // do NOT include licenseIssued here
-          totals.licenseIssued += licenseIssued;
-          totals.paid += paidOnly;
-          totals.pending += Number(item[pendingKey] ?? item.newPending ?? 0);
+        const counts = getSimplePermitCounts(item, moduleLabel);
+        totals.licenseIssued += counts.licenseIssued;
+        totals.paid += counts.paid;
+        totals.pending += counts.pending;
       } else {
-        // For complex modules (Business/Working Permit):
-        // License Issued = explicit newLicenseIssued field (or fallback to newIssued or newPaid)
-        const newLicenseIssued = Number(item.newLicenseIssued ?? item.newIssued ?? item.newPaid ?? 0);
-        const renewalLicenseIssued = Number(item.renewLicenseIssued ?? item.renewIssued ?? item.renewPaid ?? 0);
-        
-        // PAID (For Issuance and License Issued) is computed where needed
-
-        totals.newLicenseIssued += newLicenseIssued;
+        const newIssued = getLicenseIssued(item, NEW_LICENSE_KEYS, Number(item.newPaid || 0));
+        const renewalIssued = getLicenseIssued(item, RENEW_LICENSE_KEYS, Number(item.renewPaid || 0));
+        totals.newIssued += newIssued;
         totals.newPaid += item.newPaid || 0;
         totals.newGeoPay += item.newPaidViaEgov || 0;
         totals.newPending += item.newPending || 0;
-        totals.renewalLicenseIssued += renewalLicenseIssued;
+        totals.renewalIssued += renewalIssued;
         totals.renewalPaid += item.renewPaid || 0;
         totals.renewalGeoPay += item.renewPaidViaEgov || 0;
         totals.renewalPending += item.renewPending || 0;
-        
-        // Male and Female: License Issued = malePaid / femalePaid (no eGOV breakdown in data)
-        totals.maleIssued += (item.malePaid || 0);
+        totals.maleIssued += getLicenseIssued(item, MALE_LICENSE_KEYS, Number(item.malePaid || 0));
         totals.malePaid += item.malePaid || 0;
         totals.malePending += item.malePending || 0;
-        totals.femaleIssued += (item.femalePaid || 0);
+        totals.femaleIssued += getLicenseIssued(item, FEMALE_LICENSE_KEYS, Number(item.femalePaid || 0));
         totals.femalePaid += item.femalePaid || 0;
         totals.femalePending += item.femalePending || 0;
       }
@@ -222,15 +211,14 @@ const calculateGrandTotals = (data: any[], moduleLabel: string) => {
   return totals;
 };
 
-const normalizeCertificateOfOccupancyData = (rawData: any[]): any[] => {
-  type MonthEntry = { month: string; coPaid: number; coPending: number };
-  const byLgu = new Map<string, { base: any; monthsMap: Map<string, MonthEntry>; hasError?: boolean; region?: string; }>();
+const normalizeReportData = (rawData: any[], moduleLabel: string): any[] => {
+  const byLgu = new Map<string, { base: any; monthsMap: Map<string, any>; hasError?: boolean; region?: string; }>();
 
   for (const entry of rawData || []) {
     const key = entry?.lgu || '';
     if (!key) continue;
     if (!byLgu.has(key)) {
-      byLgu.set(key, { base: { ...entry, monthlyResults: [] }, monthsMap: new Map<string, MonthEntry>(), hasError: entry?.hasError, region: normalizeRegionKey(entry?.region), });
+      byLgu.set(key, { base: { ...entry, monthlyResults: [] }, monthsMap: new Map<string, any>(), hasError: entry?.hasError, region: normalizeRegionKey(entry?.region), });
     }
     const bucket = byLgu.get(key)!;
     if (!bucket.region && entry?.region) { bucket.region = normalizeRegionKey(entry.region); }
@@ -239,7 +227,33 @@ const normalizeCertificateOfOccupancyData = (rawData: any[]): any[] => {
     for (const m of monthsArr) {
       const mKey = m?.month;
       if (!mKey) continue;
-      bucket.monthsMap.set(mKey, { month: mKey, coPaid: Number(m?.coPaid || 0), coPending: Number(m?.coPending || 0) });
+      const existing = bucket.monthsMap.get(mKey) || { month: mKey };
+
+      if (moduleLabel === 'Barangay Clearance') {
+        existing.totalCount = Math.max(Number(existing.totalCount || 0), Number(m?.totalCount || 0));
+      } else if (moduleLabel === 'Building Permit') {
+        existing.buildingPaid = Math.max(Number(existing.buildingPaid || 0), Number(m?.buildingPaid || 0));
+        existing.buildingForIssuance = Math.max(Number(existing.buildingForIssuance || 0), getExplicitNumber(m, BUILDING_FOR_ISSUANCE_KEYS) ?? 0);
+        existing.buildingLicenseIssued = Math.max(Number(existing.buildingLicenseIssued || 0), Number(m?.buildingLicenseIssued || 0));
+        existing.buildingPending = Math.max(Number(existing.buildingPending || 0), Number(m?.buildingPending || 0));
+      } else if (moduleLabel === 'Certificate of Occupancy') {
+        existing.coPaid = Number(m?.coPaid || 0);
+        existing.coForIssuance = getExplicitNumber(m, CO_FOR_ISSUANCE_KEYS) ?? 0;
+        existing.coLicenseIssued = Number(m?.coLicenseIssued || 0);
+        existing.coPending = Number(m?.coPending || 0);
+      } else {
+        Object.keys(m).forEach(field => {
+          if (field === 'month') return;
+          const value = m[field];
+          if (typeof value === 'number') {
+            existing[field] = Math.max(Number(existing[field] || 0), Number(value));
+          } else if (existing[field] === undefined) {
+            existing[field] = value;
+          }
+        });
+      }
+
+      bucket.monthsMap.set(mKey, existing);
     }
   }
 
@@ -310,18 +324,9 @@ const addHeader = (doc: jsPDF, params: PdfParams, pageNumber: number, pageCount:
 
 export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal) => {
     const baseData = params.data.filter(lgu => !lgu.hasError);
-    const exportableData = params.moduleLabel === 'Certificate of Occupancy' ? normalizeCertificateOfOccupancyData(baseData) : baseData;
+    const exportableData = normalizeReportData(baseData, params.moduleLabel);
     const finalParams = { ...params, generatedAt: new Date() };
     const { moduleLabel, isDayMode, dateRangeLabel } = finalParams;
-
-    // Build a safe filename that includes the period covered (if present)
-    const sanitizeForFilename = (s: string) => {
-      return (s || '').replace(/[<>:\"\\/\|\?\*\u0000-\u001F]/g, '').replace(/\s+/g, ' ').trim();
-    };
-    const moduleSlug = moduleLabel.toLowerCase().replace(/\s+/g, '-');
-    const datePart = dateRangeLabel ? `(${dateRangeLabel})` : '';
-    const rawFilename = `${moduleSlug}-report${datePart}`;
-    const safeFilename = sanitizeForFilename(rawFilename);
     const sortedData = [...exportableData].sort(compareByRegion);
 
     let base64Logo = '';
@@ -330,7 +335,7 @@ export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal)
 
     const isComplex = ['Business Permit', 'Working Permit'].includes(moduleLabel);
     const orientation = isComplex ? 'landscape' : 'portrait';
-    const pdfFormat: any = isComplex ? 'a3' : 'a4';
+    const pdfFormat = isComplex ? [1400, 842] : 'a4';
     const doc = new jsPDF({ orientation, unit: 'pt', format: pdfFormat });
 
     let head: any[][] = [];
@@ -340,16 +345,15 @@ export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal)
     if (isComplex) {
         head = [
             [
+                { content: '#', rowSpan: 2, styles: commonRowSpanStyles },
                 { content: 'REGION', rowSpan: 2, styles: commonRowSpanStyles },
                 { content: 'LGU', rowSpan: 2, styles: { ...commonRowSpanStyles, halign: 'left' } },
-          { content: 'CITIZENS SERVED', rowSpan: 2, styles: commonRowSpanStyles },
+                { content: 'CITIZENS SERVED', rowSpan: 2, styles: commonRowSpanStyles },
+                { content: 'TOTAL LICENSE ISSUED\n(NEW & RENEW)', rowSpan: 2, styles: commonRowSpanStyles },
                 { content: 'NEW', colSpan: 5, styles: commonColSpanStyles },
                 { content: 'RENEWAL', colSpan: 5, styles: commonColSpanStyles },
                 { content: 'MALE', colSpan: 4, styles: commonColSpanStyles },
-                { content: 'FEMALE', colSpan: 4, styles: commonColSpanStyles },
-                /* Commented out: Total Licensed Issued column requested to be removed from PDF
-                { content: 'TOTAL LICENSED ISSUED', rowSpan: 2, styles: commonRowSpanStyles }
-                */
+                { content: 'FEMALE', colSpan: 4, styles: commonColSpanStyles }
             ],
             [
                 'License Issued', 'PAID\n(For Issuance and License Issued)', 'PAID\n(eGOVPay)', 'ONGOING\n(For Payment)', 'Total',
@@ -360,33 +364,23 @@ export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal)
         ];
     } else if (moduleLabel === 'Barangay Clearance') {
         head = [[
+            { content: '#', styles: commonRowSpanStyles },
             { content: 'REGION', styles: commonRowSpanStyles },
             { content: 'LGU', styles: { ...commonRowSpanStyles, halign: 'left' } },
             { content: 'TOTAL ISSUED', styles: { ...commonRowSpanStyles, halign: 'right' } }
         ]];
     } else {
         const title = moduleLabel === 'Building Permit' ? 'BUILDING PERMITS' : 'CERTIFICATE OF OCCUPANCY';
-        if (moduleLabel === 'Building Permit' || moduleLabel === 'Certificate of Occupancy') {
-          head = [
+        head = [
             [
-              { content: 'REGION', rowSpan: 2, styles: commonRowSpanStyles },
-              { content: 'LGU', rowSpan: 2, styles: { ...commonRowSpanStyles, halign: 'left' } },
-              { content: 'Citizens Served', rowSpan: 2, styles: commonRowSpanStyles },
-              { content: title, colSpan: 4, styles: commonColSpanStyles },
+                { content: '#', rowSpan: 2, styles: commonRowSpanStyles },
+                { content: 'REGION', rowSpan: 2, styles: commonRowSpanStyles },
+                { content: 'LGU', rowSpan: 2, styles: { ...commonRowSpanStyles, halign: 'left' } },
+                { content: 'CITIZENS SERVED', rowSpan: 2, styles: commonRowSpanStyles },
+                { content: title, colSpan: 4, styles: commonColSpanStyles },
             ],
             ['License Issued', 'PAID\n(For Issuance and License Issued)', 'ONGOING\n(For Payment)', 'Total']
-          ];
-        } else {
-          head = [
-            [
-              { content: 'REGION', rowSpan: 2, styles: commonRowSpanStyles },
-              { content: 'LGU', rowSpan: 2, styles: { ...commonRowSpanStyles, halign: 'left' } },
-              { content: 'Citizens Served', rowSpan: 2, styles: commonRowSpanStyles },
-              { content: title, colSpan: 5, styles: commonColSpanStyles },
-            ],
-            ['License Issued', 'PAID\n(For Issuance and License Issued)', 'PAID\n(eGOVPay)', 'ONGOING\n(For Payment)', 'Total']
-          ];
-        }
+        ];
     }
 
     const allRows = sortedData.flatMap((lgu: any) => {
@@ -394,125 +388,60 @@ export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal)
             const results = lgu.monthlyResults?.length > 0 ? lgu.monthlyResults : [{ month: lgu.months?.[0] || '' }];
             return results.map((monthData: any) => ({ lguInfo: lgu, itemToDisplay: monthData, periodLabel: getPeriodLabel(lgu, true, monthData.month) }));
         } else {
-          const aggregatedItem = (lgu.monthlyResults || []).reduce((acc: any, month: any) => {
-            Object.keys(month).forEach((key: string) => {
-              const val = month[key];
-              if (typeof val === 'number' || (!isNaN(Number(val)) && val !== null && val !== '')) {
-                acc[key] = (acc[key] || 0) + Number(val);
-              }
-            });
-            return acc;
-          }, {});
-          return [{ lguInfo: lgu, itemToDisplay: aggregatedItem, periodLabel: getPeriodLabel(lgu, false) }];
+            const aggregatedItem = (lgu.monthlyResults || []).reduce((acc: any, month: any) => { Object.keys(month).forEach((key: string) => { if (typeof month[key] === 'number') { acc[key] = (acc[key] || 0) + month[key]; } }); return acc; }, {});
+            return [{ lguInfo: lgu, itemToDisplay: aggregatedItem, periodLabel: getPeriodLabel(lgu, false) }];
         }
     });
 
     const totals = calculateGrandTotals(sortedData, moduleLabel);
     const dataRows: any[] = [];
-    allRows.forEach((rowData: any) => {
+    allRows.forEach((rowData: any, index: number) => {
         const { lguInfo, itemToDisplay, periodLabel } = rowData;
         const lguText = `${lguInfo.lgu}\n${periodLabel}`;
         const regionDisplay = getRegionDisplayName(normalizeRegionKey(lguInfo.region));
         const dataCells: any[] = [];
 
         if (isComplex) {
-          // Match table calculations exactly but avoid double-counting:
-          // License Issued = explicit field (or fallback to newIssued)
-          // PAID column should represent For Issuance (newPaid) only; eGOV shown in its own column.
-          const newLicenseIssued = Number(itemToDisplay.newLicenseIssued ?? itemToDisplay.newIssued ?? itemToDisplay.newPaid ?? 0);
-          const newEgov = Number(itemToDisplay.newPaidViaEgov || 0);
-          // PAID column = License Issued + PAID (eGOVPay)
-          const newPaidColumn = newLicenseIssued + newEgov;
-          const newTotal = newPaidColumn + (itemToDisplay.newPending || 0);
-
-          const renewLicenseIssued = Number(itemToDisplay.renewLicenseIssued ?? itemToDisplay.renewIssued ?? itemToDisplay.renewPaid ?? 0);
-          const renewEgov = Number(itemToDisplay.renewPaidViaEgov || 0);
-          const renewPaidColumn = renewLicenseIssued + renewEgov;
-          const renewTotal = renewPaidColumn + (itemToDisplay.renewPending || 0);
-
-          // Male/Female: License Issued may be provided separately; PAID = malePaid / femalePaid (no duplication)
-          const maleLicenseIssued = Number(itemToDisplay.maleIssued ?? itemToDisplay.malePaid ?? 0);
-          const malePaidColumn = Number(itemToDisplay.malePaid || 0);
-          const maleTotal = malePaidColumn + (itemToDisplay.malePending || 0);
-
-          const femaleLicenseIssued = Number(itemToDisplay.femaleIssued ?? itemToDisplay.femalePaid ?? 0);
-          const femalePaidColumn = Number(itemToDisplay.femalePaid || 0);
-          const femaleTotal = femalePaidColumn + (itemToDisplay.femalePending || 0);
-
-          dataCells.push(formatNumberForDisplay(newLicenseIssued), formatNumberForDisplay(newPaidColumn), formatNumberForDisplay(newEgov), formatNumberForDisplay(itemToDisplay.newPending || 0), { content: formatNumberForDisplay(newTotal), styles: { fontStyle: 'bold', fillColor: '#f1f5f9' } });
-          dataCells.push(formatNumberForDisplay(renewLicenseIssued), formatNumberForDisplay(renewPaidColumn), formatNumberForDisplay(renewEgov), formatNumberForDisplay(itemToDisplay.renewPending || 0), { content: formatNumberForDisplay(renewTotal), styles: { fontStyle: 'bold', fillColor: '#f1f5f9' } });
-          dataCells.push(formatNumberForDisplay(maleLicenseIssued), formatNumberForDisplay(malePaidColumn), formatNumberForDisplay(itemToDisplay.malePending || 0), { content: formatNumberForDisplay(maleTotal), styles: { fontStyle: 'bold', fillColor: '#f1f5f9' } });
-          dataCells.push(formatNumberForDisplay(femaleLicenseIssued), formatNumberForDisplay(femalePaidColumn), formatNumberForDisplay(itemToDisplay.femalePending || 0), { content: formatNumberForDisplay(femaleTotal), styles: { fontStyle: 'bold', fillColor: '#f1f5f9' } });
-            // Append Total Licensed Issued (New + Renewal)
-            // Commented out as requested — exclude the "Total Licensed Issued" column from PDF output
-            // dataCells.push({ content: formatNumberForDisplay(newLicenseIssued + renewLicenseIssued), styles: { fontStyle: 'bold', fillColor: '#f1f5f9' } });
+            const newIssued = getLicenseIssued(itemToDisplay, NEW_LICENSE_KEYS, Number(itemToDisplay.newPaid || 0));
+            const newPaidWithEgov = (itemToDisplay.newPaid || 0) + (itemToDisplay.newPaidViaEgov || 0);
+            const renewIssued = getLicenseIssued(itemToDisplay, RENEW_LICENSE_KEYS, Number(itemToDisplay.renewPaid || 0));
+            const renewPaidWithEgov = (itemToDisplay.renewPaid || 0) + (itemToDisplay.renewPaidViaEgov || 0);
+            dataCells.push(formatNumberForDisplay(newIssued + renewIssued));
+            dataCells.push(formatNumberForDisplay(newIssued), formatNumberForDisplay(newPaidWithEgov), formatNumberForDisplay(itemToDisplay.newPaidViaEgov), formatNumberForDisplay(itemToDisplay.newPending), { content: formatNumberForDisplay(newPaidWithEgov + (itemToDisplay.newPending || 0)), styles: { fontStyle: 'bold', fillColor: '#f1f5f9' } });
+            dataCells.push(formatNumberForDisplay(renewIssued), formatNumberForDisplay(renewPaidWithEgov), formatNumberForDisplay(itemToDisplay.renewPaidViaEgov), formatNumberForDisplay(itemToDisplay.renewPending), { content: formatNumberForDisplay(renewPaidWithEgov + (itemToDisplay.renewPending || 0)), styles: { fontStyle: 'bold', fillColor: '#f1f5f9' } });
+            dataCells.push(formatNumberForDisplay(getLicenseIssued(itemToDisplay, MALE_LICENSE_KEYS, Number(itemToDisplay.malePaid || 0))), formatNumberForDisplay(itemToDisplay.malePaid), formatNumberForDisplay(itemToDisplay.malePending), { content: formatNumberForDisplay((itemToDisplay.malePaid || 0) + (itemToDisplay.malePending || 0)), styles: { fontStyle: 'bold', fillColor: '#f1f5f9' } });
+            dataCells.push(formatNumberForDisplay(getLicenseIssued(itemToDisplay, FEMALE_LICENSE_KEYS, Number(itemToDisplay.femalePaid || 0))), formatNumberForDisplay(itemToDisplay.femalePaid), formatNumberForDisplay(itemToDisplay.femalePending), { content: formatNumberForDisplay((itemToDisplay.femalePaid || 0) + (itemToDisplay.femalePending || 0)), styles: { fontStyle: 'bold', fillColor: '#f1f5f9' } });
         } else if (moduleLabel === 'Barangay Clearance') {
-          const bcVal = Number(lguInfo?.totalCount ?? itemToDisplay.totalCount ?? lguInfo?.sum?.totalCount ?? 0);
-          // push a dedicated row for Barangay Clearance: Region, LGU, Total Issued
-          dataRows.push([{ content: regionDisplay, styles: { valign: 'middle' } }, { content: lguText, styles: { halign: 'left' } }, formatNumberForDisplay(bcVal)]);
-          return; // already pushed correct row; skip the generic push below
+            dataCells.push(formatNumberForDisplay(itemToDisplay.totalCount));
         } else {
-          const paidKey = moduleLabel === 'Building Permit' ? 'buildingPaid' : 'coPaid';
-          const pendingKey = moduleLabel === 'Building Permit' ? 'buildingPending' : 'coPending';
-          // Compute explicit License Issued and PAID aggregate (License Issued + For Issuance + eGOV)
-            const licenseIssued = Number(itemToDisplay.newLicenseIssued ?? itemToDisplay.newIssued ?? itemToDisplay.newPaid ?? itemToDisplay[paidKey] ?? 0);
-            const forIssuance = Number(itemToDisplay.newPaid ?? itemToDisplay[paidKey] ?? 0);
-            const egov = Number(itemToDisplay.newPaidViaEgov ?? 0);
-            const paidOnly = forIssuance + egov; // include egov into PAID summary but do not show separate column for Building Permit
-            const pending = Number(itemToDisplay[pendingKey] ?? itemToDisplay.newPending ?? 0);
-            // Present columns to match table order: Citizens Served | License Issued | PAID (For Issuance + eGOV) | ONGOING | Total
-            const citizensVal = formatNumberForDisplay(lguInfo?.totalCitizensServed ?? itemToDisplay.totalCitizensServed ?? 0);
-            if (moduleLabel === 'Building Permit' || moduleLabel === 'Certificate of Occupancy') {
-              // Do not render separate eGOV column for Building Permit or Certificate of Occupancy; PAID includes eGOV
-              dataRows.push([{ content: regionDisplay, styles: { valign: 'middle' } }, { content: lguText, styles: { halign: 'left' } }, citizensVal, formatNumberForDisplay(licenseIssued), formatNumberForDisplay(paidOnly), formatNumberForDisplay(pending), { content: formatNumberForDisplay(paidOnly + pending), styles: { fontStyle: 'bold', fillColor: '#f1f5f9' } }]);
-              return;
-            }
-            // (Other modules would display separate eGOV column)
-            dataCells.push(formatNumberForDisplay(licenseIssued), formatNumberForDisplay(paidOnly), formatNumberForDisplay(egov), formatNumberForDisplay(pending), { content: formatNumberForDisplay(paidOnly + pending), styles: { fontStyle: 'bold', fillColor: '#f1f5f9' } });
-            // We'll insert citizens cell separately (so region and LGU remain the first two cells)
-            dataRows.push([{ content: regionDisplay, styles: { valign: 'middle' } }, { content: lguText, styles: { halign: 'left' } }, citizensVal, ...dataCells]);
-            return; // already pushed row; skip the default push below
+            const { licenseIssued, paid, pending } = getSimplePermitCounts(itemToDisplay, moduleLabel);
+            dataCells.push(formatNumberForDisplay(licenseIssued), formatNumberForDisplay(paid), formatNumberForDisplay(pending), { content: formatNumberForDisplay(paid + pending), styles: { fontStyle: 'bold', fillColor: '#f1f5f9' } });
         }
-            dataRows.push([{ content: regionDisplay, styles: { valign: 'middle' } }, { content: lguText, styles: { halign: 'left' } }, formatNumberForDisplay(lguInfo?.totalCitizensServed ?? itemToDisplay.totalCitizensServed ?? 0), ...dataCells]);
+        if (moduleLabel === 'Barangay Clearance') {
+            dataRows.push([formatNumberForDisplay(index + 1), { content: regionDisplay, styles: { valign: 'middle' } }, { content: lguText, styles: { halign: 'left' } }, ...dataCells]);
+        } else {
+            dataRows.push([formatNumberForDisplay(index + 1), { content: regionDisplay, styles: { valign: 'middle' } }, { content: lguText, styles: { halign: 'left' } }, formatNumberForDisplay(getCitizensServed(lguInfo)), ...dataCells]);
+        }
     });
 
     let grandTotalRow: any[] | null = null;
     if (allRows.length > 0) {
     if (isComplex) {
-      // Match table footer calculations (do NOT double-count license-issued inside PAID totals):
-      // License Issued column = explicit newLicenseIssued (or fallback to newPaid)
-      // PAID column (summary) = sum of For Issuance (newPaid) + eGOV (newGeoPay) — licenseIssued is shown separately
-      const newLicenseIssuedTotal = totals.newLicenseIssued;
-      const newPaidOnlyTotal = totals.newLicenseIssued + totals.newGeoPay; // PAID = License Issued + eGOVPay
-      const newTotalDisplay = newPaidOnlyTotal + totals.newPending;
-
-      const renewLicenseIssuedTotal = totals.renewalLicenseIssued;
-      const renewPaidOnlyTotal = totals.renewalLicenseIssued + totals.renewalGeoPay;
-      const renewTotalDisplay = renewPaidOnlyTotal + totals.renewalPending;
-
-      const maleLicenseIssuedTotal = totals.maleIssued; // equals totals.malePaid in table logic
-      const malePaidOnlyTotal = totals.malePaid;
-      const maleTotalDisplay = malePaidOnlyTotal + totals.malePending;
-
-      const femaleLicenseIssuedTotal = totals.femaleIssued; // equals totals.femalePaid in table logic
-      const femalePaidOnlyTotal = totals.femalePaid;
-      const femaleTotalDisplay = femalePaidOnlyTotal + totals.femalePending;
-
-      grandTotalRow = [ { content: `GRAND TOTAL\n(${dateRangeLabel})`, colSpan: 2 },
-            formatNumberForDisplay((totals as any).totalCitizensServed || 0),
-            formatNumberForDisplay(newLicenseIssuedTotal), formatNumberForDisplay(newPaidOnlyTotal), formatNumberForDisplay(totals.newGeoPay), formatNumberForDisplay(totals.newPending), formatNumberForDisplay(newTotalDisplay),
-                formatNumberForDisplay(renewLicenseIssuedTotal), formatNumberForDisplay(renewPaidOnlyTotal), formatNumberForDisplay(totals.renewalGeoPay), formatNumberForDisplay(totals.renewalPending), formatNumberForDisplay(renewTotalDisplay),
-                formatNumberForDisplay(maleLicenseIssuedTotal), formatNumberForDisplay(malePaidOnlyTotal), formatNumberForDisplay(totals.malePending), formatNumberForDisplay(maleTotalDisplay),
-                formatNumberForDisplay(femaleLicenseIssuedTotal), formatNumberForDisplay(femalePaidOnlyTotal), formatNumberForDisplay(totals.femalePending), formatNumberForDisplay(femaleTotalDisplay)
+      // Prefer explicit issued totals when available; otherwise use the paid count.
+      const licenseIssuedNewTotal = totals.newIssued;
+      const licenseIssuedRenewalTotal = totals.renewalIssued;
+            grandTotalRow = [ { content: `GRAND TOTAL\n(${dateRangeLabel})`, colSpan: 3 },
+                formatNumberForDisplay(totals.citizensServed),
+                formatNumberForDisplay(licenseIssuedNewTotal + licenseIssuedRenewalTotal),
+                formatNumberForDisplay(licenseIssuedNewTotal), formatNumberForDisplay(totals.newPaid + totals.newGeoPay), formatNumberForDisplay(totals.newGeoPay), formatNumberForDisplay(totals.newPending), formatNumberForDisplay(totals.newPaid + totals.newGeoPay + totals.newPending),
+                formatNumberForDisplay(licenseIssuedRenewalTotal), formatNumberForDisplay(totals.renewalPaid + totals.renewalGeoPay), formatNumberForDisplay(totals.renewalGeoPay), formatNumberForDisplay(totals.renewalPending), formatNumberForDisplay(totals.renewalPaid + totals.renewalGeoPay + totals.renewalPending),
+                formatNumberForDisplay(totals.maleIssued), formatNumberForDisplay(totals.malePaid), formatNumberForDisplay(totals.malePending), formatNumberForDisplay(totals.malePaid + totals.malePending),
+                formatNumberForDisplay(totals.femaleIssued), formatNumberForDisplay(totals.femalePaid), formatNumberForDisplay(totals.femalePending), formatNumberForDisplay(totals.femalePaid + totals.femalePending)
             ];
-            // Append GRAND TOTAL for Total Licensed Issued (New + Renewal)
-            // Commented out as requested — exclude the "Total Licensed Issued" column from PDF grand total
-            // grandTotalRow.push(formatNumberForDisplay(newLicenseIssuedTotal + renewLicenseIssuedTotal));
         } else if (moduleLabel === 'Barangay Clearance') {
-            grandTotalRow = [{ content: `GRAND TOTAL\n(${dateRangeLabel})`, colSpan: 2 }, formatNumberForDisplay(totals.totalCount)];
+            grandTotalRow = [{ content: `GRAND TOTAL\n(${dateRangeLabel})`, colSpan: 3 }, formatNumberForDisplay(totals.totalCount)];
         } else {
-          // Column order: after LGU comes Citizens Served, then License Issued, PAID, ONGOING, Total
-          grandTotalRow = [{ content: `GRAND TOTAL\n(${dateRangeLabel})`, colSpan: 2 }, formatNumberForDisplay((totals as any).totalCitizensServed || 0), formatNumberForDisplay(totals.licenseIssued), formatNumberForDisplay(totals.paid), formatNumberForDisplay(totals.pending), formatNumberForDisplay(totals.paid + totals.pending)];
+            grandTotalRow = [{ content: `GRAND TOTAL\n(${dateRangeLabel})`, colSpan: 3 }, formatNumberForDisplay(totals.citizensServed), formatNumberForDisplay(totals.licenseIssued), formatNumberForDisplay(totals.paid), formatNumberForDisplay(totals.pending), formatNumberForDisplay(totals.paid + totals.pending)];
         }
     }
 
@@ -531,24 +460,24 @@ export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal)
             theme: 'grid',
             margin: { top: 90, left: 30, right: 30 },
             tableWidth: 'auto',
-            styles: { font: 'helvetica', fontSize: isComplex ? 8.5 : 7, cellPadding: { top: 4, right: 5, bottom: 4, left: 5 }, lineWidth: 0.4, lineColor: '#e2e8f0', overflow: 'linebreak' },
-            headStyles: { fontStyle: 'bold', fillColor: '#9ec6f7', textColor: '#000000', lineWidth: 0.5, lineColor: '#a5b4fc', halign: 'center', valign: 'middle', fontSize: 7.5 },
+            styles: { font: 'helvetica', fontSize: isComplex ? 8 : 7, cellPadding: { top: isComplex ? 4.5 : 4, right: 5, bottom: isComplex ? 4.5 : 4, left: 5 }, lineWidth: 0.4, lineColor: '#e2e8f0', overflow: 'linebreak' },
+            headStyles: { fontStyle: 'bold', fillColor: '#9ec6f7', textColor: '#000000', lineWidth: 0.5, lineColor: '#a5b4fc', halign: 'center', valign: 'middle', fontSize: isComplex ? 8.2 : 7.5 },
             bodyStyles: { fillColor: '#FFFFFF', textColor: '#111827' },
             alternateRowStyles: { fillColor: '#f8fafc' },
       columnStyles: {
-    // Keep REGION narrow and give LGU more room for complex modules (Business/Working Permit)
-    0: { cellWidth: 60, halign: 'center' },
-    1: isComplex ? { cellWidth: 115, halign: 'left', fontStyle: 'bold' } : { fontStyle: 'bold' },
+    0: { cellWidth: 28, halign: 'center' },
+    1: { cellWidth: 55, halign: 'center' },
+    2: isComplex ? { cellWidth: 140, halign: 'left', fontStyle: 'bold' } : { cellWidth: 150, halign: 'left', fontStyle: 'bold' },
       },
             didParseCell: (data: any) => {
                 const isGrandTotalRow = data.row?.raw?.[0]?.content?.startsWith('GRAND TOTAL');
                 if (data.section === 'head') {
                     if (data.row.index === 1) {
                         data.cell.styles.fillColor = '#dbeafe'; // bg-blue-100
-                        data.cell.styles.fontSize = 6.5;
+                        data.cell.styles.fontSize = isComplex ? 7.2 : 6.5;
                         data.cell.styles.cellPadding = 3;
                     }
-                    if (data.column.index >= 2) data.cell.styles.halign = 'center';
+                    if (data.column.index >= 3) data.cell.styles.halign = 'center';
                 } else if (data.section === 'body') {
                     if (isGrandTotalRow) {
                         data.cell.styles.fillColor = '#1e293b';
@@ -558,14 +487,28 @@ export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal)
                         if (data.column.index === 0) data.cell.styles.halign = 'left';
                         else data.cell.styles.halign = 'right';
                     } else {
-                        if (data.column.index === 0) data.cell.styles.fillColor = '#FFFFFF';
-                        if (data.column.index === 1) data.cell.styles.halign = 'left';
-                        if (data.column.index >= 2) data.cell.styles.halign = 'right';
+                        if (data.column.index === 1) data.cell.styles.fillColor = '#FFFFFF';
+                        if (data.column.index === 2) data.cell.styles.halign = 'left';
+                        if (data.column.index !== 2) data.cell.styles.halign = 'right';
+                        const importantBlueColumns = moduleLabel === 'Barangay Clearance'
+                            ? [3]
+                            : isComplex
+                                ? [4]
+                                : [4, 7];
+                        const importantGreenColumns = !isComplex && moduleLabel !== 'Barangay Clearance' ? [5] : [];
+                        if (importantBlueColumns.includes(data.column.index)) {
+                            data.cell.styles.fillColor = '#eff6ff';
+                            data.cell.styles.fontStyle = 'bold';
+                        }
+                        if (importantGreenColumns.includes(data.column.index)) {
+                            data.cell.styles.fillColor = '#ecfdf5';
+                            data.cell.styles.fontStyle = 'bold';
+                        }
                     }
                 }
             },
             willDrawCell: (data: any) => {
-              if (data.section !== 'body' || data.column.index !== 0 || (data.cell.colSpan && data.cell.colSpan > 1)) return;
+              if (data.section !== 'body' || data.column.index !== 1 || (data.cell.colSpan && data.cell.colSpan > 1)) return;
               data.cell.styles.fillColor = WHITE;
               (data.cell.styles as any).lineWidth = { top: 0, right: 0.5, bottom: 0, left: 0.5 };
               (data.cell.styles as any).lineColor = lineColor;
@@ -574,7 +517,7 @@ export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal)
               data.cell.text = [''];
             },
             didDrawCell: (data: any) => {
-              if (data.section !== 'body' || data.column.index !== 0 || (data.cell.colSpan && data.cell.colSpan > 1)) return;
+              if (data.section !== 'body' || data.column.index !== 1 || (data.cell.colSpan && data.cell.colSpan > 1)) return;
               const page = data.table.pageNumber as number;
               const raw = data.cell.raw as any;
               const text: string = (raw && raw._regionText) || (raw && raw.content) || '';
@@ -596,7 +539,7 @@ export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal)
         });
     };
 
-    const rowsPerPage = isComplex ? (isDayMode ? 15 : 15) : 26;
+    const rowsPerPage = 20;
     if (!rowsPerPage || dataRows.length <= rowsPerPage) {
         renderChunk(dataRows, true);
     } else {
@@ -617,7 +560,7 @@ export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal)
         addHeader(doc, finalParams, p, pageCount, base64Logo);
     }
     if (signal?.aborted) { const e: any = new Error('canceled'); e.name = 'CanceledError'; throw e; }
-    doc.save(`${safeFilename}.pdf`);
+    doc.save(buildReportFileName(moduleLabel, dateRangeLabel, 'pdf'));
 };
 
 // --- FIX: Added ExcelParams interface definition ---
@@ -625,11 +568,11 @@ interface ExcelParams {
   data: any[];
   moduleLabel: string;
   isDayMode: boolean;
-  dateRangeLabel?: string;
+  dateRangeLabel: string;
 }
 export const exportReportToExcel = (params: ExcelParams, signal?: AbortSignal) => {
     const baseData = params.data.filter((lgu: any) => !lgu.hasError);
-    const exportableData = params.moduleLabel === 'Certificate of Occupancy' ? normalizeCertificateOfOccupancyData(baseData) : baseData;
+    const exportableData = normalizeReportData(baseData, params.moduleLabel);
     const { moduleLabel, isDayMode, dateRangeLabel } = params;
     const throwIfAborted = () => { if (signal?.aborted) { const e: any = new Error('canceled'); e.name = 'CanceledError'; throw e; } };
     throwIfAborted();
@@ -646,44 +589,41 @@ export const exportReportToExcel = (params: ExcelParams, signal?: AbortSignal) =
             const results = lgu.monthlyResults?.length > 0 ? lgu.monthlyResults : [{ month: lgu.months?.[0] || '' }];
             return results.map((monthData: any) => ({ lguInfo: lgu, itemToDisplay: monthData, periodLabel: getPeriodLabel(lgu, true, monthData.month) }));
         } else {
-          const aggregatedItem = (lgu.monthlyResults || []).reduce((acc: any, month: any) => {
-            Object.keys(month).forEach((key: string) => {
-              const val = month[key];
-              if (typeof val === 'number' || (!isNaN(Number(val)) && val !== null && val !== '')) {
-                acc[key] = (acc[key] || 0) + Number(val);
-              }
-            });
-            return acc;
-          }, {});
-          return [{ lguInfo: lgu, itemToDisplay: aggregatedItem, periodLabel: getPeriodLabel(lgu, false) }];
+            const aggregatedItem = (lgu.monthlyResults || []).reduce((acc: any, month: any) => { Object.keys(month).forEach((key: string) => { if (typeof month[key] === 'number') { acc[key] = (acc[key] || 0) + month[key]; } }); return acc; }, {});
+            return [{ lguInfo: lgu, itemToDisplay: aggregatedItem, periodLabel: getPeriodLabel(lgu, false) }];
         }
     });
 
     if (isComplex) {
-      headers = [
-      ['Region', 'LGU', 'Citizens Served', 'New', null, null, null, null, 'Renewal', null, null, null, null, 'Male', null, null, null, 'Female', null, null, null/*, 'Total Licensed Issued'*/],
-      [null, null, null, 'License Issued', 'PAID\n(For Issuance to License Issued)', 'PAID (eGOVPay)\n', 'ONGOING\n(For verification to For Payment)', 'Total', 'License Issued', 'PAID\n(For Issuance to License Issued)', 'PAID (eGOVPay)\n', 'ONGOING\n(For verification to For Payment)', 'Total', 'License Issued', 'PAID\n(For Issuance to License Issued)', 'ONGOING\n(For verification to For Payment)', 'Total', 'License Issued', 'PAID\n(For Issuance to License Issued)', 'ONGOING\n(For verification to For Payment)', 'Total'/*, null*/]
-      ];
+        headers = [
+            ['#', 'Region', 'LGU', 'Citizens Served', 'Total License Issued\n(New & Renew)', 'New', null, null, null, null, 'Renewal', null, null, null, null, 'Male', null, null, null, 'Female', null, null, null],
+            [null, null, null, null, null, 'License Issued', 'PAID\n(For Issuance and License Issued)', 'PAID (eGOVPay)\n', 'ONGOING\n(For Payment)', 'Total', 'License Issued', 'PAID\n(For Issuance and License Issued)', 'PAID (eGOVPay)\n', 'ONGOING\n(For Payment)', 'Total', 'License Issued', 'PAID\n(For Issuance and License Issued)', 'ONGOING\n(For Payment)', 'Total', 'License Issued', 'PAID\n(For Issuance and License Issued)', 'ONGOING\n(For Payment)', 'Total']
+        ];
+    } else if (moduleLabel === 'Building Permit' || moduleLabel === 'Certificate of Occupancy') {
+        const title = moduleLabel === 'Building Permit' ? 'Building Permits' : 'Certificate of Occupancy';
+        headers = [
+            ['#', 'Region', 'LGU', 'Citizens Served', title, null, null, null],
+            [null, null, null, null, 'License Issued', 'PAID\n(For Issuance and License Issued)', 'ONGOING\n(For Payment)', 'Total']
+        ];
     } else {
-      headers = [
-        moduleLabel === 'Barangay Clearance'
-          ? ['Region', 'LGU', 'Total Results']
-                : (moduleLabel === 'Building Permit' || moduleLabel === 'Certificate of Occupancy')
-                ? ['Region', 'LGU', 'Citizens Served', 'License Issued', 'Paid\n(For Issuance to License Issued)', 'Ongoing\n(For verification to For Payment)', 'Total']
-            : ['Region', 'LGU', 'Paid\n(For Issuance to License Issued)', 'Ongoing\n(For verification to For Payment)']
-      ];
+        headers = [
+            moduleLabel === 'Barangay Clearance'
+                ? ['#', 'Region', 'LGU', 'Total Issued']
+                : ['#', 'Region', 'LGU', 'Paid\n(For Issuance and License Issued)', 'Ongoing\n(For Payment)']
+        ];
     }
 
     let currentRowIndex = headers.length;
     let lastRegion: string | null = null;
     let regionStartIndex = currentRowIndex;
 
-    allRows.forEach((rowData: any) => {
+    allRows.forEach((rowData: any, index: number) => {
         const { lguInfo, itemToDisplay, periodLabel } = rowData;
         let row: any[] = [];
         const canonicalRegion = normalizeRegionKey(lguInfo.region);
+        row.push(index + 1);
         if (canonicalRegion !== lastRegion) {
-            if (lastRegion !== null && currentRowIndex > regionStartIndex + 1) { merges.push({ s: { r: regionStartIndex, c: 0 }, e: { r: currentRowIndex - 1, c: 0 } }); }
+            if (lastRegion !== null && currentRowIndex > regionStartIndex + 1) { merges.push({ s: { r: regionStartIndex, c: 1 }, e: { r: currentRowIndex - 1, c: 1 } }); }
             lastRegion = canonicalRegion;
             regionStartIndex = currentRowIndex;
             row.push(getRegionDisplayName(canonicalRegion));
@@ -691,53 +631,27 @@ export const exportReportToExcel = (params: ExcelParams, signal?: AbortSignal) =
             row.push(null);
         }
         row.push(`${lguInfo.lgu} ${periodLabel}`);
+        if (moduleLabel !== 'Barangay Clearance') {
+            row.push(formatNumberForExcel(getCitizensServed(lguInfo)));
+        }
 
         if (isComplex) {
-          // Match table calculations but avoid double-counting in Excel too:
-            // Prefer itemToDisplay values but fall back to lguInfo or lguInfo.sum when missing
-            const srcNew = itemToDisplay.newLicenseIssued ?? itemToDisplay.newIssued ?? lguInfo?.newLicenseIssued ?? lguInfo?.newIssued ?? itemToDisplay.newPaid ?? lguInfo?.newPaid ?? 0;
-            const newLicenseIssued = Number(srcNew);
-            const newEgov = Number(itemToDisplay.newPaidViaEgov ?? lguInfo?.newPaidViaEgov ?? 0);
-            const newPaidColumn = newLicenseIssued + newEgov; // PAID = License Issued + eGOVPay
-            const newTotal = newPaidColumn + Number(itemToDisplay.newPending ?? lguInfo?.newPending ?? 0);
-
-            const srcRenew = itemToDisplay.renewLicenseIssued ?? itemToDisplay.renewIssued ?? lguInfo?.renewLicenseIssued ?? lguInfo?.renewIssued ?? itemToDisplay.renewPaid ?? lguInfo?.renewPaid ?? 0;
-            const renewLicenseIssued = Number(srcRenew);
-            const renewEgov = Number(itemToDisplay.renewPaidViaEgov ?? lguInfo?.renewPaidViaEgov ?? 0);
-            const renewPaidColumn = renewLicenseIssued + renewEgov;
-            const renewTotal = renewPaidColumn + Number(itemToDisplay.renewPending ?? lguInfo?.renewPending ?? 0);
-
-            const maleLicenseIssued = Number(itemToDisplay.maleIssued ?? lguInfo?.maleIssued ?? itemToDisplay.malePaid ?? lguInfo?.malePaid ?? 0);
-            const malePaidColumn = Number(itemToDisplay.malePaid ?? lguInfo?.malePaid ?? 0);
-            const maleTotal = malePaidColumn + Number(itemToDisplay.malePending ?? lguInfo?.malePending ?? 0);
-
-            const femaleLicenseIssued = Number(itemToDisplay.femaleIssued ?? lguInfo?.femaleIssued ?? itemToDisplay.femalePaid ?? lguInfo?.femalePaid ?? 0);
-            const femalePaidColumn = Number(itemToDisplay.femalePaid ?? lguInfo?.femalePaid ?? 0);
-            const femaleTotal = femalePaidColumn + Number(itemToDisplay.femalePending ?? lguInfo?.femalePending ?? 0);
-
-            const citizensVal = formatNumberForExcel(lguInfo?.totalCitizensServed ?? itemToDisplay.totalCitizensServed ?? lguInfo?.sum?.totalCitizensServed ?? 0);
-            row.push(citizensVal, formatNumberForExcel(newLicenseIssued), formatNumberForExcel(newPaidColumn), formatNumberForExcel(newEgov), formatNumberForExcel(Number(itemToDisplay.newPending ?? lguInfo?.newPending ?? 0)), newTotal);
-            row.push(formatNumberForExcel(renewLicenseIssued), formatNumberForExcel(renewPaidColumn), formatNumberForExcel(renewEgov), formatNumberForExcel(Number(itemToDisplay.renewPending ?? lguInfo?.renewPending ?? 0)), renewTotal);
-            row.push(formatNumberForExcel(maleLicenseIssued), formatNumberForExcel(malePaidColumn), formatNumberForExcel(Number(itemToDisplay.malePending ?? lguInfo?.malePending ?? 0)), maleTotal);
-            row.push(formatNumberForExcel(femaleLicenseIssued), formatNumberForExcel(femalePaidColumn), formatNumberForExcel(Number(itemToDisplay.femalePending ?? lguInfo?.femalePending ?? 0)), femaleTotal);
-            // Append Total Licensed Issued (New + Renewal)
-            // Commented out as requested — exclude the "Total Licensed Issued" column from Excel output
-            // row.push(newLicenseIssued + renewLicenseIssued);
+            const newIssued = getLicenseIssued(itemToDisplay, NEW_LICENSE_KEYS, Number(itemToDisplay.newPaid || 0));
+            const newPaidWithEgov = (itemToDisplay.newPaid || 0) + (itemToDisplay.newPaidViaEgov || 0);
+            const renewIssued = getLicenseIssued(itemToDisplay, RENEW_LICENSE_KEYS, Number(itemToDisplay.renewPaid || 0));
+            const renewPaidWithEgov = (itemToDisplay.renewPaid || 0) + (itemToDisplay.renewPaidViaEgov || 0);
+            row.push(formatNumberForExcel(newIssued + renewIssued));
+            row.push(formatNumberForExcel(newIssued), formatNumberForExcel(newPaidWithEgov), formatNumberForExcel(itemToDisplay.newPaidViaEgov), formatNumberForExcel(itemToDisplay.newPending), newPaidWithEgov + (itemToDisplay.newPending || 0));
+            row.push(formatNumberForExcel(renewIssued), formatNumberForExcel(renewPaidWithEgov), formatNumberForExcel(itemToDisplay.renewPaidViaEgov), formatNumberForExcel(itemToDisplay.renewPending), renewPaidWithEgov + (itemToDisplay.renewPending || 0));
+            const maleIssued = getLicenseIssued(itemToDisplay, MALE_LICENSE_KEYS, Number(itemToDisplay.malePaid || 0));
+            row.push(formatNumberForExcel(maleIssued), formatNumberForExcel(itemToDisplay.malePaid), formatNumberForExcel(itemToDisplay.malePending), (itemToDisplay.malePaid || 0) + (itemToDisplay.malePending || 0));
+            const femaleIssued = getLicenseIssued(itemToDisplay, FEMALE_LICENSE_KEYS, Number(itemToDisplay.femalePaid || 0));
+            row.push(formatNumberForExcel(femaleIssued), formatNumberForExcel(itemToDisplay.femalePaid), formatNumberForExcel(itemToDisplay.femalePending), (itemToDisplay.femalePaid || 0) + (itemToDisplay.femalePending || 0));
         } else if (moduleLabel === 'Barangay Clearance') {
-          const bcVal = lguInfo?.totalCount ?? itemToDisplay.totalCount ?? lguInfo?.sum?.totalCount ?? 0;
-          row.push(formatNumberForExcel(bcVal));
+            row.push(formatNumberForExcel(itemToDisplay.totalCount));
         } else if (moduleLabel === 'Building Permit' || moduleLabel === 'Certificate of Occupancy') {
-          const paidKey = moduleLabel === 'Building Permit' ? 'buildingPaid' : 'coPaid';
-          const pendingKey = moduleLabel === 'Building Permit' ? 'buildingPending' : 'coPending';
-          // License Issued + For Issuance + eGOV should be considered in the PAID column
-          const licenseIssued = Number(itemToDisplay.newLicenseIssued ?? itemToDisplay.newIssued ?? itemToDisplay.newPaid ?? itemToDisplay[paidKey] ?? 0);
-          const forIssuance = Number(itemToDisplay.newPaid ?? itemToDisplay[paidKey] ?? 0);
-          const egov = Number(itemToDisplay.newPaidViaEgov ?? 0);
-          const paidOnly = forIssuance + egov;
-          const pending = Number(itemToDisplay[pendingKey] ?? itemToDisplay.newPending ?? 0);
-          const citizensVal = formatNumberForExcel(lguInfo?.totalCitizensServed ?? itemToDisplay.totalCitizensServed ?? 0);
-          // Order: Citizens Served, License Issued, PAID, ONGOING, Total
-          row.push(citizensVal, formatNumberForExcel(licenseIssued), formatNumberForExcel(paidOnly), formatNumberForExcel(pending), paidOnly + pending);
+            const { licenseIssued, paid, pending } = getSimplePermitCounts(itemToDisplay, moduleLabel);
+            row.push(formatNumberForExcel(licenseIssued), formatNumberForExcel(paid), formatNumberForExcel(pending), paid + pending);
         } else {
             const paidKey = moduleLabel === 'Building Permit' ? 'buildingPaid' : 'coPaid';
             const pendingKey = moduleLabel === 'Building Permit' ? 'buildingPending' : 'coPending';
@@ -747,81 +661,48 @@ export const exportReportToExcel = (params: ExcelParams, signal?: AbortSignal) =
         currentRowIndex++;
     });
 
-    if (lastRegion !== null && currentRowIndex > regionStartIndex + 1) { merges.push({ s: { r: regionStartIndex, c: 0 }, e: { r: currentRowIndex - 1, c: 0 } }); }
+    if (lastRegion !== null && currentRowIndex > regionStartIndex + 1) { merges.push({ s: { r: regionStartIndex, c: 1 }, e: { r: currentRowIndex - 1, c: 1 } }); }
 
     if (allRows.length > 0) {
-      let totalRow: any[];
+        let totalRow: any[];
     if (isComplex) {
-      // Match table footer calculations: do NOT double-count license-issued inside PAID totals.
-      const newLicenseIssuedTotal = totals.newLicenseIssued;
-      const newPaidOnlyTotal = totals.newPaid + totals.newGeoPay;
-      const newTotalDisplay = newPaidOnlyTotal + totals.newPending;
-
-      const renewLicenseIssuedTotal = totals.renewalLicenseIssued;
-      const renewPaidOnlyTotal = totals.renewalPaid + totals.renewalGeoPay;
-      const renewTotalDisplay = renewPaidOnlyTotal + totals.renewalPending;
-
-      const maleLicenseIssuedTotal = totals.maleIssued;
-      const malePaidOnlyTotal = totals.malePaid;
-      const maleTotalDisplay = malePaidOnlyTotal + totals.malePending;
-
-      const femaleLicenseIssuedTotal = totals.femaleIssued;
-      const femalePaidOnlyTotal = totals.femalePaid;
-      const femaleTotalDisplay = femalePaidOnlyTotal + totals.femalePending;
-
-            totalRow = [ 'GRAND TOTAL', null, (totals as any).totalCitizensServed || 0, newLicenseIssuedTotal, newPaidOnlyTotal, totals.newGeoPay, totals.newPending, newTotalDisplay,
-              renewLicenseIssuedTotal, renewPaidOnlyTotal, totals.renewalGeoPay, totals.renewalPending, renewTotalDisplay,
-              maleLicenseIssuedTotal, malePaidOnlyTotal, totals.malePending, maleTotalDisplay,
-              femaleLicenseIssuedTotal, femalePaidOnlyTotal, totals.femalePending, femaleTotalDisplay ];
-        // Append GRAND TOTAL for Total Licensed Issued (New + Renewal)
-        // Commented out as requested — exclude the "Total Licensed Issued" column from Excel grand total
-        // totalRow.push(newLicenseIssuedTotal + renewLicenseIssuedTotal);
-        merges.push({ s: { r: currentRowIndex, c: 0 }, e: { r: currentRowIndex, c: 1 } });
+      // Use the same issued totals shown in the rows for grand totals.
+      const licenseIssuedNewTotal = totals.newIssued;
+      const licenseIssuedRenewalTotal = totals.renewalIssued;
+            totalRow = [ 'GRAND TOTAL', null, null, totals.citizensServed, licenseIssuedNewTotal + licenseIssuedRenewalTotal, licenseIssuedNewTotal, totals.newPaid + totals.newGeoPay, totals.newGeoPay, totals.newPending, (totals.newPaid + totals.newGeoPay + totals.newPending), licenseIssuedRenewalTotal, totals.renewalPaid + totals.renewalGeoPay, totals.renewalGeoPay, totals.renewalPending, (totals.renewalPaid + totals.renewalGeoPay + totals.renewalPending), totals.maleIssued, totals.malePaid, totals.malePending, (totals.malePaid + totals.malePending), totals.femaleIssued, totals.femalePaid, totals.femalePending, (totals.femalePaid + totals.femalePending) ];
+            merges.push({ s: { r: currentRowIndex, c: 0 }, e: { r: currentRowIndex, c: 2 } });
         } else {
             if (moduleLabel === 'Barangay Clearance') {
-                totalRow = ['GRAND TOTAL', null, totals.totalCount];
+                totalRow = ['GRAND TOTAL', null, null, totals.totalCount];
             } else if (moduleLabel === 'Building Permit' || moduleLabel === 'Certificate of Occupancy') {
-              // Column order: Region, LGU, Citizens Served, License Issued, PAID, ONGOING, Total
-              totalRow = [ 'GRAND TOTAL', null, (totals as any).totalCitizensServed, totals.licenseIssued, totals.paid, totals.pending, (totals.paid + totals.pending) ];
+                totalRow = [ 'GRAND TOTAL', null, null, totals.citizensServed, totals.licenseIssued, totals.paid, totals.pending, (totals.paid + totals.pending) ];
             } else {
-                totalRow = ['GRAND TOTAL', null, totals.paid, totals.pending];
+                totalRow = ['GRAND TOTAL', null, null, totals.paid, totals.pending];
             }
-            merges.push({ s: { r: currentRowIndex, c: 0 }, e: { r: currentRowIndex, c: 1 } });
+            merges.push({ s: { r: currentRowIndex, c: 0 }, e: { r: currentRowIndex, c: 2 } });
         }
         body.push(totalRow);
     }
 
     const ws = xlsx.utils.aoa_to_sheet([...headers, ...body]);
-        if (isComplex) {
-      merges.push(
-        { s: { r: 0, c: 0 }, e: { r: 1, c: 0 } },
-        { s: { r: 0, c: 1 }, e: { r: 1, c: 1 } },
-        { s: { r: 0, c: 2 }, e: { r: 1, c: 2 } },
-        { s: { r: 0, c: 3 }, e: { r: 0, c: 7 } },
-        { s: { r: 0, c: 8 }, e: { r: 0, c: 12 } },
-        { s: { r: 0, c: 13 }, e: { r: 0, c: 16 } },
-        { s: { r: 0, c: 17 }, e: { r: 0, c: 20 } }
-        // Commented out merge for last 'Total Licensed Issued' column (removed)
-        // { s: { r: 0, c: 20 }, e: { r: 1, c: 20 } }
-      );
+    if (isComplex) {
+        merges.push({ s: { r: 0, c: 0 }, e: { r: 1, c: 0 } }, { s: { r: 0, c: 1 }, e: { r: 1, c: 1 } }, { s: { r: 0, c: 2 }, e: { r: 1, c: 2 } }, { s: { r: 0, c: 3 }, e: { r: 1, c: 3 } }, { s: { r: 0, c: 4 }, e: { r: 1, c: 4 } }, { s: { r: 0, c: 5 }, e: { r: 0, c: 9 } }, { s: { r: 0, c: 10 }, e: { r: 0, c: 14 } }, { s: { r: 0, c: 15 }, e: { r: 0, c: 18 } }, { s: { r: 0, c: 19 }, e: { r: 0, c: 22 } });
+    } else if (moduleLabel === 'Building Permit' || moduleLabel === 'Certificate of Occupancy') {
+        merges.push(
+            { s: { r: 0, c: 0 }, e: { r: 1, c: 0 } },
+            { s: { r: 0, c: 1 }, e: { r: 1, c: 1 } },
+            { s: { r: 0, c: 2 }, e: { r: 1, c: 2 } },
+            { s: { r: 0, c: 3 }, e: { r: 1, c: 3 } },
+            { s: { r: 0, c: 4 }, e: { r: 0, c: 7 } }
+        );
     }
     ws['!merges'] = merges;
     const lastHeaderRow = headers[headers.length - 1];
   // Make LGU column wider in Excel output only for complex modules (Business/Working Permit)
-  ws['!cols'] = lastHeaderRow.map((_c: any, idx: number) => ({ wch: idx === 0 ? 22 : idx === 1 ? (isComplex ? 40 : 24) : 24 }));
+  ws['!cols'] = lastHeaderRow.map((_c: any, idx: number) => ({ wch: idx === 0 ? 8 : idx === 1 ? 14 : idx === 2 ? (isComplex ? 40 : 30) : 24 }));
 
     const wb = xlsx.utils.book_new();
     xlsx.utils.book_append_sheet(wb, ws, 'Report');
     if (signal?.aborted) { const e: any = new Error('canceled'); e.name = 'CanceledError'; throw e; }
-
-    // Build safe filename for Excel export including Period Covered
-    const sanitizeForFilename = (s: string) => {
-      return (s || '').replace(/[<>:\"\\/\|\?\*\u0000-\u001F]/g, '').replace(/\s+/g, ' ').trim();
-    };
-    const moduleSlug = moduleLabel.toLowerCase().replace(/\s+/g, '-');
-    const datePart = dateRangeLabel ? `(${dateRangeLabel})` : '';
-    const rawFilename = `${moduleSlug}-report${datePart}`;
-    const safeFilename = sanitizeForFilename(rawFilename);
-
-    xlsx.writeFile(wb, `${safeFilename}.xlsx`);
+    xlsx.writeFile(wb, buildReportFileName(moduleLabel, dateRangeLabel, 'xlsx'));
 };

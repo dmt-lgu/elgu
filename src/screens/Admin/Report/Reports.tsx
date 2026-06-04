@@ -5,8 +5,8 @@ import { regionMapping } from '../../../screens/Admin/Report/utils/mockData';
 import dictImage from '../../../assets/logo/dict.png';
 import { exportReportToPdf, exportReportToExcel } from './utils/reportGenerator';
 import { useSelector, useDispatch } from 'react-redux';
-import { RootState, AppDispatch } from '@/redux/store';
-import { updateFilterField } from '../../../redux/reportFilterSlice';
+import type { AppDispatch, RootState } from '@/redux/store';
+import { updateFilterField, type FilterState } from '../../../redux/reportFilterSlice';
 import { setTableData, setAppliedFilter } from '../../../redux/businessPermitSlice';
 import ScrollToTopButton from './components/ScrollToTopButton';
 import Swal from 'sweetalert2';
@@ -19,9 +19,9 @@ import { setbuildingPermiAppliedFilter, setbuildingPermitData } from '@/redux/bu
 import CertificateOfOccupancyReport from './table/CertificateOfOccupancyReport';
 import { setcertificateOfOccupancy, setCertificateOfOccupancyAppliedFilter } from '@/redux/CertificateOfOccupancySlice';
 import ProgressIndicator from './components/ProgressIndicator';
-import { filterTableResults, getDateRangeLabel } from './utils/reportUtils';
+import { filterTableResults, formatNumber, getDateRangeLabel } from './utils/reportUtils';
 import BusinessPermitReport from './table/BusinessPermitReport';
-import { Filter } from 'lucide-react';
+import { Activity, Building2, ChevronDown, FileCheck, Filter, RefreshCw, Shield, TrendingUp } from 'lucide-react';
 
 
 // Type definitions and helper functions remain the same
@@ -40,6 +40,12 @@ type ReportData = { results: any[] } | null;
 type ProgressiveDataState = { [key: string]: ReportData };
 type ProgressDetail = { currentRegion: string; currentIndex: number; totalRegions: number };
 type ProgressState = { [moduleKey: string]: ProgressDetail | null };
+type ProgressiveCacheState = {
+  key: string | null;
+  loading: boolean;
+  data: ProgressiveDataState;
+  progress: ProgressState;
+};
 
 const BP = "Business Permit";
 const WP = "Working Permit";
@@ -47,12 +53,34 @@ const BC = "Barangay Clearance";
 const BLDG = "Building Permit";
 const CO = "Certificate of Occupancy";
 
-// Other helper functions (areFiltersEqual, ensureDate, etc.) remain the same...
-function areFiltersEqual(a: any, b: any) {
-  if (!a && !b) return true;
-  if (!a || !b) return false;
-  return JSON.stringify({ ...a, selectedModules: (a.selectedModules || []).slice().sort() }) === JSON.stringify({ ...b, selectedModules: (b.selectedModules || []).slice().sort() });
+const SUMMARY_MODULES = [BP, WP, BC, BLDG, CO];
+const NEW_LICENSE_KEYS = ['newLicenseIssued', 'newIssued', 'licenseIssuedNew', 'newLicense'];
+const RENEW_LICENSE_KEYS = ['renewLicenseIssued', 'renewIssued', 'licenseIssuedRenewal', 'renewLicense'];
+const MALE_LICENSE_KEYS = ['maleLicenseIssued', 'maleIssued'];
+const FEMALE_LICENSE_KEYS = ['femaleLicenseIssued', 'femaleIssued'];
+
+const moduleRequestState = new Map<string, { active: boolean; completed: boolean }>();
+const progressiveRequestCache: ProgressiveCacheState = {
+  key: null,
+  loading: false,
+  data: { [BP]: null, [WP]: null, [BC]: null, [BLDG]: null, [CO]: null },
+  progress: {},
+};
+const progressiveSubscribers = new Set<(state: ProgressiveCacheState) => void>();
+let reportSearchGeneration = 0;
+let activeReportRequestGeneration = 0;
+
+function notifyProgressiveSubscribers() {
+  const snapshot: ProgressiveCacheState = {
+    key: progressiveRequestCache.key,
+    loading: progressiveRequestCache.loading,
+    data: { ...progressiveRequestCache.data },
+    progress: { ...progressiveRequestCache.progress },
+  };
+  progressiveSubscribers.forEach(listener => listener(snapshot));
 }
+
+// Other helper functions (ensureDate, etc.) remain the same...
 function ensureDate(val: Date | string | null | undefined): Date | null {
   if (!val) return null;
   if (val instanceof Date) return val;
@@ -69,19 +97,133 @@ function formatLocalDate(date: Date | null): string | null {
   const dd = String(date.getDate()).padStart(2, '0');
   return `${yyyy}-${mm}-${dd}`;
 }
+
+function getExplicitNumber(item: any, keys: string[]): number | null {
+  for (const key of keys) {
+    const value = item?.[key];
+    if (value !== null && value !== undefined && value !== '') {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+  }
+  return null;
+}
+
+function getLicenseIssued(item: any, keys: string[], fallback: number): number {
+  const explicit = getExplicitNumber(item, keys);
+  return explicit === null ? fallback : explicit;
+}
+
+function sumMonthly(lgu: any, sumItem: (item: any) => number): number {
+  if (!Array.isArray(lgu?.monthlyResults)) return 0;
+  return lgu.monthlyResults.reduce((sum: number, item: any) => sum + sumItem(item), 0);
+}
+
+function normalizeSummaryResults(results: any[]): any[] {
+  const byLgu = new Map<string, { lgu: any; monthsMap: Map<string, any>; hasError?: boolean }>();
+
+  (results || []).forEach((entry: any) => {
+    const key = entry?.lgu || '';
+    if (!key) return;
+    if (!byLgu.has(key)) {
+      byLgu.set(key, { lgu: { ...entry, monthlyResults: [] }, monthsMap: new Map(), hasError: entry?.hasError });
+    }
+
+    const bucket = byLgu.get(key)!;
+    if (entry?.hasError) bucket.hasError = true;
+
+    const monthsArr = Array.isArray(entry?.monthlyResults) ? entry.monthlyResults : [];
+    monthsArr.forEach((monthData: any) => {
+      const monthKey = monthData?.month as string | undefined;
+      if (!monthKey) return;
+      const existing = bucket.monthsMap.get(monthKey) || { month: monthKey };
+      Object.keys(monthData).forEach(field => {
+        const value = monthData[field];
+        if (typeof value === 'number') {
+          existing[field] = Math.max(Number(existing[field] || 0), Number(value));
+        } else if (existing[field] === undefined) {
+          existing[field] = value;
+        }
+      });
+      bucket.monthsMap.set(monthKey, existing);
+    });
+  });
+
+  return Array.from(byLgu.values()).map(({ lgu, monthsMap, hasError }) => {
+    const monthlyResults = Array.from(monthsMap.values()).sort((a, b) => String(a.month || '').localeCompare(String(b.month || '')));
+    const months = monthlyResults.map(item => item.month).filter(Boolean);
+    return { ...lgu, hasError: !!hasError, monthlyResults, months };
+  });
+}
+
+function getSummaryCardTheme(moduleKey: string) {
+  const themes = {
+    [BP]: {
+      icon: FileCheck,
+      iconColor: 'bg-green-600',
+      accentColor: 'text-green-600',
+      borderAccent: 'border-l-green-500',
+      loaderColor: '#16a34a',
+    },
+    [WP]: {
+      icon: RefreshCw,
+      iconColor: 'bg-yellow-500',
+      accentColor: 'text-yellow-500',
+      borderAccent: 'border-l-yellow-500',
+      loaderColor: '#eab308',
+    },
+    [BC]: {
+      icon: Shield,
+      iconColor: 'bg-blue-600',
+      accentColor: 'text-blue-600',
+      borderAccent: 'border-l-blue-500',
+      loaderColor: '#2563eb',
+    },
+    [BLDG]: {
+      icon: Building2,
+      iconColor: 'bg-[#2464e8]',
+      accentColor: 'text-[#2464e8]',
+      borderAccent: 'border-l-[#2464e8]',
+      loaderColor: '#2464e8',
+    },
+    [CO]: {
+      icon: Activity,
+      iconColor: 'bg-purple-600',
+      accentColor: 'text-purple-600',
+      borderAccent: 'border-l-purple-500',
+      loaderColor: '#9333ea',
+    },
+  };
+
+  return themes[moduleKey as keyof typeof themes] || themes[BP];
+}
+
+function emptyReportData(): ReportData {
+  return { results: [] };
+}
+
+function emptyProgressiveData(): ProgressiveDataState {
+  return { [BP]: null, [WP]: null, [BC]: null, [BLDG]: null, [CO]: null };
+}
+
+function isLatestReportRequest(generation: number) {
+  return generation === activeReportRequestGeneration;
+}
 function useReportData({
   moduleKey, apiUrl, appliedFilter, reduxTableData, reduxAppliedFilter,
   setReduxTableData, setReduxAppliedFilter, hasSearched, abortSignal,
-  skipLoading, isSelectAll,
+  skipLoading, isSelectAll, refreshKey,
 }: {
   moduleKey: string; apiUrl: string; appliedFilter: AppliedFilter & { skipLoading?: boolean };
   lguToRegion: Record<string, string>; reduxTableData: any; reduxAppliedFilter: any;
   setReduxTableData: (data: any) => void; setReduxAppliedFilter: (filter: any) => void;
   hasSearched: boolean; abortSignal: AbortSignal | undefined;
-  skipLoading?: boolean; isSelectAll?: boolean;
+  skipLoading?: boolean; isSelectAll?: boolean; refreshKey: number;
 }) {
   const [_data, setData] = useState<ReportData>(null);
   const [loading, setLoading] = useState(false);
+  const activeRequestKey = useRef<string | null>(null);
+  const completedRequestKey = useRef<string | null>(null);
   const currentFilter = useMemo(() => ({
     selectedRegions: appliedFilter.selectedRegions,
     selectedProvinces: appliedFilter.selectedProvinces,
@@ -92,12 +234,22 @@ function useReportData({
     appliedFilter.selectedRegions, appliedFilter.selectedProvinces, appliedFilter.selectedCities,
     appliedFilter.selectedIslands, appliedFilter.dateRange?.start, appliedFilter.dateRange?.end,
   ]);
+  const currentFilterKey = JSON.stringify(currentFilter);
+  const requestKey = `${refreshKey}:${currentFilterKey}`;
   useEffect(() => {
+    const requestGeneration = refreshKey;
   // If we have persisted table data + a persisted applied filter that matches the
     // current UI filter, reuse that data so the tables remain after a page refresh.
     // This allows users to refresh the page and still see the results they previously
     // fetched without needing to click Search again.
-    if (reduxTableData && reduxAppliedFilter && JSON.stringify(currentFilter) === JSON.stringify(reduxAppliedFilter)) {
+    const globalRequestKey = `${moduleKey}:${requestKey}`;
+    if (abortSignal?.aborted || !isLatestReportRequest(requestGeneration)) {
+      moduleRequestState.set(globalRequestKey, { active: false, completed: false });
+      setLoading(false);
+      return;
+    }
+    const canUseCachedData = refreshKey === 0 || completedRequestKey.current === requestKey || moduleRequestState.get(globalRequestKey)?.completed;
+    if (canUseCachedData && reduxTableData && reduxAppliedFilter && currentFilterKey === JSON.stringify(reduxAppliedFilter)) {
       setData(reduxTableData); setLoading(false); return;
     }
 
@@ -105,6 +257,15 @@ function useReportData({
     if (!hasSearched || skipLoading || (!appliedFilter.selectedRegions.length && !appliedFilter.selectedIslands.length) || !appliedFilter.dateRange.start || !appliedFilter.dateRange.end) {
       setData(null); setLoading(false); return;
     }
+
+    const globalRequest = moduleRequestState.get(globalRequestKey);
+    if (activeRequestKey.current === requestKey || globalRequest?.active) {
+      setLoading(true);
+      return;
+    }
+
+    activeRequestKey.current = requestKey;
+    moduleRequestState.set(globalRequestKey, { active: true, completed: false });
     setLoading(true);
     const expandNIR = (regions: string[]): string[] => {
       if (!regions.includes('NIR')) return regions;
@@ -127,11 +288,12 @@ function useReportData({
           const aggregated: any[] = [];
           for (let i = 0; i < regions.length; i++) {
             const region = regions[i];
-            if (abortSignal?.aborted) break;
+            if (abortSignal?.aborted || !isLatestReportRequest(requestGeneration)) break;
             const regionPayload = { ...payload, locationName: [region] };
             try {
               // eslint-disable-next-line no-await-in-loop
               const res = await axios.post(apiUrl, regionPayload, { signal: abortSignal });
+              if (!isLatestReportRequest(requestGeneration)) return;
               const rawData = res?.data;
               if (rawData && Array.isArray(rawData.results)) {
                 rawData.results.forEach((r: any) => {
@@ -140,9 +302,14 @@ function useReportData({
               }
             } catch (err: any) {
               if (err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED' || err?.message === 'canceled') {
-                break;
+                moduleRequestState.set(globalRequestKey, { active: false, completed: false });
+                return;
               }
               // otherwise continue to next region
+            }
+            if (abortSignal?.aborted || !isLatestReportRequest(requestGeneration)) {
+              moduleRequestState.set(globalRequestKey, { active: false, completed: false });
+              return;
             }
             // call parent-updater via a custom event so Reports can update its progressState (since hook is inside same module)
             try {
@@ -154,6 +321,7 @@ function useReportData({
             // Push intermediate aggregated results to state/redux so tables update progressively
             try {
               const interim = { results: aggregated.slice(), lguCount: aggregated.length };
+              if (!isLatestReportRequest(requestGeneration)) return;
               setData(interim);
               setReduxTableData(interim);
               setReduxAppliedFilter(currentFilter);
@@ -162,12 +330,23 @@ function useReportData({
             }
             // Small delay to keep UI responsive
           }
+          if (abortSignal?.aborted || !isLatestReportRequest(requestGeneration)) {
+            moduleRequestState.set(globalRequestKey, { active: false, completed: false });
+            return;
+          }
           const final = { results: aggregated, lguCount: aggregated.length };
+          if (!isLatestReportRequest(requestGeneration)) return;
           setData(final);
           setReduxTableData(final);
           setReduxAppliedFilter(currentFilter);
+          completedRequestKey.current = requestKey;
+          moduleRequestState.set(globalRequestKey, { active: false, completed: true });
         } else {
           const response = await axios.post(apiUrl, payload, { signal: abortSignal });
+          if (abortSignal?.aborted || !isLatestReportRequest(requestGeneration)) {
+            moduleRequestState.set(globalRequestKey, { active: false, completed: false });
+            return;
+          }
           // --- START OF FIX ---
           const rawData = response.data;
           let cleanedData = rawData;
@@ -182,21 +361,28 @@ function useReportData({
             });
             cleanedData = { ...rawData, results: uniqueResults, lguCount: uniqueResults.length };
           }
-          setData(cleanedData);
-          setReduxTableData(cleanedData);
-          setReduxAppliedFilter(currentFilter);
+          if (isLatestReportRequest(requestGeneration)) {
+            setData(cleanedData);
+            setReduxTableData(cleanedData);
+            setReduxAppliedFilter(currentFilter);
+            completedRequestKey.current = requestKey;
+            moduleRequestState.set(globalRequestKey, { active: false, completed: true });
+          }
           // --- END OF FIX ---
         }
       } catch (err: any) {
-        if (!(err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED' || err?.message === 'canceled')) {
+        if (isLatestReportRequest(requestGeneration) && !(err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED' || err?.message === 'canceled')) {
           setData(null); setReduxTableData(null);
         }
       } finally {
-        setLoading(false);
+        if (activeRequestKey.current === requestKey) activeRequestKey.current = null;
+        const latestRequest = moduleRequestState.get(globalRequestKey);
+        if (latestRequest?.active) moduleRequestState.set(globalRequestKey, { active: false, completed: false });
+        if (isLatestReportRequest(requestGeneration)) setLoading(false);
       }
     };
     void doFetch();
-  }, [ hasSearched, JSON.stringify(currentFilter), JSON.stringify(reduxAppliedFilter), reduxTableData, apiUrl, skipLoading, isSelectAll, setReduxTableData, setReduxAppliedFilter, abortSignal ]);
+  }, [ hasSearched, currentFilterKey, JSON.stringify(reduxAppliedFilter), reduxTableData, apiUrl, skipLoading, isSelectAll, setReduxTableData, setReduxAppliedFilter, abortSignal, refreshKey ]);
   return { loading };
 }
 
@@ -240,25 +426,37 @@ const Reports: React.FC = () => {
   // and avoid showing a loading spinner on refresh.
   const initialHasSearched = !!(bpTableData || wpTableData || bcTableData || bldgTableData || coTableData);
   const [hasSearched, setHasSearched] = useState<boolean>(initialHasSearched);
-  // Initialize lastAppliedFilters from any persisted applied filter so that
-  // handleSearch won't re-trigger a fetch when navigating back to Reports.
-  const [lastAppliedFilters, setLastAppliedFilters] = useState<any>(() => {
-    return bpPersistedAppliedFilter || wpPersistedAppliedFilter || bcPersistedAppliedFilter || bldgPersistedAppliedFilter || coPersistedAppliedFilter || null;
-  });
   const [cancelled, setCancelled] = useState(false);
   const [hasTableData, setHasTableData] = useState(false);
   const [lguToRegion, setLguToRegion] = useState<Record<string, string>>({});
   const [lguRegionLoading, setLguRegionLoading] = useState(true);
   const searchAbortController = useRef<AbortController | null>(null);
   const exportAbortController = useRef<AbortController | null>(null);
+  const lguRegionAbortController = useRef<AbortController | null>(null);
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const [isProgressiveLoading, setIsProgressiveLoading] = useState(false);
   const [progressiveData, setProgressiveData] = useState<ProgressiveDataState>({ [BP]: null, [WP]: null, [BC]: null, [BLDG]: null, [CO]: null });
   const [progressState, setProgressState] = useState<ProgressState>({});
+  const [searchRefreshKey, setSearchRefreshKey] = useState(reportSearchGeneration);
   
   // Track search vs export separately so UI doesn't show cancel/progress during export
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [isExportActive, setIsExportActive] = useState(false);
+  const [summaryCardsOpen, setSummaryCardsOpen] = useState(true);
+
+  useEffect(() => {
+    const syncProgressiveState = (state: ProgressiveCacheState) => {
+      setProgressiveData(state.data);
+      setProgressState(state.progress);
+      setIsProgressiveLoading(state.loading);
+      if (state.loading) setIsSearchActive(true);
+    };
+    syncProgressiveState(progressiveRequestCache);
+    progressiveSubscribers.add(syncProgressiveState);
+    return () => {
+      progressiveSubscribers.delete(syncProgressiveState);
+    };
+  }, []);
 
   // Listen to progress events dispatched by useReportData and update local progress state
   useEffect(() => {
@@ -279,9 +477,13 @@ const Reports: React.FC = () => {
 
   useEffect(() => {
     const fetchLguToRegion = async () => {
+      if (lguRegionAbortController.current) lguRegionAbortController.current.abort();
+      lguRegionAbortController.current = new AbortController();
+      const signal = lguRegionAbortController.current.signal;
       setLguRegionLoading(true);
       try {
-        const res = await axios.get(`${import.meta.env.VITE_URL}/api/bp/lgu-list`);
+        const res = await axios.get(`${import.meta.env.VITE_URL}/api/bp/lgu-list`, { signal });
+        if (signal.aborted) return;
         const mapping: Record<string, string> = {};
         Object.entries(res.data).forEach(([regionKey, lguList]) => {
           (lguList as string[]).forEach(lguName => {
@@ -289,22 +491,48 @@ const Reports: React.FC = () => {
           });
         });
         setLguToRegion(mapping);
-      } catch {
-        setLguToRegion({});
+      } catch (err: any) {
+        if (!(err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED' || err?.message === 'canceled')) {
+          setLguToRegion({});
+        }
       } finally {
-        setLguRegionLoading(false);
+        if (!signal.aborted) setLguRegionLoading(false);
       }
     };
     fetchLguToRegion();
+    return () => {
+      if (lguRegionAbortController.current) lguRegionAbortController.current.abort();
+    };
   }, []);
 
   const isSelectAll = !!appliedFilter.allRegionsSelected;
 
   useEffect(() => {
     if (!hasSearched || !isSelectAll) return;
-    const abortController = new AbortController();
-    const { signal } = abortController;
+    const requestGeneration = searchRefreshKey;
+    const progressiveKey = `${searchRefreshKey}:${JSON.stringify(appliedFilter)}`;
+    const signal = searchAbortController.current?.signal;
+    if (signal?.aborted || !isLatestReportRequest(requestGeneration)) return;
+    if (progressiveRequestCache.key === progressiveKey) {
+      setProgressiveData({ ...progressiveRequestCache.data });
+      setProgressState({ ...progressiveRequestCache.progress });
+      setIsProgressiveLoading(progressiveRequestCache.loading);
+      return;
+    }
+    const getModuleUrl = (moduleKey: string) => {
+      if (moduleKey === BP) return `${import.meta.env.VITE_URL}/api/bp/transaction-count`;
+      if (moduleKey === WP) return `${import.meta.env.VITE_URL}/api/wp/transaction-count`;
+      if (moduleKey === BC) return `${import.meta.env.VITE_URL}/api/bc/transaction-count`;
+      if (moduleKey === BLDG) return `${import.meta.env.VITE_URL}/api/bpco/transaction-count-bp`;
+      if (moduleKey === CO) return `${import.meta.env.VITE_URL}/api/bpco/transaction-count-co`;
+      return '';
+    };
     const fetchSequentially = async () => {
+      if (signal?.aborted || !isLatestReportRequest(requestGeneration)) return;
+      progressiveRequestCache.key = progressiveKey;
+      progressiveRequestCache.loading = true;
+      progressiveRequestCache.data = { [BP]: null, [WP]: null, [BC]: null, [BLDG]: null, [CO]: null };
+      progressiveRequestCache.progress = {};
       setIsProgressiveLoading(true);
       const regionOrder = ["Region I", "Region II", "Region III", "IV-A", "IV-B", "Region V", "Region VI", "Region VII", "Region VIII", "Region IX", "Region X", "Region XI", "Region XII", "Region XIII", "CAR", "BARMM1", "BARMM2"];
       const expandedRegions = (() => {
@@ -315,36 +543,67 @@ const Reports: React.FC = () => {
         return expanded;
       })();
       const sortedRegions = expandedRegions.slice().sort((a, b) => regionOrder.indexOf(a) - regionOrder.indexOf(b));
+      const selectedModules = appliedFilter.selectedModules || [];
       const initialProgress: ProgressState = {};
-      (appliedFilter.selectedModules || []).forEach(moduleKey => { initialProgress[moduleKey] = { currentRegion: "Initializing...", currentIndex: 0, totalRegions: sortedRegions.length }; });
+      selectedModules.forEach(moduleKey => { initialProgress[moduleKey] = { currentRegion: "Initializing...", currentIndex: 0, totalRegions: sortedRegions.length }; });
+      progressiveRequestCache.progress = initialProgress;
       setProgressState(initialProgress);
       const initialState: ProgressiveDataState = {};
-      (appliedFilter.selectedModules || []).forEach(moduleKey => { initialState[moduleKey] = { results: [] }; });
+      selectedModules.forEach(moduleKey => { initialState[moduleKey] = { results: [] }; });
+      progressiveRequestCache.data = initialState;
       setProgressiveData(initialState);
-      for (let i = 0; i < sortedRegions.length; i++) {
-        const region = sortedRegions[i];
-        if (signal.aborted) break;
-        const payload = { locationName: [region], startDate: formatLocalDate(ensureDate(appliedFilter.dateRange.start)), endDate: formatLocalDate(ensureDate(appliedFilter.dateRange.end)) };
-        const promisesForRegion = (appliedFilter.selectedModules || []).map(moduleKey => {
-          let url = '';
-          if (moduleKey === BP) url = `${import.meta.env.VITE_URL}/api/bp/transaction-count`;
-          if (moduleKey === WP) url = `${import.meta.env.VITE_URL}/api/wp/transaction-count`;
-          if (moduleKey === BC) url = `${import.meta.env.VITE_URL}/api/bc/transaction-count`;
-          if (moduleKey === BLDG) url = `${import.meta.env.VITE_URL}/api/bpco/transaction-count-bp`;
-          if (moduleKey === CO) url = `${import.meta.env.VITE_URL}/api/bpco/transaction-count-co`;
-          if (!url) return Promise.resolve();
-          return axios.post(url, payload, { signal })
-            .then(res => { if (res.data?.results) { setProgressiveData(prev => ({ ...prev, [moduleKey]: { results: [...(prev[moduleKey]?.results || []), ...res.data.results] } })); } })
-            .catch(err => { if (err.name !== 'CanceledError') { console.error(`Failed to fetch ${moduleKey} for ${region}`); } })
-            .finally(() => { if (!signal.aborted) { setProgressState(prev => ({ ...prev, [moduleKey]: { currentRegion: region, currentIndex: i + 1, totalRegions: sortedRegions.length } })); } });
-        });
-        await Promise.all(promisesForRegion);
-      }
+      notifyProgressiveSubscribers();
+
+      await Promise.all(selectedModules.map(async moduleKey => {
+        const url = getModuleUrl(moduleKey);
+        if (!url || signal?.aborted || !isLatestReportRequest(requestGeneration)) return;
+        for (let i = 0; i < sortedRegions.length; i++) {
+          if (signal?.aborted || !isLatestReportRequest(requestGeneration)) return;
+          const region = sortedRegions[i];
+          const payload = { locationName: [region], startDate: formatLocalDate(ensureDate(appliedFilter.dateRange.start)), endDate: formatLocalDate(ensureDate(appliedFilter.dateRange.end)) };
+          try {
+            const res = await axios.post(url, payload, { signal });
+            if (signal?.aborted || !isLatestReportRequest(requestGeneration)) return;
+            if (res.data?.results) {
+              const nextModuleData = { results: [...(progressiveRequestCache.data[moduleKey]?.results || []), ...res.data.results] };
+              if (!isLatestReportRequest(requestGeneration)) return;
+              progressiveRequestCache.data = { ...progressiveRequestCache.data, [moduleKey]: nextModuleData };
+              setProgressiveData(prev => ({ ...prev, [moduleKey]: nextModuleData }));
+              if (moduleKey === BP) dispatch(setTableData(nextModuleData));
+              if (moduleKey === WP) dispatch(setWorkingPermitTableData(nextModuleData));
+              if (moduleKey === BC) dispatch(setBrgyClearanceTableData(nextModuleData));
+              if (moduleKey === BLDG) dispatch(setbuildingPermitData(nextModuleData));
+              if (moduleKey === CO) dispatch(setcertificateOfOccupancy(nextModuleData));
+            }
+          } catch (err: any) {
+            if (err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED' || err?.message === 'canceled' || signal?.aborted) {
+              return;
+            }
+            if (err.name !== 'CanceledError') {
+              console.error(`Failed to fetch ${moduleKey} for ${region}`);
+            }
+          } finally {
+            if (signal?.aborted || !isLatestReportRequest(requestGeneration)) return;
+            const nextProgress = { currentRegion: region, currentIndex: i + 1, totalRegions: sortedRegions.length };
+            progressiveRequestCache.progress = { ...progressiveRequestCache.progress, [moduleKey]: nextProgress };
+            setProgressState(prev => ({ ...prev, [moduleKey]: nextProgress }));
+            notifyProgressiveSubscribers();
+          }
+        }
+      }));
+      if (signal?.aborted || !isLatestReportRequest(requestGeneration)) return;
+      progressiveRequestCache.loading = false;
       setIsProgressiveLoading(false);
+      notifyProgressiveSubscribers();
     };
-    fetchSequentially();
-    return () => abortController.abort();
-  }, [hasSearched, isSelectAll, JSON.stringify(appliedFilter)]);
+    void fetchSequentially().finally(() => {
+      if (signal?.aborted && isLatestReportRequest(requestGeneration)) {
+        progressiveRequestCache.loading = false;
+        setIsProgressiveLoading(false);
+        notifyProgressiveSubscribers();
+      }
+    });
+  }, [hasSearched, isSelectAll, JSON.stringify(appliedFilter), searchRefreshKey]);
   
   const setBpTableData = useCallback((data:any) => dispatch(setTableData(data)), [dispatch]);
   const setBpAppliedFilter = useCallback((filter:any) => dispatch(setAppliedFilter(filter)), [dispatch]);
@@ -357,11 +616,11 @@ const Reports: React.FC = () => {
   const setCoTableData = useCallback((data:any) => dispatch(setcertificateOfOccupancy(data)), [dispatch]);
   const setCoAppliedFilter = useCallback((filter:any) => dispatch(setCertificateOfOccupancyAppliedFilter(filter)), [dispatch]);
   
-  const { loading: bpLoading } = useReportData({ moduleKey: BP, apiUrl: `${import.meta.env.VITE_URL}/api/bp/transaction-count`, appliedFilter, lguToRegion, reduxTableData: bpTableData, reduxAppliedFilter: bpPersistedAppliedFilter, setReduxTableData: setBpTableData, setReduxAppliedFilter: setBpAppliedFilter, hasSearched, abortSignal: searchAbortController.current?.signal, skipLoading: !(appliedFilter.selectedModules || []).includes(BP), isSelectAll });
-  const { loading: wpLoading } = useReportData({ moduleKey: WP, apiUrl: `${import.meta.env.VITE_URL}/api/wp/transaction-count`, appliedFilter, lguToRegion, reduxTableData: wpTableData, reduxAppliedFilter: wpPersistedAppliedFilter, setReduxTableData: setWpTableData, setReduxAppliedFilter: setWpAppliedFilter, hasSearched, abortSignal: searchAbortController.current?.signal, skipLoading: !(appliedFilter.selectedModules || []).includes(WP), isSelectAll });
-  const { loading: bcLoading } = useReportData({ moduleKey: BC, apiUrl: `${import.meta.env.VITE_URL}/api/bc/transaction-count`, appliedFilter, lguToRegion, reduxTableData: bcTableData, reduxAppliedFilter: bcPersistedAppliedFilter, setReduxTableData: setBcTableData, setReduxAppliedFilter: setBcAppliedFilter, hasSearched, abortSignal: searchAbortController.current?.signal, skipLoading: !(appliedFilter.selectedModules || []).includes(BC), isSelectAll });
-  const { loading: bldgLoading } = useReportData({ moduleKey: BLDG, apiUrl: `${import.meta.env.VITE_URL}/api/bpco/transaction-count-bp`, appliedFilter, lguToRegion, reduxTableData: bldgTableData, reduxAppliedFilter: bldgPersistedAppliedFilter, setReduxTableData: setBldgTableData, setReduxAppliedFilter: setBldgAppliedFilter, hasSearched, abortSignal: searchAbortController.current?.signal, skipLoading: !(appliedFilter.selectedModules || []).includes(BLDG), isSelectAll });
-  const { loading: coLoading } = useReportData({ moduleKey: CO, apiUrl: `${import.meta.env.VITE_URL}/api/bpco/transaction-count-co`, appliedFilter, lguToRegion, reduxTableData: coTableData, reduxAppliedFilter: coPersistedAppliedFilter, setReduxTableData: setCoTableData, setReduxAppliedFilter: setCoAppliedFilter, hasSearched, abortSignal: searchAbortController.current?.signal, skipLoading: !(appliedFilter.selectedModules || []).includes(CO), isSelectAll });
+  const { loading: bpLoading } = useReportData({ moduleKey: BP, apiUrl: `${import.meta.env.VITE_URL}/api/bp/transaction-count`, appliedFilter, lguToRegion, reduxTableData: bpTableData, reduxAppliedFilter: bpPersistedAppliedFilter, setReduxTableData: setBpTableData, setReduxAppliedFilter: setBpAppliedFilter, hasSearched, abortSignal: searchAbortController.current?.signal, skipLoading: !(appliedFilter.selectedModules || []).includes(BP), isSelectAll, refreshKey: searchRefreshKey });
+  const { loading: wpLoading } = useReportData({ moduleKey: WP, apiUrl: `${import.meta.env.VITE_URL}/api/wp/transaction-count`, appliedFilter, lguToRegion, reduxTableData: wpTableData, reduxAppliedFilter: wpPersistedAppliedFilter, setReduxTableData: setWpTableData, setReduxAppliedFilter: setWpAppliedFilter, hasSearched, abortSignal: searchAbortController.current?.signal, skipLoading: !(appliedFilter.selectedModules || []).includes(WP), isSelectAll, refreshKey: searchRefreshKey });
+  const { loading: bcLoading } = useReportData({ moduleKey: BC, apiUrl: `${import.meta.env.VITE_URL}/api/bc/transaction-count`, appliedFilter, lguToRegion, reduxTableData: bcTableData, reduxAppliedFilter: bcPersistedAppliedFilter, setReduxTableData: setBcTableData, setReduxAppliedFilter: setBcAppliedFilter, hasSearched, abortSignal: searchAbortController.current?.signal, skipLoading: !(appliedFilter.selectedModules || []).includes(BC), isSelectAll, refreshKey: searchRefreshKey });
+  const { loading: bldgLoading } = useReportData({ moduleKey: BLDG, apiUrl: `${import.meta.env.VITE_URL}/api/bpco/transaction-count-bp`, appliedFilter, lguToRegion, reduxTableData: bldgTableData, reduxAppliedFilter: bldgPersistedAppliedFilter, setReduxTableData: setBldgTableData, setReduxAppliedFilter: setBldgAppliedFilter, hasSearched, abortSignal: searchAbortController.current?.signal, skipLoading: !(appliedFilter.selectedModules || []).includes(BLDG), isSelectAll, refreshKey: searchRefreshKey });
+  const { loading: coLoading } = useReportData({ moduleKey: CO, apiUrl: `${import.meta.env.VITE_URL}/api/bpco/transaction-count-co`, appliedFilter, lguToRegion, reduxTableData: coTableData, reduxAppliedFilter: coPersistedAppliedFilter, setReduxTableData: setCoTableData, setReduxAppliedFilter: setCoAppliedFilter, hasSearched, abortSignal: searchAbortController.current?.signal, skipLoading: !(appliedFilter.selectedModules || []).includes(CO), isSelectAll, refreshKey: searchRefreshKey });
 
   const searchedModules = appliedFilter.selectedModules || [];
   const loading = !cancelled && (isProgressiveLoading || (!isSelectAll && ((searchedModules.includes(BP) && bpLoading) || (searchedModules.includes(WP) && wpLoading) || (searchedModules.includes(BC) && bcLoading) || (searchedModules.includes(BLDG) && bldgLoading) || (searchedModules.includes(CO) && coLoading))));
@@ -402,15 +661,19 @@ const Reports: React.FC = () => {
       ? (progressState[CO] ? (progressState[CO]!.currentIndex < progressState[CO]!.totalRegions) : (isSelectAll ? isProgressiveLoading : !!coLoading))
       : !!coLoading,
   };
-  
+
   const handleSearch = (filters: any) => {
+    if (filters.skipApi) return;
+    if (searchAbortController.current) searchAbortController.current.abort();
+    searchAbortController.current = new AbortController();
+    reportSearchGeneration += 1;
+    activeReportRequestGeneration = reportSearchGeneration;
     // Mark search as active
     setIsSearchActive(true);
     setCancelled(false);
     setGeneratedAt(new Date());
     const normalizedDateRangeVal = { start: filters.dateRange?.start ? (typeof filters.dateRange.start === "string" ? filters.dateRange.start : filters.dateRange.start.toISOString().slice(0, 10)) : null, end: filters.dateRange?.end ? (typeof filters.dateRange.end === "string" ? filters.dateRange.end : filters.dateRange.end.toISOString().slice(0, 10)) : null };
     const normalizedFilters = { ...filters, dateRange: normalizedDateRangeVal, selectedModules: (filters.selectedModules || []).slice().sort(), selectedDateType: filters.selectedDateType || 'Month' };
-    if (filters.skipApi || areFiltersEqual(normalizedFilters, lastAppliedFilters)) return;
     // Initialize progress entries so ProgressIndicator can show during normal (non-select-all) fetches
     try {
       const shouldTrackProgress = !!normalizedFilters.allRegionsSelected || ((normalizedFilters.selectedRegions?.length || 0) > 1);
@@ -433,15 +696,19 @@ const Reports: React.FC = () => {
     }
     setAppliedFilterState(normalizedFilters);
     setHasSearched(true);
-    setLastAppliedFilters(normalizedFilters);
+    setSearchRefreshKey(reportSearchGeneration);
     const selected = normalizedFilters.selectedModules || [];
+    const blankData = emptyReportData();
+    if (selected.includes(BP)) dispatch(setTableData(blankData));
+    if (selected.includes(WP)) dispatch(setWorkingPermitTableData(blankData));
+    if (selected.includes(BC)) dispatch(setBrgyClearanceTableData(blankData));
+    if (selected.includes(BLDG)) dispatch(setbuildingPermitData(blankData));
+    if (selected.includes(CO)) dispatch(setcertificateOfOccupancy(blankData));
     if (selected.includes(BP)) dispatch(setAppliedFilter(normalizedFilters));
     if (selected.includes(WP)) dispatch(setWorkingPermitAppliedFilter(normalizedFilters));
     if (selected.includes(BC)) dispatch(setBrgyClearanceAppliedFilter(normalizedFilters));
     if (selected.includes(BLDG)) dispatch(setbuildingPermiAppliedFilter(normalizedFilters));
     if (selected.includes(CO)) dispatch(setCertificateOfOccupancyAppliedFilter(normalizedFilters));
-    if (searchAbortController.current) searchAbortController.current.abort();
-    searchAbortController.current = new AbortController();
   };
 
   // Auto-run an initial search on mount when the FilterSection already contains
@@ -475,15 +742,30 @@ const Reports: React.FC = () => {
 
   const handleReset = () => {
     // Ensure search state is inactive
+    reportSearchGeneration += 1;
+    activeReportRequestGeneration = reportSearchGeneration;
     setIsSearchActive(false);
     setProgressState({});
-    const keys: (keyof RootState['reportFilter'])[] = ['selectedRegions', 'selectedProvinces', 'selectedCities', 'selectedIslands', 'selectedModules'];
+    if (searchAbortController.current) searchAbortController.current.abort();
+    if (lguRegionAbortController.current) lguRegionAbortController.current.abort();
+    searchAbortController.current = null;
+    lguRegionAbortController.current = null;
+    moduleRequestState.clear();
+    progressiveRequestCache.loading = false;
+    progressiveRequestCache.progress = {};
+    progressiveRequestCache.data = emptyProgressiveData();
+    progressiveRequestCache.key = null;
+    setProgressiveData(emptyProgressiveData());
+    setIsProgressiveLoading(false);
+    setLguRegionLoading(false);
+    notifyProgressiveSubscribers();
+    const keys: (keyof FilterState)[] = ['selectedRegions', 'selectedProvinces', 'selectedCities', 'selectedIslands', 'selectedModules'];
     keys.forEach(key => dispatch(updateFilterField({ key, value: [] })));
   dispatch(updateFilterField({ key: 'dateRange', value: { start: null, end: null } }));
   // Restore default date type to 'Month' in the filter UI
   dispatch(updateFilterField({ key: 'selectedDateType', value: 'Month' }));
     setHasSearched(false);
-    setLastAppliedFilters(null);
+    setSearchRefreshKey(reportSearchGeneration);
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
@@ -498,18 +780,32 @@ const Reports: React.FC = () => {
   
   const handleCancelSearch = () => {
     // Explicitly mark the search request as inactive
+    reportSearchGeneration += 1;
+    activeReportRequestGeneration = reportSearchGeneration;
     setIsSearchActive(false);
     setProgressState({});
     if (searchAbortController.current) searchAbortController.current.abort();
+    if (lguRegionAbortController.current) lguRegionAbortController.current.abort();
+    searchAbortController.current = null;
+    lguRegionAbortController.current = null;
+    moduleRequestState.clear();
+    progressiveRequestCache.loading = false;
+    progressiveRequestCache.progress = {};
+    progressiveRequestCache.data = emptyProgressiveData();
+    progressiveRequestCache.key = null;
+    setProgressiveData(emptyProgressiveData());
+    notifyProgressiveSubscribers();
     setHasSearched(false);
+    setSearchRefreshKey(reportSearchGeneration);
     setCancelled(true);
+    setLguRegionLoading(false);
     setIsProgressiveLoading(false);
     Swal.fire({ icon: "info", title: "Search Cancelled", timer: 1200, showConfirmButton: false });
   };
 
    const handleDownload = async (
     type: "pdf" | "excel",
-    filters: RootState['reportFilter'], 
+    filters: FilterState, 
     permitTypes?: ("business" | "working" | "barangay" | "building" | "certificate")[]
 ) => {
     // Mark export as active; do not affect search UI
@@ -575,7 +871,8 @@ const Reports: React.FC = () => {
               await exportReportToExcel({
                 data: finalSortedData,
                 moduleLabel: moduleKey,
-                isDayMode: filters.selectedDateType === 'Day'
+                isDayMode: filters.selectedDateType === 'Day',
+                dateRangeLabel,
               }, exportSignal);
             }
           } catch (err: any) {
@@ -601,6 +898,14 @@ const Reports: React.FC = () => {
     [BC]: useRef<HTMLDivElement>(null), [BLDG]: useRef<HTMLDivElement>(null),
     [CO]: useRef<HTMLDivElement>(null),
   };
+  const displayedModules = hasSearched ? uiSelectedModules || [] : [];
+  const rawReportDataByModule = useMemo<ProgressiveDataState>(() => ({
+    [BP]: isSelectAll ? progressiveData[BP] : bpTableData,
+    [WP]: isSelectAll ? progressiveData[WP] : wpTableData,
+    [BC]: isSelectAll ? progressiveData[BC] : bcTableData,
+    [BLDG]: isSelectAll ? progressiveData[BLDG] : bldgTableData,
+    [CO]: isSelectAll ? progressiveData[CO] : coTableData,
+  }), [isSelectAll, progressiveData, bpTableData, wpTableData, bcTableData, bldgTableData, coTableData]);
   
   const scrollToReport = (moduleKey: string) => {
     reportRefs[moduleKey as keyof typeof reportRefs]?.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -608,19 +913,9 @@ const Reports: React.FC = () => {
 
   // Compute counts for ProgressIndicator based on the current FilterSection (UI) filters
   const counts = useMemo(() => {
-    const modulesList = [BP, WP, BC, BLDG, CO];
     const result: Record<string, number> = {};
-    modulesList.forEach((moduleKey) => {
-      let rawData: any = null;
-      if (isSelectAll) {
-        rawData = progressiveData[moduleKey];
-      } else {
-        if (moduleKey === BP) rawData = bpTableData;
-        if (moduleKey === WP) rawData = wpTableData;
-        if (moduleKey === BC) rawData = bcTableData;
-        if (moduleKey === BLDG) rawData = bldgTableData;
-        if (moduleKey === CO) rawData = coTableData;
-      }
+    SUMMARY_MODULES.forEach((moduleKey) => {
+      const rawData = rawReportDataByModule[moduleKey];
       const safeApiData = rawData || { results: [] };
       try {
         const filtered = filterTableResults({
@@ -638,11 +933,109 @@ const Reports: React.FC = () => {
       }
     });
     return result;
-  }, [progressiveData, bpTableData, wpTableData, bcTableData, bldgTableData, coTableData, lguToRegion, uiDateRange, uiSelectedRegions, selectedProvinces, selectedCities, uiSelectedIslands, isSelectAll]);
+  }, [rawReportDataByModule, lguToRegion, uiDateRange, uiSelectedRegions, selectedProvinces, selectedCities, uiSelectedIslands]);
+
+  const reportSummaries = useMemo(() => {
+    const selectedModules = displayedModules;
+    const activeDateRange = appliedFilter.dateRange;
+    const activeRegions = appliedFilter.selectedRegions;
+    const activeIslands = appliedFilter.selectedIslands;
+    const activeDateType = appliedFilter.selectedDateType;
+
+    return selectedModules.map((moduleKey) => {
+      const rawData = rawReportDataByModule[moduleKey];
+
+      const filtered = filterTableResults({
+        apiData: rawData || { results: [] },
+        lguToRegion,
+        dateRange: activeDateRange,
+        selectedRegions: activeRegions,
+        selectedProvinces,
+        selectedCities,
+        selectedIslands: activeIslands,
+        selectedDateType: activeDateType,
+      });
+      const normalized = normalizeSummaryResults(filtered || []);
+
+      const lguNames = new Set<string>();
+      let primaryTotal = 0;
+      let secondaryTotal = 0;
+      let pendingTotal = 0;
+      let maleTotal = 0;
+      let femaleTotal = 0;
+
+      (normalized || []).forEach((lgu: any) => {
+        if (lgu?.hasError) {
+          return;
+        }
+        if (lgu?.lgu) lguNames.add(lgu.lgu);
+
+        if (moduleKey === BP || moduleKey === WP) {
+          const newIssued = sumMonthly(lgu, item => getLicenseIssued(item, NEW_LICENSE_KEYS, Number(item.newPaid || 0)));
+          const renewIssued = sumMonthly(lgu, item => getLicenseIssued(item, RENEW_LICENSE_KEYS, Number(item.renewPaid || 0)));
+          const totalTransactions = sumMonthly(lgu, item => (
+            Number(item.newPaid || 0) + Number(item.newPaidViaEgov || 0) + Number(item.newPending || 0) +
+            Number(item.renewPaid || 0) + Number(item.renewPaidViaEgov || 0) + Number(item.renewPending || 0)
+          ));
+          const pending = sumMonthly(lgu, item => Number(item.newPending || 0) + Number(item.renewPending || 0));
+          const maleCount = sumMonthly(lgu, item => getLicenseIssued(item, MALE_LICENSE_KEYS, Number(item.malePaid || 0)));
+          const femaleCount = sumMonthly(lgu, item => getLicenseIssued(item, FEMALE_LICENSE_KEYS, Number(item.femalePaid || 0)));
+          primaryTotal += newIssued + renewIssued;
+          secondaryTotal += totalTransactions;
+          pendingTotal += pending;
+          maleTotal += maleCount;
+          femaleTotal += femaleCount;
+          return;
+        }
+
+        if (moduleKey === BC) {
+          primaryTotal += sumMonthly(lgu, item => {
+            const genderTotal = Number(item.malePaid || 0) + Number(item.malePending || 0) + Number(item.femalePaid || 0) + Number(item.femalePending || 0);
+            return genderTotal || Number(item.totalCount || 0);
+          });
+          return;
+        }
+
+        if (moduleKey === BLDG || moduleKey === CO) {
+          const pendingKey = moduleKey === BLDG ? 'buildingPending' : 'coPending';
+          const licenseKey = moduleKey === BLDG ? 'buildingLicenseIssued' : 'coLicenseIssued';
+          const forIssuanceKey = moduleKey === BLDG ? 'buildingForIssuance' : 'coForIssuance';
+          primaryTotal += sumMonthly(lgu, item => Number(item[licenseKey] || 0));
+          secondaryTotal += sumMonthly(lgu, item => {
+            const licenseIssued = Number(item[licenseKey] || 0);
+            const forIssuance = Number(item[forIssuanceKey] || 0);
+            return forIssuance + licenseIssued;
+          });
+          pendingTotal += sumMonthly(lgu, item => Number(item[pendingKey] || 0));
+        }
+      });
+
+      const primaryLabel = moduleKey === BC ? 'Total Issued' : 'License Issued';
+      const secondaryLabel = moduleKey === BC ? 'LGUs with Data' : moduleKey === BP || moduleKey === WP ? 'Total Transactions' : 'PAID (For Issuance and License Issued)';
+      const pendingLabel = 'Pending';
+
+      return {
+        moduleKey,
+        lguCount: lguNames.size,
+        primaryLabel,
+        primaryTotal,
+        secondaryLabel,
+        secondaryTotal: moduleKey === BC ? lguNames.size : secondaryTotal,
+        pendingTotal,
+        pendingLabel,
+        maleTotal,
+        femaleTotal,
+      };
+    });
+  }, [
+    displayedModules, appliedFilter,
+    rawReportDataByModule,
+    lguToRegion, selectedProvinces, selectedCities,
+  ]);
 
   return (
     <div ref={tableContainerRef} style={{ position: "relative", marginTop: 24, height: "88vh", overflow: "auto" }}>
-      <div className='p-6 max-w-[1200px] mx-auto bg-background flex flex-col gap-6'>
+      <div className='p-6  mx-auto bg-background flex flex-col gap-6'>
         <FilterSection
           onSearch={handleSearch}
           onDownload={handleDownload}
@@ -651,14 +1044,113 @@ const Reports: React.FC = () => {
           // === START OF FIX ===
           // Prevent showing the main loading state during an export.
           // This stops the `loading` prop from triggering the cancel button appearance.
-          loading={!isExportActive && (isSearchActive || lguRegionLoading || anyModuleLoading)}
+          loading={!isExportActive && (isSearchActive || anyModuleLoading)}
           // Hide the cancel button during export operations by not providing onCancel when exporting
           onCancel={isExportActive ? undefined : handleCancelSearch}
           // === END OF FIX ===
           hasSearched={hasSearched}
         />
+        {reportSummaries.length > 0 && (
+          <div className="flex flex-col gap-3">
+            <button
+              type="button"
+              onClick={() => setSummaryCardsOpen(prev => !prev)}
+              className="flex w-full items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-3 text-left shadow-sm hover:shadow-md transition-shadow duration-200"
+              aria-expanded={summaryCardsOpen}
+            >
+              <div>
+                <h2 className="text-sm font-bold uppercase tracking-wide text-gray-700">Summary Cards</h2>
+                <p className="text-xs text-gray-500">{reportSummaries.length} selected module{reportSummaries.length > 1 ? 's' : ''}</p>
+              </div>
+              <ChevronDown className={`h-5 w-5 text-gray-500 transition-transform duration-200 ${summaryCardsOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {summaryCardsOpen && (
+              <div className="grid grid-cols-3 slg:grid-cols-2 md:grid-cols-1 gap-4">
+                {reportSummaries.map(summary => {
+                  const theme = getSummaryCardTheme(summary.moduleKey);
+                  const IconComponent = theme.icon;
+                  const isCardLoading = Boolean(moduleLoading[summary.moduleKey]);
+
+                  return (
+                    <button
+                      key={summary.moduleKey}
+                      type="button"
+                      onClick={() => scrollToReport(summary.moduleKey)}
+                      className={`bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 relative overflow-hidden border-l-4 ${isCardLoading ? 'border-l-transparent' : theme.borderAccent} text-left cursor-pointer`}
+                    >
+                      {isCardLoading && (
+                        <div className="absolute left-0 top-0 h-full w-1 overflow-hidden">
+                          <div
+                            className="h-1/3 w-full animate-[summaryCardLine_1.3s_linear_infinite]"
+                            style={{ backgroundColor: theme.loaderColor }}
+                          />
+                          <style>
+                            {`
+                              @keyframes summaryCardLine {
+                                0% { transform: translateY(-120%); }
+                                100% { transform: translateY(320%); }
+                              }
+                            `}
+                          </style>
+                        </div>
+                      )}
+                      <div className="p-4">
+                        <div className="flex items-start justify-between mb-3 gap-3">
+                          <div className="flex items-center space-x-2 min-w-0">
+                            <div className={`p-2 rounded-md ${theme.iconColor} text-white shadow-sm shrink-0`}>
+                              <IconComponent className="w-4 h-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <h3 className="text-xs font-medium text-gray-600 uppercase tracking-wide truncate">{summary.moduleKey}</h3>
+                              <p className="text-xs text-gray-500">{summary.primaryLabel}</p>
+                            </div>
+                          </div>
+                          <span className="shrink-0 rounded-md bg-gray-50 px-2 py-1 text-xs font-semibold tabular-nums text-gray-600">
+                            {formatNumber(summary.lguCount)} LGUs
+                          </span>
+                        </div>
+
+                        <div className="flex items-baseline space-x-2">
+                          <p className={`text-2xl font-bold tabular-nums ${theme.accentColor}`}>{formatNumber(summary.primaryTotal)}</p>
+                          <TrendingUp className="w-3 h-3 text-green-500" />
+                        </div>
+
+                        <div className={`mt-3 grid gap-2 text-xs ${summary.moduleKey === BC ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                          <div className="rounded-md bg-gray-50 px-2 py-1.5">
+                            <p className="font-semibold tabular-nums text-gray-800">{formatNumber(summary.secondaryTotal)}</p>
+                            <p className="text-gray-500">{summary.secondaryLabel}</p>
+                          </div>
+                          {summary.moduleKey !== BC && (
+                            <div className="rounded-md bg-gray-50 px-2 py-1.5">
+                              <p className="font-semibold tabular-nums text-gray-800">{formatNumber(summary.pendingTotal)}</p>
+                              <p className="text-gray-500">{summary.pendingLabel}</p>
+                            </div>
+                          )}
+                        </div>
+
+                        {(summary.moduleKey === BP || summary.moduleKey === WP) && (
+                          <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                            <div className="rounded-md bg-gray-50 px-2 py-1.5">
+                              <p className="font-semibold tabular-nums text-gray-800">{formatNumber(summary.maleTotal)}</p>
+                              <p className="text-gray-500">Male Count</p>
+                            </div>
+                            <div className="rounded-md bg-gray-50 px-2 py-1.5">
+                              <p className="font-semibold tabular-nums text-gray-800">{formatNumber(summary.femaleTotal)}</p>
+                              <p className="text-gray-500">Female Count</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
         <div className="relative flex flex-col gap-6">
-          {uiSelectedModules.includes(BP) && 
+          {displayedModules.includes(BP) && 
             <div ref={reportRefs[BP]}>
               <BusinessPermitReport 
               selectedRegions={hasSearched ? appliedFilter.selectedRegions : uiSelectedRegions}
@@ -667,17 +1159,17 @@ const Reports: React.FC = () => {
               selectedIslands={hasSearched ? appliedFilter.selectedIslands : uiSelectedIslands}
               selectedProvinces={selectedProvinces} 
               selectedCities={selectedCities} 
-              apiData={isSelectAll ? progressiveData[BP] : bpTableData} 
-              loading={(isSelectAll ? isProgressiveLoading : (moduleLoading[BP] || bpLoading))} 
-              isProgressive={isProgressiveLoading} 
+              apiData={rawReportDataByModule[BP]} 
+              loading={moduleLoading[BP] || bpLoading} 
+              isProgressive={moduleLoading[BP]} 
               lguToRegion={lguToRegion} 
               hasSearched={hasSearched} 
               moduleLoading={moduleLoading[BP]}
               searchStartedAt={generatedAt}
-              searchLoading={(isSelectAll ? isProgressiveLoading : (moduleLoading[BP] || bpLoading))}
+              searchLoading={moduleLoading[BP] || bpLoading}
               onTableDataChange={setHasTableData}/>
             </div>}
-          {uiSelectedModules.includes(WP) && 
+          {displayedModules.includes(WP) && 
             <div ref={reportRefs[WP]}>
               <WorkingPermitReport 
               selectedRegions={hasSearched ? appliedFilter.selectedRegions : uiSelectedRegions}
@@ -686,17 +1178,17 @@ const Reports: React.FC = () => {
               selectedIslands={hasSearched ? appliedFilter.selectedIslands : uiSelectedIslands}
               selectedProvinces={selectedProvinces} 
               selectedCities={selectedCities} 
-              apiData={isSelectAll ? progressiveData[WP] : wpTableData} 
-              loading={(isSelectAll ? isProgressiveLoading : (moduleLoading[WP] || wpLoading))} 
-              isProgressive={isProgressiveLoading} 
+              apiData={rawReportDataByModule[WP]} 
+              loading={moduleLoading[WP] || wpLoading} 
+              isProgressive={moduleLoading[WP]} 
               lguToRegion={lguToRegion} 
               hasSearched={hasSearched} 
               moduleLoading={moduleLoading[WP]}
               searchStartedAt={generatedAt}
-              searchLoading={(isSelectAll ? isProgressiveLoading : (moduleLoading[WP] || wpLoading))}
+              searchLoading={moduleLoading[WP] || wpLoading}
               onTableDataChange={setHasTableData}/>
             </div>}
-          {uiSelectedModules.includes(BC) && 
+          {displayedModules.includes(BC) && 
             <div ref={reportRefs[BC]}>
               <BrgyClearanceReport 
               selectedRegions={hasSearched ? appliedFilter.selectedRegions : uiSelectedRegions}
@@ -705,17 +1197,17 @@ const Reports: React.FC = () => {
               selectedIslands={hasSearched ? appliedFilter.selectedIslands : uiSelectedIslands}
               selectedProvinces={selectedProvinces} 
               selectedCities={selectedCities} 
-              apiData={isSelectAll ? progressiveData[BC] : bcTableData} 
-              loading={(isSelectAll ? isProgressiveLoading : (moduleLoading[BC] || bcLoading))} 
-              isProgressive={isProgressiveLoading} 
+              apiData={rawReportDataByModule[BC]} 
+              loading={moduleLoading[BC] || bcLoading} 
+              isProgressive={moduleLoading[BC]} 
               lguToRegion={lguToRegion} 
               hasSearched={hasSearched} 
               moduleLoading={moduleLoading[BC]}
               searchStartedAt={generatedAt}
-              searchLoading={(isSelectAll ? isProgressiveLoading : (moduleLoading[BC] || bcLoading))}
+              searchLoading={moduleLoading[BC] || bcLoading}
               onTableDataChange={setHasTableData}/>
             </div>}
-          {uiSelectedModules.includes(BLDG) && 
+          {displayedModules.includes(BLDG) && 
             <div ref={reportRefs[BLDG]}>
               <BuildingPermitReport 
               selectedRegions={hasSearched ? appliedFilter.selectedRegions : uiSelectedRegions}
@@ -724,17 +1216,17 @@ const Reports: React.FC = () => {
               selectedIslands={hasSearched ? appliedFilter.selectedIslands : uiSelectedIslands}
               selectedProvinces={selectedProvinces} 
               selectedCities={selectedCities} 
-              apiData={isSelectAll ? progressiveData[BLDG] : bldgTableData} 
-              loading={(isSelectAll ? isProgressiveLoading : (moduleLoading[BLDG] || bldgLoading))} 
-              isProgressive={isProgressiveLoading} 
+              apiData={rawReportDataByModule[BLDG]} 
+              loading={moduleLoading[BLDG] || bldgLoading} 
+              isProgressive={moduleLoading[BLDG]} 
               lguToRegion={lguToRegion} 
               hasSearched={hasSearched} 
               moduleLoading={moduleLoading[BLDG]}
               searchStartedAt={generatedAt}
-              searchLoading={(isSelectAll ? isProgressiveLoading : (moduleLoading[BLDG] || bldgLoading))}
+              searchLoading={moduleLoading[BLDG] || bldgLoading}
               onTableDataChange={setHasTableData}/>
             </div>}
-          {uiSelectedModules.includes(CO) && 
+          {displayedModules.includes(CO) && 
             <div ref={reportRefs[CO]}>
               <CertificateOfOccupancyReport 
               selectedRegions={hasSearched ? appliedFilter.selectedRegions : uiSelectedRegions}
@@ -743,17 +1235,17 @@ const Reports: React.FC = () => {
               selectedIslands={hasSearched ? appliedFilter.selectedIslands : uiSelectedIslands}
               selectedProvinces={selectedProvinces} 
               selectedCities={selectedCities} 
-              apiData={isSelectAll ? progressiveData[CO] : coTableData} 
-              loading={(isSelectAll ? isProgressiveLoading : (moduleLoading[CO] || coLoading))} 
-              isProgressive={isProgressiveLoading} 
+              apiData={rawReportDataByModule[CO]} 
+              loading={moduleLoading[CO] || coLoading} 
+              isProgressive={moduleLoading[CO]} 
               lguToRegion={lguToRegion} 
               hasSearched={hasSearched} 
               moduleLoading={moduleLoading[CO]}
               searchStartedAt={generatedAt}
-              searchLoading={(isSelectAll ? isProgressiveLoading : (moduleLoading[CO] || coLoading))}
+              searchLoading={moduleLoading[CO] || coLoading}
               onTableDataChange={setHasTableData}/>
             </div>}
-          {!loading && uiSelectedModules.length === 0 && (
+          {!loading && !hasSearched && uiSelectedModules.length === 0 && (
             <div className="text-center bg-card p-8 rounded-lg border text-secondary-foreground border-border shadow-sm">
               <div className="flex flex-col items-center gap-4">
                 <Filter className="h-16 w-16 text-muted-foreground" />

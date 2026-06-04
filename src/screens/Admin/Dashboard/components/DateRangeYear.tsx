@@ -47,6 +47,7 @@ function DateRangeYear({
   React.useEffect(() => {
     let startDate: Date | null = null;
     let endDate: Date | null = null;
+    
     if (value?.start) {
       startDate = value.start instanceof Date ? value.start : new Date(value.start);
       if (!isNaN(startDate.getTime())) {
@@ -57,6 +58,7 @@ function DateRangeYear({
     } else {
       setFrom(null);
     }
+    
     if (value?.end) {
       endDate = value.end instanceof Date ? value.end : new Date(value.end);
       if (!isNaN(endDate.getTime())) {
@@ -74,6 +76,7 @@ function DateRangeYear({
     setFrom({ year });
     // Do not reset 'to' here!
   };
+  
   const handleToYear = (year: number) => {
     if (from && year < from.year) {
       setTo(from);
@@ -92,8 +95,8 @@ function DateRangeYear({
         [startYear, endYear] = [endYear, startYear];
       }
       onChange({
-        start: new Date(from.year, 0, 1), // 01-01-YYYY
-        end: new Date(to.year, 11, 31),   // 12-31-YYYY
+        start: new Date(startYear, 0, 1), // 01-01-YYYY
+        end: new Date(endYear, 11, 31),   // 12-31-YYYY
       });
       onApply?.(); // Close dropdown after applying
     } else if (from && onChange) {
@@ -160,9 +163,9 @@ function DateRangeYear({
             variant="default"
             onClick={handleApply}
             disabled={!from}
-            className={loading?" h-8 pointer-events-none":"h-8"}
+            className={loading ? " h-8 pointer-events-none" : "h-8"}
           >
-          {loading ? "Applying..." : "Apply"}
+            {loading ? "Applying..." : "Apply"}
           </Button>
           <Button
             variant="outline"

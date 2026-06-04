@@ -36,6 +36,23 @@ function getRegionSortIndex(regionKey: string): number {
   if (normalized === 'region not specified') { return DESIRED_REGION_ORDER.length + 1; }
   return DESIRED_REGION_ORDER.length;
 }
+
+const CO_FOR_ISSUANCE_KEYS = ['coForIssuance', 'forIssuance'];
+
+function getExplicitNumber(item: any, keys: string[]): number | null {
+  for (const key of keys) {
+    const value = item?.[key];
+    if (value !== null && value !== undefined && value !== '') {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+  }
+  return null;
+}
+
+function getCitizensServed(lgu: any): number {
+  return Number(lgu?.totalCitizensServed || 0);
+}
 // --- End Region Sorting Helpers ---
 
 interface CertificateOfOccupancyProps {
@@ -82,31 +99,9 @@ const CertificateOfOccupancyReport = forwardRef<HTMLDivElement, CertificateOfOcc
   const normalizedSelectedRegions = useMemo(() => (selectedRegions || []).map(normalizeRegionKeyForSort), [selectedRegions]);
   const completeLguToRegion = useMemo(() => { const combinedMap = { ...lguToRegion }; if (apiData?.results && Array.isArray(apiData.results)) { apiData.results.forEach((lgu: any) => { if (lgu?.lgu && lgu?.region) { const normalized = normalizeRegionKeyForSort(lgu.region); combinedMap[lgu.lgu] = regionMapping[lgu.region as keyof typeof regionMapping] || normalized || lgu.region; } }); } return combinedMap; }, [apiData, lguToRegion]);
   const filteredResults = useMemo(() => { return filterTableResults({ apiData, selectedRegions: normalizedSelectedRegions, selectedProvinces, selectedCities, selectedDateType, selectedIslands, lguToRegion: completeLguToRegion, dateRange, }); }, [ apiData, normalizedSelectedRegions, selectedProvinces, selectedCities, selectedDateType, selectedIslands, completeLguToRegion, dateRange ]);
-  const normalizedResults = useMemo(() => { type MonthEntry = { month: string; coPaid: number; coPending: number }; const byLgu = new Map<string, { lgu: any; monthsMap: Map<string, MonthEntry>; hasError?: boolean }>(); for (const entry of filteredResults as any[]) { const key = entry?.lgu || ''; if (!key) continue; if (!byLgu.has(key)) { byLgu.set(key, { lgu: { ...entry, monthlyResults: [] }, monthsMap: new Map<string, MonthEntry>(), hasError: entry?.hasError, }); } const bucket = byLgu.get(key)!; if (entry?.hasError) bucket.hasError = true; const monthsArr = Array.isArray(entry?.monthlyResults) ? entry.monthlyResults : []; for (const m of monthsArr) { const mKey = m?.month; if (!mKey) continue; bucket.monthsMap.set(mKey, { month: mKey, coPaid: Number(m?.coPaid || 0), coPending: Number(m?.coPending || 0), }); } } const deduped: any[] = []; byLgu.forEach(({ lgu, monthsMap, hasError }) => { const monthlyResults = Array.from(monthsMap.values()).sort((a, b) => a.month.localeCompare(b.month)); const months = monthlyResults.map(m => m.month); deduped.push({ ...lgu, hasError: !!hasError, monthlyResults, months, }); }); return deduped; }, [filteredResults]);
+  const normalizedResults = useMemo(() => { type MonthEntry = { month: string; coPaid: number; coForIssuance: number; coLicenseIssued: number; coPending: number }; const byLgu = new Map<string, { lgu: any; monthsMap: Map<string, MonthEntry>; hasError?: boolean }>(); for (const entry of filteredResults as any[]) { const key = entry?.lgu || ''; if (!key) continue; if (!byLgu.has(key)) { byLgu.set(key, { lgu: { ...entry, monthlyResults: [] }, monthsMap: new Map<string, MonthEntry>(), hasError: entry?.hasError, }); } const bucket = byLgu.get(key)!; if (entry?.hasError) bucket.hasError = true; const monthsArr = Array.isArray(entry?.monthlyResults) ? entry.monthlyResults : []; for (const m of monthsArr) { const mKey = m?.month; if (!mKey) continue; const coPaid = Number(m?.coPaid || 0); bucket.monthsMap.set(mKey, { month: mKey, coPaid, coForIssuance: getExplicitNumber(m, CO_FOR_ISSUANCE_KEYS) ?? 0, coLicenseIssued: Number(m?.coLicenseIssued || 0), coPending: Number(m?.coPending || 0), }); } } const deduped: any[] = []; byLgu.forEach(({ lgu, monthsMap, hasError }) => { const monthlyResults = Array.from(monthsMap.values()).sort((a, b) => a.month.localeCompare(b.month)); const months = monthlyResults.map(m => m.month); deduped.push({ ...lgu, hasError: !!hasError, monthlyResults, months, }); }); return deduped; }, [filteredResults]);
   const regionMappingGrouped = useMemo(() => groupResultsByRegion(normalizedResults, completeLguToRegion), [normalizedResults, completeLguToRegion]);
-  const grandTotals = useMemo(() => {
-    const totals: { licenseIssued: number; paid: number; geoPay: number; pending: number; total: number; totalCitizensServed: number } = { licenseIssued: 0, paid: 0, geoPay: 0, pending: 0, total: 0, totalCitizensServed: 0 };
-    normalizedResults.forEach((lgu: any) => {
-      if (!lgu.hasError && Array.isArray(lgu.monthlyResults)) {
-        lgu.monthlyResults.forEach((item: any) => {
-          const paid = Number(item.coPaid || 0);
-          const geo = Number(item.coPaidViaEgov || 0);
-          const pending = Number(item.coPending || 0);
-          const licenseIssued = Number(item.coLicenseIssued ?? item.coIssued ?? paid ?? 0);
-          totals.paid += paid;
-          totals.geoPay += geo;
-          totals.pending += pending;
-          totals.licenseIssued += licenseIssued;
-          totals.total += licenseIssued + pending;
-        });
-      }
-      // Sum per-LGU totalCitizensServed once per LGU (skip errored LGUs)
-      if (!lgu.hasError) {
-        totals.totalCitizensServed += Number(lgu.totalCitizensServed || 0);
-      }
-    });
-    return totals;
-  }, [normalizedResults]);
+  const grandTotals = useMemo(() => { const totals = { citizensServed: 0, licenseIssued: 0, paid: 0, geoPay: 0, pending: 0, total: 0 }; normalizedResults.forEach((lgu: any) => { if (!lgu.hasError && Array.isArray(lgu.monthlyResults)) { totals.citizensServed += getCitizensServed(lgu); lgu.monthlyResults.forEach((item: any) => { const licenseIssued = Number(item.coLicenseIssued || 0); const forIssuance = Number(item.coForIssuance || 0); const paid = forIssuance + licenseIssued; const geo = Number(item.coPaidViaEgov || 0); const pending = Number(item.coPending || 0); totals.licenseIssued += licenseIssued; totals.paid += paid; totals.geoPay += geo; totals.pending += pending; totals.total += paid + pending; }); } }); return totals; }, [normalizedResults]);
 
   useEffect(() => { onTableDataChange?.(normalizedResults.length > 0); }, [normalizedResults.length, onTableDataChange]);
 
@@ -119,10 +114,11 @@ const CertificateOfOccupancyReport = forwardRef<HTMLDivElement, CertificateOfOcc
   const renderTableRows = () => {
     const allRows: React.ReactNode[] = [];
     const sortedRegionKeys = Object.keys(regionMappingGrouped).sort((a, b) => getRegionSortIndex(a) - getRegionSortIndex(b) || a.localeCompare(b));
+    let rowNumber = 1;
     sortedRegionKeys.forEach(region => {
       const lguList = regionMappingGrouped[region];
       const isRegionOpen = openRegions.has(region);
-        allRows.push(<TableRow key={`${region}-trigger`}><TableCell colSpan={7} className="text-center p-2 cursor-pointer bg-slate-50 hover:bg-slate-100 font-semibold text-blue-600 text-xs" onClick={() => toggleRegion(region)}>{isRegionOpen ? `▲ Hide ${getRegionCode(region) || region} Data` : `▼ View ${getRegionCode(region) || region} Data`}</TableCell></TableRow>);
+      allRows.push(<TableRow key={`${region}-trigger`}><TableCell colSpan={8} className="text-center p-2 cursor-pointer bg-slate-50 hover:bg-slate-100 font-semibold text-blue-600 text-xs" onClick={() => toggleRegion(region)}>{isRegionOpen ? `▲ Hide ${getRegionCode(region) || region} Data` : `▼ View ${getRegionCode(region) || region} Data`}</TableCell></TableRow>);
       if (isRegionOpen) {
         const rows: React.ReactNode[] = [];
         const isDayMode = selectedDateType === "Day";
@@ -131,34 +127,32 @@ const CertificateOfOccupancyReport = forwardRef<HTMLDivElement, CertificateOfOcc
         
         lguList.forEach((lgu: any) => {
           if (lgu.hasError) {
-            rows.push(<TableRow key={`${region}-${lgu.lgu}-error`} className="bg-red-50/50">{isFirstRowOfRegion && <TableCell className="p-3 text-center font-bold text-slate-700 align-middle bg-slate-50 border-r text-sm" rowSpan={totalRowsForRegion}>{getRegionCode(region) || region}</TableCell>}<TableCell className="p-3 text-left font-semibold text-slate-800 text-sm">{lgu.lgu}<br/><span className="text-[11px] font-bold text-red-600 mt-0.5 uppercase">{lgu.error || 'NO DATA AVAILABLE'}</span></TableCell><TableCell colSpan={4} className="p-3 text-center text-slate-500">-</TableCell></TableRow>);
-            isFirstRowOfRegion = false; return; 
+            rows.push(<TableRow key={`${region}-${lgu.lgu}-error`} className="bg-red-50/50"><TableCell className="p-3 text-center font-semibold text-slate-500 tabular-nums">{rowNumber++}</TableCell>{isFirstRowOfRegion && <TableCell className="p-3 text-center font-bold text-slate-700 align-middle bg-slate-50 border-r text-sm" rowSpan={totalRowsForRegion}>{getRegionCode(region) || region}</TableCell>}<TableCell className="p-3 text-left font-semibold text-slate-800 text-sm">{lgu.lgu}<br/><span className="text-[11px] font-bold text-red-600 mt-0.5 uppercase">{lgu.error || 'NO DATA AVAILABLE'}</span></TableCell><TableCell className="p-3 text-right tabular-nums text-slate-500">-</TableCell><TableCell colSpan={4} className="p-3 text-center text-slate-500">-</TableCell></TableRow>);
+            isFirstRowOfRegion = false; return;
           }
-          const rowsForThisLgu = lgu.hasError ? 1 : (isDayMode ? Math.max(1, lgu.monthlyResults?.length || 0) : 1);
-          let isFirstRowOfLgu = true;
-          const dataToRender = isDayMode ? (lgu.monthlyResults?.length > 0 ? lgu.monthlyResults : [{ coPaid: 0, coPending: 0 }]) : [ (lgu.monthlyResults || []).reduce((acc: any, current: any) => { acc.coPaid += Number(current.coPaid || 0); acc.coPending += Number(current.coPending || 0); return acc; }, { coPaid: 0, coPending: 0 })];
+          const dataToRender = isDayMode ? (lgu.monthlyResults?.length > 0 ? lgu.monthlyResults : [{ coPaid: 0, coForIssuance: 0, coLicenseIssued: 0, coPending: 0 }]) : [ (lgu.monthlyResults || []).reduce((acc: any, current: any) => { acc.coPaid += current.coPaid || 0; acc.coForIssuance += current.coForIssuance || 0; acc.coLicenseIssued += current.coLicenseIssued || 0; acc.coPending += current.coPending || 0; return acc; }, { coPaid: 0, coForIssuance: 0, coLicenseIssued: 0, coPending: 0 })];
+          const lguRowsToRender = dataToRender.length;
           dataToRender.forEach((item: any, itemIdx: number) => {
             const periodLabel = isDayMode ? (item.month ? `(${formatMonthYear(item.month)})` : '') : (lgu.months?.length > 1 ? `(${formatMonthYear(lgu.months[0])} - ${formatMonthYear(lgu.months[lgu.months.length - 1])})` : lgu.months?.length === 1 ? `(${formatMonthYear(lgu.months[0])})` : "");
             
             rows.push(
               <TableRow key={`${region}-${lgu.lgu}-${item.month || itemIdx}`} className="hover:bg-blue-50/70 transition-colors duration-200 text-sm">
+                <TableCell className="p-3 text-center font-semibold text-slate-500 tabular-nums">{rowNumber++}</TableCell>
                 {isFirstRowOfRegion && <TableCell className="p-3 text-center font-bold text-slate-700 align-middle bg-slate-50 border-r text-sm" rowSpan={totalRowsForRegion}>{getRegionCode(region) || region}</TableCell>}
                 <TableCell className="p-3 text-left font-semibold text-slate-800"><div>{lgu.lgu}<span className="ml-1.5 text-xs font-medium text-slate-500">{lgu.province ? `(${lgu.province})` : ""}</span></div><div className="text-[11px] font-semibold text-blue-700 mt-0.5">{periodLabel}</div></TableCell>
-                {isFirstRowOfLgu && <TableCell className="p-3 text-right tabular-nums text-slate-800" rowSpan={rowsForThisLgu}>{formatNumber(Number(lgu.totalCitizensServed || 0))}</TableCell>}
-                {/* Prefer explicit License Issued field; PAID shows For Issuance + eGOV */}
+                {itemIdx === 0 && <TableCell className="p-3 text-right tabular-nums text-slate-800 align-middle" rowSpan={lguRowsToRender}>{formatNumber(getCitizensServed(lgu))}</TableCell>}
                 {(() => {
-                  const paid = Number(item.coPaid || 0);
-                  const geo = Number(item.coPaidViaEgov || 0);
                   const pending = Number(item.coPending || 0);
-                  const licenseIssued = Number(item.coLicenseIssued ?? item.coIssued ?? paid ?? 0);
-                  const paidTotal = paid + geo; // For Issuance + eGOV
-                  const total = licenseIssued + pending;
+                  const licenseIssued = Number(item.coLicenseIssued || 0);
+                  const forIssuance = Number(item.coForIssuance || 0);
+                  const paidDisplay = forIssuance + licenseIssued;
+                  const total = paidDisplay + pending;
                   return (
                     <>
-                      <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(licenseIssued)}</TableCell>
-                      <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(paidTotal)}</TableCell>
+                      <TableCell className="p-3 text-right font-semibold tabular-nums text-slate-900 bg-blue-50">{formatNumber(licenseIssued)}</TableCell>
+                      <TableCell className="p-3 text-right font-semibold tabular-nums text-slate-900 bg-emerald-50">{formatNumber(paidDisplay)}</TableCell>
                       <TableCell className="p-3 text-right tabular-nums text-slate-800">{formatNumber(pending)}</TableCell>
-                      <TableCell className="p-3 text-right font-bold tabular-nums text-slate-900 bg-slate-100">{formatNumber(total)}</TableCell>
+                      <TableCell className="p-3 text-right font-bold tabular-nums text-slate-900 bg-blue-100">{formatNumber(total)}</TableCell>
                     </>
                   );
                 })()}
@@ -168,39 +162,13 @@ const CertificateOfOccupancyReport = forwardRef<HTMLDivElement, CertificateOfOcc
           });
         });
         allRows.push(...rows);
-  const regionTotal = { licenseIssued: 0, paid: 0, geoPay: 0, pending: 0, total: 0 };
-  lguList.forEach((lgu: any) => {
-    if (!lgu.hasError && lgu.monthlyResults && Array.isArray(lgu.monthlyResults)) {
-      lgu.monthlyResults.forEach((item: any) => {
-        const paid = Number(item.coPaid || 0);
-        const geo = Number(item.coPaidViaEgov || 0);
-        const pending = Number(item.coPending || 0);
-        const licenseIssued = Number(item.coLicenseIssued ?? item.coIssued ?? paid ?? 0);
-        regionTotal.paid += paid;
-        regionTotal.geoPay += geo;
-        regionTotal.pending += pending;
-        regionTotal.licenseIssued += licenseIssued;
-        regionTotal.total += licenseIssued + pending;
-      });
-    }
-  });
+  const regionTotal = { citizensServed: 0, licenseIssued: 0, paid: 0, geoPay: 0, pending: 0, total: 0 };
+  lguList.forEach((lgu: any) => { if (!lgu.hasError && lgu.monthlyResults && Array.isArray(lgu.monthlyResults)) { regionTotal.citizensServed += getCitizensServed(lgu); lgu.monthlyResults.forEach((item: any) => { const licenseIssued = Number(item.coLicenseIssued || 0); const forIssuance = Number(item.coForIssuance || 0); const paid = forIssuance + licenseIssued; const geo = Number(item.coPaidViaEgov || 0); const pending = Number(item.coPending || 0); regionTotal.licenseIssued += licenseIssued; regionTotal.paid += paid; regionTotal.geoPay += geo; regionTotal.pending += pending; regionTotal.total += paid + pending; }); } });
 
-  const regionLicenseIssued = regionTotal.licenseIssued;
-  const regionTotalSum = regionLicenseIssued + (regionTotal.pending || 0);
-  const regionCitizensServed = lguList.reduce((acc: number, lgu: any) => acc + (lgu.hasError ? 0 : Number(lgu.totalCitizensServed || 0)), 0);
+  const regionLicenseIssued = regionTotal.licenseIssued || 0;
+  const regionTotalSum = (regionTotal.paid || 0) + (regionTotal.pending || 0);
 
-  allRows.push(
-    <TableRow key={`${region}-subtotal`} className="font-bold text-slate-900">
-      <TableCell className="bg-slate-200 p-3 text-left" colSpan={2}>
-        <div className="font-extrabold tracking-wider text-xs">SUB-TOTAL ({getRegionCode(region) || region})</div>
-      </TableCell>
-      <TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionCitizensServed)}</TableCell>
-      <TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionLicenseIssued)}</TableCell>
-      <TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotal.paid)}</TableCell>
-      <TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotal.pending)}</TableCell>
-      <TableCell className="bg-slate-300 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotalSum)}</TableCell>
-    </TableRow>
-  );
+  allRows.push(<TableRow key={`${region}-subtotal`} className="font-bold text-slate-900"><TableCell className="bg-slate-200 p-3 text-left" colSpan={3}><div className="font-extrabold tracking-wider text-xs">SUB-TOTAL ({getRegionCode(region) || region})</div></TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotal.citizensServed)}</TableCell><TableCell className="bg-blue-100 p-3 text-right tabular-nums text-sm">{formatNumber(regionLicenseIssued)}</TableCell><TableCell className="bg-emerald-100 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotal.paid)}</TableCell><TableCell className="bg-slate-200 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotal.pending)}</TableCell><TableCell className="bg-blue-100 p-3 text-right tabular-nums text-sm">{formatNumber(regionTotalSum)}</TableCell></TableRow>);
       }
     });
     return allRows;
@@ -220,14 +188,15 @@ const CertificateOfOccupancyReport = forwardRef<HTMLDivElement, CertificateOfOcc
             {/* ===== START OF DESIGN CHANGE ===== */}
             <TableHeader className="[&>tr]:border-b-0">
               <TableRow>
-                  <TableHead rowSpan={2} className="bg-[#9ec6f7] text-black font-bold p-3 text-center align-middle sticky top-0 z-20 text-xs border-b border-r border-slate-300">Region</TableHead>
-                  <TableHead rowSpan={2} className="bg-[#9ec6f7] text-black font-bold p-3 text-left align-middle sticky top-0 z-20 text-xs border-b border-r border-slate-300">LGU</TableHead>
-                  <TableHead rowSpan={2} className="bg-[#9ec6f7] text-black font-bold p-3 text-right align-middle sticky top-0 z-20 text-xs border-b border-r border-slate-300">Total Citizens Served</TableHead>
-                  <TableHead colSpan={4} className="bg-[#9ec6f7] text-black font-bold p-3 text-center sticky top-0 z-20 uppercase tracking-wider text-xs border-b border-r border-slate-300">Certificate of Occupancy</TableHead>
-                </TableRow>
+                <TableHead rowSpan={2} className="bg-[#9ec6f7] text-black font-bold p-3 text-center align-middle sticky top-0 z-20 text-xs border-b border-r border-slate-300 w-16">#</TableHead>
+                <TableHead rowSpan={2} className="bg-[#9ec6f7] text-black font-bold p-3 text-center align-middle sticky top-0 z-20 text-xs border-b border-r border-slate-300">Region</TableHead>
+                <TableHead rowSpan={2} className="bg-[#9ec6f7] text-black font-bold p-3 text-left align-middle sticky top-0 z-20 text-xs border-b border-r border-slate-300">LGU</TableHead>
+                <TableHead rowSpan={2} className="bg-[#9ec6f7] text-black font-bold p-3 text-right align-middle sticky top-0 z-20 text-xs border-b border-r border-slate-300">Citizens Served</TableHead>
+                <TableHead colSpan={4} className="bg-[#9ec6f7] text-black font-bold p-3 text-center sticky top-0 z-20 uppercase tracking-wider text-xs border-b border-r border-slate-300">Certificate of Occupancy</TableHead>
+              </TableRow>
               <TableRow>
-                <TableHead className="bg-blue-100 text-black p-2 sticky top-[49px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">License Issued</TableHead>
-                <TableHead className="bg-blue-100 text-black p-2 sticky top-[49px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">PAID <br /><span className='font-normal'>(For Issuance and License Issued)</span></TableHead>
+                <TableHead className="bg-blue-200 text-black p-2 sticky top-[49px] z-20 text-center font-bold text-[10px] border-b border-r border-slate-300">License Issued</TableHead>
+                <TableHead className="bg-emerald-100 text-black p-2 sticky top-[49px] z-20 text-center font-bold text-[10px] border-b border-r border-slate-300">PAID <br /> <span className='font-normal'>(For Issuance and License Issued)</span></TableHead>
                 <TableHead className="bg-blue-100 text-black p-2 sticky top-[49px] z-20 text-center font-semibold text-[10px] border-b border-r border-slate-300">ONGOING <br /><span className='font-normal'>(For Payment)</span></TableHead>
                 <TableHead className="bg-blue-200 text-black p-2 sticky top-[49px] z-20 text-center font-bold uppercase text-[10px] border-b border-slate-300">Total</TableHead>
               </TableRow>
@@ -238,14 +207,14 @@ const CertificateOfOccupancyReport = forwardRef<HTMLDivElement, CertificateOfOcc
               {normalizedResults.length > 0 ? (
                 <>
                   {renderTableRows()}
-                  {Object.keys(regionMappingGrouped).length > 1 && <TableRow><TableCell colSpan={7} className="text-center p-2 cursor-pointer bg-slate-100 hover:bg-slate-200 font-bold text-slate-700 text-xs" onClick={toggleAllRegions}>{openRegions.size === Object.keys(regionMappingGrouped).length ? 'Collapse All Regions' : 'Expand All Regions'}</TableCell></TableRow>}
-                  {(loading || isProgressive) && <TableRow><TableCell colSpan={7} className="p-0"><LoaderTable message={isProgressive ? "Please wait for other regions..." : "Updating data..."} /></TableCell></TableRow>}
+                  {Object.keys(regionMappingGrouped).length > 1 && <TableRow><TableCell colSpan={8} className="text-center p-2 cursor-pointer bg-slate-100 hover:bg-slate-200 font-bold text-slate-700 text-xs" onClick={toggleAllRegions}>{openRegions.size === Object.keys(regionMappingGrouped).length ? 'Collapse All Regions' : 'Expand All Regions'}</TableCell></TableRow>}
+                  {(loading || isProgressive) && <TableRow><TableCell colSpan={8} className="p-0"><LoaderTable message={isProgressive ? "Please wait for other regions..." : "Updating data..."} /></TableCell></TableRow>}
                 </>
               ) : loading ? (
-                <TableRow><TableCell colSpan={7} className="text-center py-12"><LoaderTable /></TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center py-12"><LoaderTable /></TableCell></TableRow>
               ) : (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-20 bg-white">
+                  <TableCell colSpan={8} className="text-center py-20 bg-white">
                     <div className='flex flex-col items-center justify-center'>
                       <div className="rounded-full bg-slate-100 p-4"><Search className="h-10 w-10 text-slate-400" /></div>
                       <p className='font-bold text-lg text-slate-600 mt-5'>{hasSearched ? 'No Results Found' : 'Generate a Report'}</p>
@@ -257,12 +226,12 @@ const CertificateOfOccupancyReport = forwardRef<HTMLDivElement, CertificateOfOcc
             </TableBody>
             <tfoot>
               <TableRow className="font-bold border-t-4 border-slate-500">
-                <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-left" colSpan={2}><div className="font-extrabold tracking-wider text-base">GRAND TOTAL</div><div className='text-xs font-medium text-slate-300'>({dateRangeLabel})</div></TableCell>
-                <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base">{loading && !grandTotals.totalCitizensServed ? '-' : formatNumber(grandTotals.totalCitizensServed)}</TableCell>
+                <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-left" colSpan={3}><div className="font-extrabold tracking-wider text-base">GRAND TOTAL</div><div className='text-xs font-medium text-slate-300'>({dateRangeLabel})</div></TableCell>
+                <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base">{loading && !grandTotals.citizensServed ? '-' : formatNumber(grandTotals.citizensServed)}</TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base">{loading && !grandTotals.licenseIssued ? '-' : formatNumber(grandTotals.licenseIssued)}</TableCell>
-                <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base">{loading && !(grandTotals.paid + grandTotals.geoPay) ? '-' : formatNumber(grandTotals.paid + grandTotals.geoPay)}</TableCell>
+                <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base">{loading && !grandTotals.paid ? '-' : formatNumber(grandTotals.paid)}</TableCell>
                 <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base">{loading && !grandTotals.pending ? '-' : formatNumber(grandTotals.pending)}</TableCell>
-                <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base font-bold">{loading && !(grandTotals.licenseIssued + grandTotals.pending) ? '-' : formatNumber(grandTotals.licenseIssued + grandTotals.pending)}</TableCell>
+                <TableCell className="sticky bottom-0 z-20 bg-slate-800 text-white p-3 text-right tabular-nums text-base font-bold">{loading && !(grandTotals.paid + grandTotals.pending) ? '-' : formatNumber(grandTotals.paid + grandTotals.pending)}</TableCell>
               </TableRow>
             </tfoot>
           </Table>
