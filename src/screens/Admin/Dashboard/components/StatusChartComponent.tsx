@@ -48,6 +48,12 @@ interface BarChartProps {
   brgyRaw?: any[];
   bpcoRaw?: any[];
   bpbpRaw?: any[];
+  lcrData?: any[];
+  lcrRaw?: any[];
+  enewsData?: any[];
+  enewsRaw?: any[];
+  cedulaData?: any[];
+  cedulaRaw?: any[];
   modules?: string[];
   loading?: boolean;
 }
@@ -92,6 +98,12 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
   brgyRaw = [],
   bpcoRaw = [],
   bpbpRaw = [],
+  lcrData = [],
+  lcrRaw = [],
+  enewsData = [],
+  enewsRaw = [],
+  cedulaData = [],
+  cedulaRaw = [],
   modules = [],
   loading
 }) => {
@@ -194,11 +206,20 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
       });
     }
 
-    return Array.from(combined.entries()).map(([name, values]) => ({
-      name,
-      ...values,
-    }));
-  }, [bpData, wpData, brgyData, bpcoData, bpbpData, modules]);
+    const addData = (src: any[]) => src.forEach(item => {
+      if (!combined.has(item.name)) combined.set(item.name, { operational: 0, developmental: 0, withdraw: 0 });
+      const e = combined.get(item.name)!;
+      e.operational   += Number(item.operational)   || 0;
+      e.developmental += Number(item.developmental) || 0;
+      e.withdraw      += Number(item.withdraw)      || 0;
+    });
+
+    if (modules.includes('Local Civil Registry')) addData(lcrData);
+    if (modules.includes('eNews'))                addData(enewsData);
+    if (modules.includes('Cedula'))               addData(cedulaData);
+
+    return Array.from(combined.entries()).map(([name, values]) => ({ name, ...values }));
+  }, [bpData, wpData, brgyData, bpcoData, bpbpData, lcrData, enewsData, cedulaData, modules]);
 
   // Get selected modules data for breakdown (combine multiple selections)
   const getSelectedModulesData = () => {
@@ -237,6 +258,18 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
         case 'Building Permit & Certificate of Occupancy':
           moduleData = [...bpbpData, ...bpcoData];
           moduleRaw = [...bpbpRaw, ...bpcoRaw];
+          break;
+        case 'Local Civil Registry':
+          moduleData = lcrData;
+          moduleRaw = lcrRaw;
+          break;
+        case 'eNews':
+          moduleData = enewsData;
+          moduleRaw = enewsRaw;
+          break;
+        case 'Cedula':
+          moduleData = cedulaData;
+          moduleRaw = cedulaRaw;
           break;
       }
 
@@ -588,9 +621,9 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
                 const values = selectedOptions ? selectedOptions.map((option: any) => option.value) : [];
                 setSelectedModules(values);
               }}
-              options={['Business Permit', 'Working Permit', 'Barangay Clearance', 'Building Permit & Certificate of Occupancy'].map(module => ({ value: module, label: module }))}
+              options={['Business Permit', 'Working Permit', 'Barangay Clearance', 'Building Permit & Certificate of Occupancy', 'Local Civil Registry', 'eNews', 'Cedula'].map(module => ({ value: module, label: module }))}
               placeholder="Choose modules to analyze..."
-              className="text-sm"
+              className="text-sm z-[50]"
               classNamePrefix="react-select"
               styles={{
                 control: (base, state) => ({
@@ -649,6 +682,12 @@ const StatusChartComponent: React.FC<BarChartProps> = ({
                   <span>Barangay Clearance</span>
                   <span className="w-2 h-2 bg-purple-500 rounded-full"></span>
                   <span>Building Permit & COO</span>
+                  <span className="w-2 h-2 bg-teal-500 rounded-full"></span>
+                  <span>Local Civil Registry</span>
+                  <span className="w-2 h-2 bg-orange-500 rounded-full"></span>
+                  <span>eNews</span>
+                  <span className="w-2 h-2 bg-pink-500 rounded-full"></span>
+                  <span>Cedula</span>
                 </div>
               </div>
             </div>

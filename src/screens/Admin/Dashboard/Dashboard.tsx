@@ -99,6 +99,9 @@ const DashboardPage = () => {
     const bpcoSel = data.modules.includes('Certificate of Occupancy');
     const bpbpSel = data.modules.includes('Building Permit');
     if (bpcoSel || bpbpSel) add(sumCurrent(filteredChartData['BPCO']?.current));
+    if (data.modules.includes('Local Civil Registry')) add(sumCurrent(filteredChartData['LCR']?.current));
+    if (data.modules.includes('eNews'))                add(sumCurrent(filteredChartData['ENEWS']?.current));
+    if (data.modules.includes('Cedula'))               add(sumCurrent(filteredChartData['CEDULA']?.current));
 
     return totals;
   }, [filteredChartData, data.modules]);
@@ -137,7 +140,7 @@ const DashboardPage = () => {
       setChartLoading(true);
       axios
         .post(`${backendUrl}/api/v1/elgu/ustatus-detail/`, {
-          modules:      ['Business Permit', 'Working Permit', 'Barangay Clearance', 'Certificate of Occupancy', 'Building Permit'],
+          modules:      ['Business Permit', 'Working Permit', 'Barangay Clearance', 'Certificate of Occupancy', 'Building Permit', 'Local Civil Registry', 'eNews', 'Cedula'],
           start_period: startPeriod || undefined,
           end_period:   endPeriod   || undefined,
           group_by:     groupBy,
@@ -1222,10 +1225,13 @@ const scrollToStatusChart = () => {
       {/* Combined Status Chart for all modules */}
       {showStatusChart && (
       <div id="status-chart-section">
-      {(data.modules?.includes("Business Permit") || 
-        data.modules?.includes("Working Permit") || 
+      {(data.modules?.includes("Business Permit") ||
+        data.modules?.includes("Working Permit") ||
         data.modules?.includes("Barangay Clearance") ||
-        data.modules?.includes("Building Permit") || data.modules?.includes("Certificate of Occupancy")) && (
+        data.modules?.includes("Building Permit") || data.modules?.includes("Certificate of Occupancy") ||
+        data.modules?.includes("Local Civil Registry") ||
+        data.modules?.includes("eNews") ||
+        data.modules?.includes("Cedula")) && (
         <StatusChartComponent
           data={[]} // Not used anymore
           raw={null} // Not used anymore
@@ -1239,6 +1245,12 @@ const scrollToStatusChart = () => {
           brgyRaw={filteredChartData['BC']?.breakdown || []}
           bpcoRaw={bpcoRawProp}
           bpbpRaw={bpbpRawProp}
+          lcrData={filteredChartData['LCR']?.current || []}
+          lcrRaw={filteredChartData['LCR']?.breakdown || []}
+          enewsData={filteredChartData['ENEWS']?.current || []}
+          enewsRaw={filteredChartData['ENEWS']?.breakdown || []}
+          cedulaData={filteredChartData['CEDULA']?.current || []}
+          cedulaRaw={filteredChartData['CEDULA']?.breakdown || []}
           modules={data.modules || []}
           title="Operational vs. Developmental vs. Withdrawal (All Modules)"
           period={`${data.startDate} - ${data.endDate}`}

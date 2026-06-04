@@ -1067,6 +1067,9 @@ function Master() {
               { to: '/elgu/master/manage/wp',   code: 'WP',   label: 'Working Permit',                     Icon: BriefcaseIcon },
               { to: '/elgu/master/manage/bc',   code: 'BC',   label: 'Barangay Clearance',                 Icon: HomeIcon },
               { to: '/elgu/master/manage/bpco', code: 'BPCO', label: 'Cert. of Occupancy & Bldg. Permit',  Icon: BuildingIcon },
+              { to: '/elgu/master/manage/lcr',    code: 'LCR',   label: 'Local Civil Registry', Icon: FileTextIcon },
+              { to: '/elgu/master/manage/enews',  code: 'NEWS',  label: 'eNews',                Icon: FileTextIcon },
+              { to: '/elgu/master/manage/cedula', code: 'CED',   label: 'Cedula',               Icon: FileTextIcon },
             ].map(({ to, code, label, Icon }) => {
               const active = location.pathname === to;
               return (
@@ -1204,6 +1207,9 @@ function Master() {
                     { to: '/elgu/master/manage/wp',   code: 'WP',   label: 'Working Permit',                    Icon: BriefcaseIcon },
                     { to: '/elgu/master/manage/bc',   code: 'BC',   label: 'Barangay Clearance',                Icon: HomeIcon },
                     { to: '/elgu/master/manage/bpco', code: 'BPCO', label: 'Cert. of Occupancy & Bldg. Permit', Icon: BuildingIcon },
+                    { to: '/elgu/master/manage/lcr',    code: 'LCR',  label: 'Local Civil Registry', Icon: FileTextIcon },
+                    { to: '/elgu/master/manage/enews',  code: 'NEWS', label: 'eNews',                Icon: FileTextIcon },
+                    { to: '/elgu/master/manage/cedula', code: 'CED',  label: 'Cedula',               Icon: FileTextIcon },
                   ].map(({ to, code, label, Icon }) => {
                     const active = location.pathname === to;
                     return (

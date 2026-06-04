@@ -165,10 +165,13 @@ export const monthlyComparisonChartData: ChartDataPoint[] = [
 
 export const modules = [
   "Business Permit",
-   "Building Permit",
-   "Certificate of Occupancy",
-   "Working Permit",
-   "Barangay Clearance",
+  "Building Permit",
+  "Certificate of Occupancy",
+  "Working Permit",
+  "Barangay Clearance",
+  "Local Civil Registry",
+  "eNews",
+  "Cedula",
 ];
 
 export const regions = [

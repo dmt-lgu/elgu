@@ -21,11 +21,36 @@ const dictRoOptions = [
   'BARMM I', 'BARMM II', 'NIR',
 ];
 
+const DICT_RO_TO_REGION: Record<string, string> = {
+  PMT:       'National Capital Region (NCR)',
+  CAR:       'Cordillera Administrative Region (CAR)',
+  R1:        'Region I (Ilocos Region)',
+  R2:        'Region II (Cagayan Valley)',
+  R3:        'Region III (Central Luzon)',
+  R4A:       'Region IV-A (CALABARZON)',
+  R4B:       'MIMAROPA Region',
+  R5:        'Region V (Bicol Region)',
+  R6:        'Region VI (Western Visayas)',
+  R7:        'Region VII (Central Visayas)',
+  R8:        'Region VIII (Eastern Visayas)',
+  R9:        'Region IX (Zamboanga Peninsula)',
+  R10:       'Region X (Northern Mindanao)',
+  R11:       'Region XI (Davao Region)',
+  R12:       'Region XII (SOCCSKSARGEN)',
+  R13:       'Region XIII (Caraga)',
+  'BARMM I':  'Bangsamoro Autonomous Region in Muslim Mindanao (BARMM)',
+  'BARMM II': 'Bangsamoro Autonomous Region in Muslim Mindanao (BARMM)',
+  NIR:       'NIR',
+};
+
 const ENDPOINTS = {
   bp1:      'api/v1/elgu/bp1/',
   wp:       'api/v1/elgu/wp/',
   bc:       'api/v1/elgu/bc/',
   bpco:     'api/v1/elgu/bpco/',
+  lcr:      'api/v1/elgu/lcr/',
+  enews:    'api/v1/elgu/enews/',
+  cedula:   'api/v1/elgu/cedula/',
   epayment: 'api/v1/elgu/epayment/',
 };
 
@@ -47,7 +72,26 @@ interface MergedRecord {
   level: string;
   income_class: string;
   dict_ro: string;
+  region: string;
+  province: string;
+  lgu_name_official: string;
+  mpar: string;
+  new_geocode: string;
+  sort: string;
   version: string;
+  bp1_version: string;
+  wp_version: string;
+  bc_version: string;
+  bpco_version: string;
+  lcr_ustatus: string;
+  lcr_version: string;
+  lcr_id: number | null;
+  enews_ustatus: string;
+  enews_version: string;
+  enews_id: number | null;
+  cedula_ustatus: string;
+  cedula_version: string;
+  cedula_id: number | null;
   bp1_id: number | null;
   wp_id: number | null;
   bc_id: number | null;
@@ -57,6 +101,26 @@ interface MergedRecord {
 
 function monthNum(m: string): string {
   return m.match(/\[(\d+)\]/)?.[1] ?? '';
+}
+
+const _MONTH_NAMES: Record<string, string> = {
+  january:'01', february:'02', march:'03', april:'04',
+  may:'05', june:'06', july:'07', august:'08',
+  september:'09', october:'10', november:'11', december:'12',
+};
+
+function normalizeMonth(val: string): string {
+  if (!val) return '';
+  const bracket = val.match(/\[(\d{1,2})\]/);
+  if (bracket) return bracket[1].padStart(2, '0');
+  const dash = val.match(/\d{4}-(\d{1,2})/);
+  if (dash) return dash[1].padStart(2, '0');
+  if (/^\d{1,2}$/.test(val.trim())) return val.trim().padStart(2, '0');
+  return _MONTH_NAMES[val.toLowerCase().trim()] || '';
+}
+
+function monthOptionFromNum(num: string): string {
+  return monthOptions.find(m => monthNum(m) === num) ?? '';
 }
 
 function isOp(u: string): boolean {
@@ -115,6 +179,7 @@ export default function GeneralManage() {
   const [selectedYears, setSelectedYears] = useState<number[]>([currentYear]);
   const [searchQuery, setSearchQuery] = useState('');
   const [monthFilter, setMonthFilter] = useState<string[]>([]);
+  const [moduleFilter, setModuleFilter] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
@@ -131,8 +196,23 @@ export default function GeneralManage() {
   const [editLevel, setEditLevel] = useState('');
   const [editIncomeClass, setEditIncomeClass] = useState('');
   const [editDictRo, setEditDictRo] = useState('');
-  const [editVersionV1, setEditVersionV1] = useState(false);
-  const [editVersionV2, setEditVersionV2] = useState(false);
+  const [editBp1V1, setEditBp1V1] = useState(false);
+  const [editBp1V2, setEditBp1V2] = useState(false);
+  const [editWpV1, setEditWpV1] = useState(false);
+  const [editWpV2, setEditWpV2] = useState(false);
+  const [editBcV1, setEditBcV1] = useState(false);
+  const [editBcV2, setEditBcV2] = useState(false);
+  const [editBpcoV1, setEditBpcoV1] = useState(false);
+  const [editBpcoV2, setEditBpcoV2] = useState(false);
+  const [editLcrUstatus, setEditLcrUstatus] = useState('');
+  const [editLcrV1, setEditLcrV1] = useState(false);
+  const [editLcrV2, setEditLcrV2] = useState(false);
+  const [editEnewsUstatus, setEditEnewsUstatus] = useState('');
+  const [editEnewsV1, setEditEnewsV1] = useState(false);
+  const [editEnewsV2, setEditEnewsV2] = useState(false);
+  const [editCedulaUstatus, setEditCedulaUstatus] = useState('');
+  const [editCedulaV1, setEditCedulaV1] = useState(false);
+  const [editCedulaV2, setEditCedulaV2] = useState(false);
   const [editEpayment, setEditEpayment] = useState(false);
   const [editEgovpayV1, setEditEgovpayV1] = useState(false);
   const [editEgovpayV2, setEditEgovpayV2] = useState(false);
@@ -146,26 +226,34 @@ export default function GeneralManage() {
           .then(r => Array.isArray(r.data) ? r.data : (r.data?.results ?? []))
           .catch(() => []);
 
-      const [bp1Data, wpData, bcData, bpcoData, epData] = await Promise.all([
+      const [bp1Data, wpData, bcData, bpcoData, lcrData, enewsData, cedulaData, epData] = await Promise.all([
         fetchList(ENDPOINTS.bp1),
         fetchList(ENDPOINTS.wp),
         fetchList(ENDPOINTS.bc),
         fetchList(ENDPOINTS.bpco),
+        fetchList(ENDPOINTS.lcr),
+        fetchList(ENDPOINTS.enews),
+        fetchList(ENDPOINTS.cedula),
         fetchList(ENDPOINTS.epayment),
       ]);
 
       const map = new Map<string, MergedRecord>();
 
-      const getOrCreate = (key: string, year: number, month: string, lgu: string): MergedRecord => {
+      const getOrCreate = (key: string, year: number, month: string, mNum: string, lgu: string): MergedRecord => {
         if (!map.has(key)) {
-          const num = monthNum(month);
           map.set(key, {
             key, year, month,
-            period_id: num ? `${year}-${num.padStart(2, '0')}` : '',
+            period_id: mNum ? `${year}-${mNum}` : '',
             lgu_name: lgu,
             bp1_ustatus: '', wp_ustatus: '', bc_ustatus: '', bpco_ustatus: '',
             epayment: false, egovpay_v1: false, egovpay_v2: false,
-            ustatus: '', district: '', level: '', income_class: '', dict_ro: '', version: '',
+            ustatus: '', district: '', level: '', income_class: '', dict_ro: '',
+            region: '', province: '', lgu_name_official: '', mpar: '', new_geocode: '', sort: '',
+            version: '',
+            bp1_version: '', wp_version: '', bc_version: '', bpco_version: '',
+            lcr_ustatus: '', lcr_version: '', lcr_id: null,
+            enews_ustatus: '', enews_version: '', enews_id: null,
+            cedula_ustatus: '', cedula_version: '', cedula_id: null,
             bp1_id: null, wp_id: null, bc_id: null, bpco_id: null, epayment_id: null,
           });
         }
@@ -173,49 +261,107 @@ export default function GeneralManage() {
       };
 
       const applyProfile = (rec: MergedRecord, r: any) => {
-        if (!rec.ustatus     && r.ustatus)      rec.ustatus      = r.ustatus;
-        if (!rec.district    && r.district)     rec.district     = r.district;
-        if (!rec.level       && r.level)        rec.level        = r.level;
-        if (!rec.income_class && r.income_class) rec.income_class = r.income_class;
-        if (!rec.dict_ro     && r.dict_ro)      rec.dict_ro      = r.dict_ro;
-        if (!rec.version     && r.version)      rec.version      = r.version;
+        if (!rec.ustatus           && r.ustatus)      rec.ustatus           = r.ustatus;
+        if (!rec.district          && r.district)     rec.district          = r.district;
+        if (!rec.level             && r.level)        rec.level             = r.level;
+        if (!rec.income_class      && r.income_class) rec.income_class      = r.income_class;
+        if (!rec.dict_ro           && r.dict_ro)      rec.dict_ro           = r.dict_ro;
+        if (!rec.region            && r.region)       rec.region            = r.region;
+        if (!rec.province          && r.province)     rec.province          = r.province;
+        if (!rec.lgu_name_official && r.name)         rec.lgu_name_official = r.name;
+        if (!rec.mpar              && r.mpar)         rec.mpar              = r.mpar;
+        if (!rec.new_geocode       && r.new_geocode)  rec.new_geocode       = r.new_geocode;
+        if (!rec.sort              && r.sort)         rec.sort              = r.sort;
+        if (!rec.version           && r.version)      rec.version           = r.version;
+      };
+
+      // BP1/WP/BC/BPCO use `period` as the actual month identifier (DB unique key)
+      // falling back to `month` if period is absent
+      const moduleKey = (r: any) => {
+        const raw = r.period || r.month || '';
+        const mNum = normalizeMonth(raw);
+        const display = mNum ? (monthOptionFromNum(mNum) || raw) : raw;
+        const keyPart = mNum || raw;
+        return { mNum, display, keyPart, lgu: (r.lgu || '').toLowerCase().trim() };
       };
 
       bp1Data.forEach((r: any) => {
-        const key = `${r.year}|${r.month}|${(r.lgu || '').toLowerCase().trim()}`;
-        const rec = getOrCreate(key, Number(r.year), r.month, r.lgu ?? '');
+        const { mNum, display, keyPart, lgu } = moduleKey(r);
+        const key = `${r.year}|${keyPart}|${lgu}`;
+        const rec = getOrCreate(key, Number(r.year), display, mNum, r.lgu ?? '');
         rec.bp1_ustatus = r.ustatus ?? '';
+        rec.bp1_version = r.version ?? '';
         rec.bp1_id = r.id;
         applyProfile(rec, r);
       });
 
       wpData.forEach((r: any) => {
-        const key = `${r.year}|${r.month}|${(r.lgu || '').toLowerCase().trim()}`;
-        const rec = getOrCreate(key, Number(r.year), r.month, r.lgu ?? '');
+        const { mNum, display, keyPart, lgu } = moduleKey(r);
+        const key = `${r.year}|${keyPart}|${lgu}`;
+        const rec = getOrCreate(key, Number(r.year), display, mNum, r.lgu ?? '');
         rec.wp_ustatus = r.ustatus ?? '';
+        rec.wp_version = r.version ?? '';
         rec.wp_id = r.id;
         applyProfile(rec, r);
       });
 
       bcData.forEach((r: any) => {
-        const key = `${r.year}|${r.month}|${(r.lgu || '').toLowerCase().trim()}`;
-        const rec = getOrCreate(key, Number(r.year), r.month, r.lgu ?? '');
+        const { mNum, display, keyPart, lgu } = moduleKey(r);
+        const key = `${r.year}|${keyPart}|${lgu}`;
+        const rec = getOrCreate(key, Number(r.year), display, mNum, r.lgu ?? '');
         rec.bc_ustatus = r.ustatus ?? '';
+        rec.bc_version = r.version ?? '';
         rec.bc_id = r.id;
         applyProfile(rec, r);
       });
 
       bpcoData.forEach((r: any) => {
-        const key = `${r.year}|${r.month}|${(r.lgu || '').toLowerCase().trim()}`;
-        const rec = getOrCreate(key, Number(r.year), r.month, r.lgu ?? '');
+        const { mNum, display, keyPart, lgu } = moduleKey(r);
+        const key = `${r.year}|${keyPart}|${lgu}`;
+        const rec = getOrCreate(key, Number(r.year), display, mNum, r.lgu ?? '');
         rec.bpco_ustatus = r.ustatus ?? '';
+        rec.bpco_version = r.version ?? '';
         rec.bpco_id = r.id;
         applyProfile(rec, r);
       });
 
+      lcrData.forEach((r: any) => {
+        const { mNum, display, keyPart, lgu } = moduleKey(r);
+        const key = `${r.year}|${keyPart}|${lgu}`;
+        const rec = getOrCreate(key, Number(r.year), display, mNum, r.lgu ?? '');
+        rec.lcr_ustatus = r.ustatus ?? '';
+        rec.lcr_version = r.version ?? '';
+        rec.lcr_id = r.id;
+        applyProfile(rec, r);
+      });
+
+      enewsData.forEach((r: any) => {
+        const { mNum, display, keyPart, lgu } = moduleKey(r);
+        const key = `${r.year}|${keyPart}|${lgu}`;
+        const rec = getOrCreate(key, Number(r.year), display, mNum, r.lgu ?? '');
+        rec.enews_ustatus = r.ustatus ?? '';
+        rec.enews_version = r.version ?? '';
+        rec.enews_id = r.id;
+        applyProfile(rec, r);
+      });
+
+      cedulaData.forEach((r: any) => {
+        const { mNum, display, keyPart, lgu } = moduleKey(r);
+        const key = `${r.year}|${keyPart}|${lgu}`;
+        const rec = getOrCreate(key, Number(r.year), display, mNum, r.lgu ?? '');
+        rec.cedula_ustatus = r.ustatus ?? '';
+        rec.cedula_version = r.version ?? '';
+        rec.cedula_id = r.id;
+        applyProfile(rec, r);
+      });
+
       epData.forEach((r: any) => {
-        const key = `${r.year}|${r.month}|${(r.lgu_full_name || '').toLowerCase().trim()}`;
-        const rec = getOrCreate(key, Number(r.year), r.month, r.lgu_full_name ?? '');
+        const mNum = normalizeMonth(r.month || '');
+        const display = mNum ? (monthOptionFromNum(mNum) || r.month || '') : (r.month || '');
+        const keyPart = mNum || r.month || '';
+        const lgu = (r.lgu_full_name || '').toLowerCase().trim();
+        const key = `${r.year}|${keyPart}|${lgu}`;
+        const rec = getOrCreate(key, Number(r.year), display, mNum, r.lgu_full_name ?? '');
         rec.epayment    = !!r.epayment;
         rec.egovpay_v1  = !!r.egovpay_v1;
         rec.egovpay_v2  = !!r.egovpay_v2;
@@ -225,8 +371,8 @@ export default function GeneralManage() {
 
       const sorted = Array.from(map.values()).sort((a, b) => {
         if (b.year !== a.year) return b.year - a.year;
-        const ma = parseInt(monthNum(a.month) || '0', 10);
-        const mb = parseInt(monthNum(b.month) || '0', 10);
+        const ma = parseInt(monthNum(a.month) || normalizeMonth(a.month) || '0', 10);
+        const mb = parseInt(monthNum(b.month) || normalizeMonth(b.month) || '0', 10);
         if (ma !== mb) return ma - mb;
         return a.lgu_name.localeCompare(b.lgu_name);
       });
@@ -238,11 +384,22 @@ export default function GeneralManage() {
   };
 
   useEffect(() => { fetchData(); }, [selectedYears]);
-  useEffect(() => { setCurrentPage(1); }, [monthFilter, searchQuery, pageSize]);
+  useEffect(() => { setCurrentPage(1); }, [monthFilter, moduleFilter, searchQuery, pageSize]);
 
   const filteredRecords = useMemo(() => {
     let r = mergedRecords;
     if (monthFilter.length > 0) r = r.filter(rec => monthFilter.includes(rec.month));
+    if (moduleFilter.length > 0) {
+      r = r.filter(rec =>
+        (moduleFilter.includes('BP1')    && rec.bp1_id    !== null) ||
+        (moduleFilter.includes('WP')     && rec.wp_id     !== null) ||
+        (moduleFilter.includes('BC')     && rec.bc_id     !== null) ||
+        (moduleFilter.includes('BPCO')   && rec.bpco_id   !== null) ||
+        (moduleFilter.includes('LCR')    && rec.lcr_id    !== null) ||
+        (moduleFilter.includes('eNews')  && rec.enews_id  !== null) ||
+        (moduleFilter.includes('Cedula') && rec.cedula_id !== null)
+      );
+    }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       r = r.filter(rec =>
@@ -252,20 +409,36 @@ export default function GeneralManage() {
       );
     }
     return r;
-  }, [mergedRecords, monthFilter, searchQuery]);
+  }, [mergedRecords, monthFilter, moduleFilter, searchQuery]);
 
   const totalPages = Math.max(1, Math.ceil(filteredRecords.length / pageSize));
   const safePage = Math.min(currentPage, totalPages);
   const visible = filteredRecords.slice((safePage - 1) * pageSize, safePage * pageSize);
 
-  const summary = useMemo(() => ({
-    operational:  filteredRecords.filter(r => isOp(r.bp1_ustatus)  || isOp(r.wp_ustatus)  || isOp(r.bc_ustatus)  || isOp(r.bpco_ustatus)).length,
-    developmental: filteredRecords.filter(r => isDev(r.bp1_ustatus) || isDev(r.wp_ustatus) || isDev(r.bc_ustatus) || isDev(r.bpco_ustatus)).length,
-    withdraw:     filteredRecords.filter(r => isWd(r.bp1_ustatus)   || isWd(r.wp_ustatus)  || isWd(r.bc_ustatus)  || isWd(r.bpco_ustatus)).length,
-    epayment:     filteredRecords.filter(r => r.epayment).length,
-    egovpay_v1:   filteredRecords.filter(r => r.egovpay_v1).length,
-    egovpay_v2:   filteredRecords.filter(r => r.egovpay_v2).length,
-  }), [filteredRecords]);
+  const summary = useMemo(() => {
+    const mods = moduleFilter.length === 0 ? ['BP1', 'WP', 'BC', 'BPCO', 'LCR', 'eNews', 'Cedula'] : moduleFilter;
+    const countFn = (fn: (u: string) => boolean) => {
+      let n = 0;
+      for (const r of filteredRecords) {
+        if (mods.includes('BP1')    && fn(r.bp1_ustatus))    n++;
+        if (mods.includes('WP')     && fn(r.wp_ustatus))     n++;
+        if (mods.includes('BC')     && fn(r.bc_ustatus))     n++;
+        if (mods.includes('BPCO')   && fn(r.bpco_ustatus))   n++;
+        if (mods.includes('LCR')    && fn(r.lcr_ustatus))    n++;
+        if (mods.includes('eNews')  && fn(r.enews_ustatus))  n++;
+        if (mods.includes('Cedula') && fn(r.cedula_ustatus)) n++;
+      }
+      return n;
+    };
+    return {
+      operational:   countFn(isOp),
+      developmental: countFn(isDev),
+      withdraw:      countFn(isWd),
+      epayment:      filteredRecords.filter(r => r.epayment).length,
+      egovpay_v1:    filteredRecords.filter(r => r.egovpay_v1).length,
+      egovpay_v2:    filteredRecords.filter(r => r.egovpay_v2).length,
+    };
+  }, [filteredRecords, moduleFilter]);
 
   const openEdit = (rec: MergedRecord) => {
     setEditRecord(rec);
@@ -277,9 +450,23 @@ export default function GeneralManage() {
     setEditLevel(rec.level);
     setEditIncomeClass(rec.income_class);
     setEditDictRo(rec.dict_ro);
-    const { v1, v2 } = parseVersion(rec.version);
-    setEditVersionV1(v1);
-    setEditVersionV2(v2);
+    const bp1v  = parseVersion(rec.bp1_version);
+    const wpv   = parseVersion(rec.wp_version);
+    const bcv   = parseVersion(rec.bc_version);
+    const bpcov = parseVersion(rec.bpco_version);
+    const lcrv  = parseVersion(rec.lcr_version);
+    const env   = parseVersion(rec.enews_version);
+    const cdv   = parseVersion(rec.cedula_version);
+    setEditBp1V1(bp1v.v1);  setEditBp1V2(bp1v.v2);
+    setEditWpV1(wpv.v1);    setEditWpV2(wpv.v2);
+    setEditBcV1(bcv.v1);    setEditBcV2(bcv.v2);
+    setEditBpcoV1(bpcov.v1); setEditBpcoV2(bpcov.v2);
+    setEditLcrUstatus(rec.lcr_ustatus);
+    setEditLcrV1(lcrv.v1);  setEditLcrV2(lcrv.v2);
+    setEditEnewsUstatus(rec.enews_ustatus);
+    setEditEnewsV1(env.v1);  setEditEnewsV2(env.v2);
+    setEditCedulaUstatus(rec.cedula_ustatus);
+    setEditCedulaV1(cdv.v1); setEditCedulaV2(cdv.v2);
     setEditEpayment(rec.epayment);
     setEditEgovpayV1(rec.egovpay_v1);
     setEditEgovpayV2(rec.egovpay_v2);
@@ -302,33 +489,58 @@ export default function GeneralManage() {
     setSaving(true);
     setEditError('');
 
-    const versionStr = [editVersionV1 && 'V1', editVersionV2 && 'V2'].filter(Boolean).join(', ');
-    const profilePatch = { district: editDistrict, level: editLevel, income_class: editIncomeClass, dict_ro: editDictRo, version: versionStr };
+    const mkVer = (v1: boolean, v2: boolean) => [v1 && 'V1', v2 && 'V2'].filter(Boolean).join(', ');
+    const sharedPatch = { district: editDistrict, level: editLevel, income_class: editIncomeClass, dict_ro: editDictRo };
+    const derivedRegion = editRecord.region || DICT_RO_TO_REGION[editDictRo] || '';
+    const newModuleBase = {
+      year: editRecord.year,
+      month: editRecord.month,
+      period: editRecord.month,
+      period_id: editRecord.period_id,
+      report_id: editRecord.period_id ? `[${editRecord.period_id}]${editRecord.new_geocode}` : '',
+      lgu: editRecord.lgu_name,
+      name: editRecord.lgu_name_official || editRecord.lgu_name,
+      province: editRecord.province,
+      region: derivedRegion,
+      mpar: editRecord.mpar,
+      new_geocode: editRecord.new_geocode,
+      sort: editRecord.sort,
+      ...sharedPatch,
+    };
 
     try {
       const patches: Promise<any>[] = [];
 
-      if (editRecord.bp1_id !== null)
-        patches.push(axios.patch(`${backendUrl}/${ENDPOINTS.bp1}${editRecord.bp1_id}/`, { ...profilePatch, ustatus: editBp1Ustatus }));
-      if (editRecord.wp_id !== null)
-        patches.push(axios.patch(`${backendUrl}/${ENDPOINTS.wp}${editRecord.wp_id}/`, { ...profilePatch, ustatus: editWpUstatus }));
-      if (editRecord.bc_id !== null)
-        patches.push(axios.patch(`${backendUrl}/${ENDPOINTS.bc}${editRecord.bc_id}/`, { ...profilePatch, ustatus: editBcUstatus }));
-      if (editRecord.bpco_id !== null)
-        patches.push(axios.patch(`${backendUrl}/${ENDPOINTS.bpco}${editRecord.bpco_id}/`, { ...profilePatch, ustatus: editBpcoUstatus }));
+      const addModule = (endpoint: string, id: number | null, ustatus: string, version: string) => {
+        if (id !== null)
+          patches.push(axios.patch(`${backendUrl}/${endpoint}${id}/`, { ...sharedPatch, ustatus, version }));
+        else if (ustatus)
+          patches.push(axios.post(`${backendUrl}/${endpoint}`, { ...newModuleBase, ustatus, version }));
+      };
+
+      addModule(ENDPOINTS.bp1,    editRecord.bp1_id,    editBp1Ustatus,    mkVer(editBp1V1, editBp1V2));
+      addModule(ENDPOINTS.wp,     editRecord.wp_id,     editWpUstatus,     mkVer(editWpV1, editWpV2));
+      addModule(ENDPOINTS.bc,     editRecord.bc_id,     editBcUstatus,     mkVer(editBcV1, editBcV2));
+      addModule(ENDPOINTS.bpco,   editRecord.bpco_id,   editBpcoUstatus,   mkVer(editBpcoV1, editBpcoV2));
+      addModule(ENDPOINTS.lcr,    editRecord.lcr_id,    editLcrUstatus,    mkVer(editLcrV1, editLcrV2));
+      addModule(ENDPOINTS.enews,  editRecord.enews_id,  editEnewsUstatus,  mkVer(editEnewsV1, editEnewsV2));
+      addModule(ENDPOINTS.cedula, editRecord.cedula_id, editCedulaUstatus, mkVer(editCedulaV1, editCedulaV2));
 
       const epPayload = {
         year: editRecord.year,
         month: editRecord.month,
-        lgu_full_name: editRecord.lgu_name,
+        period_id: editRecord.period_id,
+        report_id: editRecord.period_id ? `[${editRecord.period_id}]${editDictRo}` : '',
         dict_ro: editDictRo,
+        region: editRecord.region || DICT_RO_TO_REGION[editDictRo] || '',
+        lgu_full_name: editRecord.lgu_name,
         epayment: editEpayment,
         egovpay_v1: editEgovpayV1,
         egovpay_v2: editEgovpayV2,
       };
       if (editRecord.epayment_id !== null)
         patches.push(axios.patch(`${backendUrl}/${ENDPOINTS.epayment}${editRecord.epayment_id}/`, epPayload));
-      else
+      else if (editEpayment || editEgovpayV1 || editEgovpayV2)
         patches.push(axios.post(`${backendUrl}/${ENDPOINTS.epayment}`, epPayload));
 
       await Promise.all(patches);
@@ -353,10 +565,13 @@ export default function GeneralManage() {
     if (!result.isConfirmed) return;
 
     const deletes: Promise<any>[] = [];
-    if (rec.bp1_id !== null)      deletes.push(axios.delete(`${backendUrl}/${ENDPOINTS.bp1}${rec.bp1_id}/`).catch(() => {}));
-    if (rec.wp_id !== null)       deletes.push(axios.delete(`${backendUrl}/${ENDPOINTS.wp}${rec.wp_id}/`).catch(() => {}));
-    if (rec.bc_id !== null)       deletes.push(axios.delete(`${backendUrl}/${ENDPOINTS.bc}${rec.bc_id}/`).catch(() => {}));
-    if (rec.bpco_id !== null)     deletes.push(axios.delete(`${backendUrl}/${ENDPOINTS.bpco}${rec.bpco_id}/`).catch(() => {}));
+    if (rec.bp1_id    !== null) deletes.push(axios.delete(`${backendUrl}/${ENDPOINTS.bp1}${rec.bp1_id}/`).catch(() => {}));
+    if (rec.wp_id     !== null) deletes.push(axios.delete(`${backendUrl}/${ENDPOINTS.wp}${rec.wp_id}/`).catch(() => {}));
+    if (rec.bc_id     !== null) deletes.push(axios.delete(`${backendUrl}/${ENDPOINTS.bc}${rec.bc_id}/`).catch(() => {}));
+    if (rec.bpco_id   !== null) deletes.push(axios.delete(`${backendUrl}/${ENDPOINTS.bpco}${rec.bpco_id}/`).catch(() => {}));
+    if (rec.lcr_id    !== null) deletes.push(axios.delete(`${backendUrl}/${ENDPOINTS.lcr}${rec.lcr_id}/`).catch(() => {}));
+    if (rec.enews_id  !== null) deletes.push(axios.delete(`${backendUrl}/${ENDPOINTS.enews}${rec.enews_id}/`).catch(() => {}));
+    if (rec.cedula_id !== null) deletes.push(axios.delete(`${backendUrl}/${ENDPOINTS.cedula}${rec.cedula_id}/`).catch(() => {}));
     if (rec.epayment_id !== null) deletes.push(axios.delete(`${backendUrl}/${ENDPOINTS.epayment}${rec.epayment_id}/`).catch(() => {}));
 
     await Promise.all(deletes);
@@ -389,7 +604,10 @@ export default function GeneralManage() {
       </div>
 
       {/* Summary Cards — row 1: UStatus, row 2: ePayment */}
-      <div className="space-y-4">
+      <div className="space-y-3">
+
+
+
         <div className="grid grid-cols-3 slg:grid-cols-2 sm:grid-cols-1 gap-4">
           {[
             { label: 'Operational',   count: summary.operational,   from: 'from-emerald-400', to: 'to-teal-400',   text: 'text-emerald-500' },
@@ -399,10 +617,18 @@ export default function GeneralManage() {
             <div key={label} className="rounded-2xl overflow-hidden bg-white shadow-sm border border-slate-100">
               <div className={`h-1 bg-gradient-to-r ${from} ${to}`} />
               <div className="px-6 py-5 md:px-4 md:py-4">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">No. of LGU</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                  {moduleFilter.length > 0 ? 'No. of Module Records' : 'No. of LGU'}
+                </p>
                 <p className="text-sm font-semibold text-slate-600 mt-0.5">{label}</p>
                 <p className={`text-5xl md:text-4xl font-black mt-3 tabular-nums leading-none ${text}`}>{count}</p>
-                <p className="text-xs text-slate-400 mt-3">{monthFilter.length > 0 || searchQuery ? 'Filtered view' : `All records · ${selectedYears.join(', ')}`}</p>
+                <p className="text-xs text-slate-400 mt-3">
+                  {moduleFilter.length > 0
+                    ? moduleFilter.join(' + ')
+                    : monthFilter.length > 0 || searchQuery
+                      ? 'Filtered view'
+                      : `All modules · ${selectedYears.join(', ')}`}
+                </p>
               </div>
             </div>
           ))}
@@ -443,6 +669,25 @@ export default function GeneralManage() {
               className="rounded-lg border border-border bg-slate-50 px-3 py-1.5 text-sm text-slate-900 outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 w-64 md:w-full shrink-0" />
           </div>
 
+          {/* Module chips */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider shrink-0">Module</span>
+            <button type="button" onClick={() => { setModuleFilter([]); setCurrentPage(1); }}
+              className={`inline-flex items-center rounded-full border px-3 py-0.5 text-xs font-semibold transition ${
+                moduleFilter.length === 0 ? 'bg-primary text-white border-primary' : 'bg-white text-slate-600 border-slate-300 hover:border-primary hover:text-primary'
+              }`}>All</button>
+            {['BP1', 'WP', 'BC', 'BPCO', 'LCR', 'eNews', 'Cedula'].map(mod => {
+              const isActive = moduleFilter.includes(mod);
+              return (
+                <button key={mod} type="button"
+                  onClick={() => { setModuleFilter(prev => isActive ? prev.filter(x => x !== mod) : [...prev, mod]); setCurrentPage(1); }}
+                  className={`inline-flex items-center rounded-full border px-3 py-0.5 text-xs font-semibold transition ${
+                    isActive ? 'bg-primary text-white border-primary' : 'bg-white text-slate-600 border-slate-300 hover:border-primary hover:text-primary'
+                  }`}>{mod}</button>
+              );
+            })}
+          </div>
+
           {/* Month chips */}
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider shrink-0">Month</span>
@@ -455,7 +700,7 @@ export default function GeneralManage() {
               const isActive = monthFilter.includes(opt);
               return (
                 <button key={opt} type="button"
-                  onClick={() => { setMonthFilter(prev => isActive ? prev.filter(x => x !== opt) : [...prev, opt]); setCurrentPage(1); }}
+                  onClick={() => { setMonthFilter(isActive ? [] : [opt]); setCurrentPage(1); }}
                   className={`inline-flex items-center rounded-full border px-3 py-0.5 text-xs font-semibold transition ${
                     isActive ? 'bg-primary text-white border-primary' : 'bg-white text-slate-600 border-slate-300 hover:border-primary hover:text-primary'
                   }`}>{label}</button>
@@ -476,36 +721,46 @@ export default function GeneralManage() {
                 <th className="px-3 py-3 whitespace-nowrap font-semibold text-center">WP</th>
                 <th className="px-3 py-3 whitespace-nowrap font-semibold text-center">BC</th>
                 <th className="px-3 py-3 whitespace-nowrap font-semibold text-center">BPCO</th>
+                <th className="px-3 py-3 whitespace-nowrap font-semibold text-center">LCR</th>
+                <th className="px-3 py-3 whitespace-nowrap font-semibold text-center">eNews</th>
+                <th className="px-3 py-3 whitespace-nowrap font-semibold text-center">Cedula</th>
                 <th className="px-3 py-3 whitespace-nowrap font-semibold">ePayment</th>
                 <th className="px-3 py-3 whitespace-nowrap font-semibold text-center">Coverage</th>
                 <th className="px-3 py-3 whitespace-nowrap font-semibold">District</th>
                 <th className="px-3 py-3 whitespace-nowrap font-semibold">Level</th>
                 <th className="px-3 py-3 whitespace-nowrap font-semibold">Income Class</th>
                 <th className="px-3 py-3 whitespace-nowrap font-semibold">DICT RO</th>
-                <th className="px-3 py-3 whitespace-nowrap font-semibold text-center">V1</th>
-                <th className="px-3 py-3 whitespace-nowrap font-semibold text-center">V2</th>
                 <th className="px-3 py-3 whitespace-nowrap font-semibold">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 bg-white">
               {loading ? (
-                <tr><td colSpan={17} className="px-4 py-10 text-center">
+                <tr><td colSpan={18} className="px-4 py-10 text-center">
                   <div className="flex flex-col items-center gap-2 text-slate-400">
                     <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                     Loading records…
                   </div>
                 </td></tr>
               ) : visible.length === 0 ? (
-                <tr><td colSpan={17} className="px-4 py-10 text-center text-slate-400">
+                <tr><td colSpan={18} className="px-4 py-10 text-center text-slate-400">
                   {searchQuery ? `No records match "${searchQuery}".` : `No records found for ${selectedYears.join(', ')}.`}
                 </td></tr>
               ) : visible.map(r => {
-                const { v1: hasV1, v2: hasV2 } = parseVersion(r.version);
+                const { v1: bp1V1, v2: bp1V2 } = parseVersion(r.bp1_version);
+                const { v1: wpV1,  v2: wpV2  } = parseVersion(r.wp_version);
+                const { v1: bcV1,  v2: bcV2  } = parseVersion(r.bc_version);
+                const { v1: bpV1,  v2: bpV2  } = parseVersion(r.bpco_version);
+                const { v1: lcrV1, v2: lcrV2 } = parseVersion(r.lcr_version);
+                const { v1: enV1,  v2: enV2  } = parseVersion(r.enews_version);
+                const { v1: cdV1,  v2: cdV2  } = parseVersion(r.cedula_version);
                 const coverageScore =
-                  (r.bp1_id !== null ? 1 : 0) +
-                  (r.wp_id  !== null ? 1 : 0) +
-                  (r.bc_id  !== null ? 1 : 0) +
-                  (r.bpco_id !== null ? 1 : 0) +
+                  (r.bp1_id    !== null ? 1 : 0) +
+                  (r.wp_id     !== null ? 1 : 0) +
+                  (r.bc_id     !== null ? 1 : 0) +
+                  (r.bpco_id   !== null ? 1 : 0) +
+                  (r.lcr_id    !== null ? 1 : 0) +
+                  (r.enews_id  !== null ? 1 : 0) +
+                  (r.cedula_id !== null ? 1 : 0) +
                   (r.epayment   ? 1 : 0) +
                   (r.egovpay_v1 ? 1 : 0) +
                   (r.egovpay_v2 ? 1 : 0);
@@ -515,10 +770,48 @@ export default function GeneralManage() {
                     <td className="px-3 py-2.5 whitespace-nowrap text-slate-600">{r.year}</td>
                     <td className="px-3 py-2.5 whitespace-nowrap text-slate-600 text-xs">{r.month.replace(/^\[\d+\]\s*/, '')}</td>
                     <td className="px-3 py-2.5 font-medium text-slate-900 max-w-[200px] truncate" title={r.lgu_name}>{r.lgu_name || '—'}</td>
-                    <td className="px-3 py-2.5 text-center"><UsBadge val={r.bp1_ustatus} /></td>
-                    <td className="px-3 py-2.5 text-center"><UsBadge val={r.wp_ustatus} /></td>
-                    <td className="px-3 py-2.5 text-center"><UsBadge val={r.bc_ustatus} /></td>
-                    <td className="px-3 py-2.5 text-center"><UsBadge val={r.bpco_ustatus} /></td>
+                    <td className="px-3 py-2.5 text-center">
+                      <div className="inline-flex flex-col items-center gap-0.5">
+                        <UsBadge val={r.bp1_ustatus} />
+                        {(bp1V1 || bp1V2) && <span className="text-[8px] font-semibold text-slate-400 leading-none">{[bp1V1 && 'v1', bp1V2 && 'v2'].filter(Boolean).join(' ')}</span>}
+                      </div>
+                    </td>
+                    <td className="px-3 py-2.5 text-center">
+                      <div className="inline-flex flex-col items-center gap-0.5">
+                        <UsBadge val={r.wp_ustatus} />
+                        {(wpV1 || wpV2) && <span className="text-[8px] font-semibold text-slate-400 leading-none">{[wpV1 && 'v1', wpV2 && 'v2'].filter(Boolean).join(' ')}</span>}
+                      </div>
+                    </td>
+                    <td className="px-3 py-2.5 text-center">
+                      <div className="inline-flex flex-col items-center gap-0.5">
+                        <UsBadge val={r.bc_ustatus} />
+                        {(bcV1 || bcV2) && <span className="text-[8px] font-semibold text-slate-400 leading-none">{[bcV1 && 'v1', bcV2 && 'v2'].filter(Boolean).join(' ')}</span>}
+                      </div>
+                    </td>
+                    <td className="px-3 py-2.5 text-center">
+                      <div className="inline-flex flex-col items-center gap-0.5">
+                        <UsBadge val={r.bpco_ustatus} />
+                        {(bpV1 || bpV2) && <span className="text-[8px] font-semibold text-slate-400 leading-none">{[bpV1 && 'v1', bpV2 && 'v2'].filter(Boolean).join(' ')}</span>}
+                      </div>
+                    </td>
+                    <td className="px-3 py-2.5 text-center">
+                      <div className="inline-flex flex-col items-center gap-0.5">
+                        <UsBadge val={r.lcr_ustatus} />
+                        {(lcrV1 || lcrV2) && <span className="text-[8px] font-semibold text-slate-400 leading-none">{[lcrV1 && 'v1', lcrV2 && 'v2'].filter(Boolean).join(' ')}</span>}
+                      </div>
+                    </td>
+                    <td className="px-3 py-2.5 text-center">
+                      <div className="inline-flex flex-col items-center gap-0.5">
+                        <UsBadge val={r.enews_ustatus} />
+                        {(enV1 || enV2) && <span className="text-[8px] font-semibold text-slate-400 leading-none">{[enV1 && 'v1', enV2 && 'v2'].filter(Boolean).join(' ')}</span>}
+                      </div>
+                    </td>
+                    <td className="px-3 py-2.5 text-center">
+                      <div className="inline-flex flex-col items-center gap-0.5">
+                        <UsBadge val={r.cedula_ustatus} />
+                        {(cdV1 || cdV2) && <span className="text-[8px] font-semibold text-slate-400 leading-none">{[cdV1 && 'v1', cdV2 && 'v2'].filter(Boolean).join(' ')}</span>}
+                      </div>
+                    </td>
                     <td className="px-3 py-2.5">
                       <div className="flex items-center gap-1 flex-wrap">
                         {r.epayment   && <span className="inline-flex rounded-full border px-1.5 py-0.5 text-[9px] font-bold bg-emerald-100 text-emerald-800 border-emerald-200">EP</span>}
@@ -529,24 +822,18 @@ export default function GeneralManage() {
                     </td>
                     <td className="px-3 py-2.5 text-center whitespace-nowrap">
                       <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-bold tabular-nums ${
-                        coverageScore === 7 ? 'bg-emerald-100 text-emerald-800 border-emerald-200' :
+                        coverageScore === 10 ? 'bg-emerald-100 text-emerald-800 border-emerald-200' :
                         coverageScore >= 4  ? 'bg-blue-100    text-blue-800    border-blue-200'    :
                         coverageScore >= 1  ? 'bg-amber-100   text-amber-800   border-amber-200'   :
                                              'bg-slate-100   text-slate-500   border-slate-200'
                       }`}>
-                        {coverageScore}/7
+                        {coverageScore}/10
                       </span>
                     </td>
                     <td className="px-3 py-2.5 whitespace-nowrap text-slate-600 text-xs">{r.district || '—'}</td>
                     <td className="px-3 py-2.5 whitespace-nowrap text-slate-600 text-xs">{r.level || '—'}</td>
                     <td className="px-3 py-2.5 whitespace-nowrap text-slate-600 text-xs">{r.income_class || '—'}</td>
                     <td className="px-3 py-2.5 whitespace-nowrap font-medium text-slate-800 text-xs">{r.dict_ro || '—'}</td>
-                    <td className="px-3 py-2.5 text-center">
-                      {hasV1 ? <span className="text-emerald-600 font-bold text-xs">✓</span> : <span className="text-slate-300 text-xs">—</span>}
-                    </td>
-                    <td className="px-3 py-2.5 text-center">
-                      {hasV2 ? <span className="text-emerald-600 font-bold text-xs">✓</span> : <span className="text-slate-300 text-xs">—</span>}
-                    </td>
                     <td className="px-3 py-2.5 whitespace-nowrap">
                       <div className="flex items-center gap-1.5">
                         <button onClick={() => openEdit(r)}
@@ -616,55 +903,68 @@ export default function GeneralManage() {
                 </div>
               </div>
 
-              {/* Module UStatus */}
+              {/* Module UStatus + Version */}
               <div>
                 <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">Module UStatus</p>
-                {editRecord.bp1_id === null && editRecord.wp_id === null && editRecord.bc_id === null && editRecord.bpco_id === null ? (
-                  <p className="text-sm text-slate-400 italic">No module records for this LGU-month.</p>
-                ) : (
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {editRecord.bp1_id !== null && (
-                      <label className="flex flex-col gap-1.5 text-sm font-medium text-slate-700">
-                        BP1 UStatus
-                        <select value={editBp1Ustatus} onChange={e => setEditBp1Ustatus(e.target.value)}
-                          className="rounded-lg border border-border bg-slate-50 px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/10">
-                          <option value="">— Select —</option>
-                          {ustatusOptions.map(o => <option key={o} value={o}>{o}</option>)}
-                        </select>
-                      </label>
-                    )}
-                    {editRecord.wp_id !== null && (
-                      <label className="flex flex-col gap-1.5 text-sm font-medium text-slate-700">
-                        WP UStatus
-                        <select value={editWpUstatus} onChange={e => setEditWpUstatus(e.target.value)}
-                          className="rounded-lg border border-border bg-slate-50 px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/10">
-                          <option value="">— Select —</option>
-                          {ustatusOptions.map(o => <option key={o} value={o}>{o}</option>)}
-                        </select>
-                      </label>
-                    )}
-                    {editRecord.bc_id !== null && (
-                      <label className="flex flex-col gap-1.5 text-sm font-medium text-slate-700">
-                        BC UStatus
-                        <select value={editBcUstatus} onChange={e => setEditBcUstatus(e.target.value)}
-                          className="rounded-lg border border-border bg-slate-50 px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/10">
-                          <option value="">— Select —</option>
-                          {ustatusOptions.map(o => <option key={o} value={o}>{o}</option>)}
-                        </select>
-                      </label>
-                    )}
-                    {editRecord.bpco_id !== null && (
-                      <label className="flex flex-col gap-1.5 text-sm font-medium text-slate-700">
-                        BPCO UStatus
-                        <select value={editBpcoUstatus} onChange={e => setEditBpcoUstatus(e.target.value)}
-                          className="rounded-lg border border-border bg-slate-50 px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/10">
-                          <option value="">— Select —</option>
-                          {ustatusOptions.map(o => <option key={o} value={o}>{o}</option>)}
-                        </select>
-                      </label>
-                    )}
-                  </div>
-                )}
+                <div className="space-y-2">
+                  {([
+                    { id: editRecord.bp1_id,    label: 'BP1',    val: editBp1Ustatus,    set: setEditBp1Ustatus,    v1: editBp1V1,    sv1: setEditBp1V1,    v2: editBp1V2,    sv2: setEditBp1V2    },
+                    { id: editRecord.wp_id,     label: 'WP',     val: editWpUstatus,     set: setEditWpUstatus,     v1: editWpV1,     sv1: setEditWpV1,     v2: editWpV2,     sv2: setEditWpV2     },
+                    { id: editRecord.bc_id,     label: 'BC',     val: editBcUstatus,     set: setEditBcUstatus,     v1: editBcV1,     sv1: setEditBcV1,     v2: editBcV2,     sv2: setEditBcV2     },
+                    { id: editRecord.bpco_id,   label: 'BPCO',   val: editBpcoUstatus,   set: setEditBpcoUstatus,   v1: editBpcoV1,   sv1: setEditBpcoV1,   v2: editBpcoV2,   sv2: setEditBpcoV2   },
+                    { id: editRecord.lcr_id,    label: 'LCR',    val: editLcrUstatus,    set: setEditLcrUstatus,    v1: editLcrV1,    sv1: setEditLcrV1,    v2: editLcrV2,    sv2: setEditLcrV2    },
+                    { id: editRecord.enews_id,  label: 'eNews',  val: editEnewsUstatus,  set: setEditEnewsUstatus,  v1: editEnewsV1,  sv1: setEditEnewsV1,  v2: editEnewsV2,  sv2: setEditEnewsV2  },
+                    { id: editRecord.cedula_id, label: 'Cedula', val: editCedulaUstatus, set: setEditCedulaUstatus, v1: editCedulaV1, sv1: setEditCedulaV1, v2: editCedulaV2, sv2: setEditCedulaV2 },
+                  ] as { id: number|null; label: string; val: string; set: (v:string)=>void; v1:boolean; sv1:(v:boolean)=>void; v2:boolean; sv2:(v:boolean)=>void }[])
+                    .map(m => (
+                      <div key={m.label} className="flex items-end gap-2">
+                        <label className="flex-1 flex flex-col gap-1 min-w-0">
+                          <span className="text-sm font-medium text-slate-700 flex items-center gap-1.5">
+                            {m.label} UStatus
+                            {m.id === null && <span className="text-[9px] font-bold text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-1.5 py-0.5 leading-none">NEW</span>}
+                          </span>
+                          <select value={m.val} onChange={e => m.set(e.target.value)}
+                            className={`rounded-lg border px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 ${
+                              m.id === null ? 'border-amber-200 bg-amber-50/50' : 'border-border bg-slate-50'
+                            }`}>
+                            <option value="">— Select —</option>
+                            {ustatusOptions.map(o => <option key={o} value={o}>{o}</option>)}
+                          </select>
+                        </label>
+                        <div className="flex gap-1 pb-0.5 shrink-0">
+                          {([{ label: 'V1', val: m.v1, set: m.sv1 }, { label: 'V2', val: m.v2, set: m.sv2 }]).map(chip => (
+                            <button key={chip.label} type="button" onClick={() => chip.set(!chip.val)}
+                              className={`rounded-full border px-2.5 py-1 text-[10px] font-bold transition ${
+                                chip.val ? 'bg-primary text-white border-primary' : 'bg-white text-slate-500 border-slate-300 hover:border-primary hover:text-primary'
+                              }`}>{chip.label}</button>
+                          ))}
+                        </div>
+                      </div>
+                    ))
+                  }
+                </div>
+              </div>
+
+              {/* ePayment */}
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">ePayment Utilization Status</p>
+                <div className="flex flex-wrap gap-3">
+                  {([
+                    { label: 'ePayment',   val: editEpayment,   set: setEditEpayment   },
+                    { label: 'eGovPay v1', val: editEgovpayV1,  set: setEditEgovpayV1  },
+                    { label: 'eGovPay v2', val: editEgovpayV2,  set: setEditEgovpayV2  },
+                  ] as { label: string; val: boolean; set: (v: boolean) => void }[]).map(({ label, val, set }) => (
+                    <button key={label} type="button" onClick={() => set(!val)}
+                      className={`flex items-center gap-2 rounded-full border px-4 py-1.5 text-sm font-medium transition-all ${
+                        val ? 'bg-emerald-600 border-emerald-600 text-white shadow-emerald-200 shadow-md'
+                            : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+                      }`}>
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${val ? 'bg-white/70' : 'bg-slate-400'}`} />
+                      {label}
+                      <span className="text-xs opacity-75">{val ? 'TRUE' : 'FALSE'}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* LGU Profile */}
@@ -694,43 +994,6 @@ export default function GeneralManage() {
                       {dictRoOptions.map(o => <option key={o} value={o}>{o}</option>)}
                     </select>
                   </label>
-                  <div className="flex flex-col gap-1.5 sm:col-span-2">
-                    <span className="text-sm font-medium text-slate-700">eLGU Version</span>
-                    <div className="flex items-center gap-4">
-                      {[
-                        { label: 'V1', val: editVersionV1, set: setEditVersionV1 },
-                        { label: 'V2', val: editVersionV2, set: setEditVersionV2 },
-                      ].map(({ label, val, set }) => (
-                        <label key={label} className="flex items-center gap-2 cursor-pointer">
-                          <input type="checkbox" className="accent-primary w-4 h-4"
-                            checked={val} onChange={e => set(e.target.checked)} />
-                          <span className="text-sm text-slate-700 font-medium">{label}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* ePayment */}
-              <div>
-                <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">ePayment Utilization Status</p>
-                <div className="flex flex-wrap gap-3">
-                  {([
-                    { label: 'ePayment',   val: editEpayment,   set: setEditEpayment   },
-                    { label: 'eGovPay v1', val: editEgovpayV1,  set: setEditEgovpayV1  },
-                    { label: 'eGovPay v2', val: editEgovpayV2,  set: setEditEgovpayV2  },
-                  ] as { label: string; val: boolean; set: (v: boolean) => void }[]).map(({ label, val, set }) => (
-                    <button key={label} type="button" onClick={() => set(!val)}
-                      className={`flex items-center gap-2 rounded-full border px-4 py-1.5 text-sm font-medium transition-all ${
-                        val ? 'bg-emerald-600 border-emerald-600 text-white shadow-emerald-200 shadow-md'
-                            : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-                      }`}>
-                      <span className={`w-2 h-2 rounded-full shrink-0 ${val ? 'bg-white/70' : 'bg-slate-400'}`} />
-                      {label}
-                      <span className="text-xs opacity-75">{val ? 'TRUE' : 'FALSE'}</span>
-                    </button>
-                  ))}
                 </div>
               </div>
             </div>

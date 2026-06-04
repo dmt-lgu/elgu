@@ -127,6 +127,12 @@ export function startReportsForFilter(filters: Filters) {
     if (moduleKey === 'Building Permit') apiUrl = `${(import.meta.env as any).VITE_URL}/api/bpco/transaction-count-bp`;
     if (moduleKey === 'Certificate of Occupancy') apiUrl = `${(import.meta.env as any).VITE_URL}/api/bpco/transaction-count-co`;
 
+    // Modules without a transaction count API (LCR, eNews, Cedula, etc.) — skip silently
+    if (!apiUrl) {
+      globalAny._reportFetches[moduleKey] = { status: 'done', controller };
+      return;
+    }
+
   const run = async () => {
       try {
         if (Array.isArray(filters.selectedRegions) && filters.selectedRegions.length > 1 && !filters.allRegionsSelected) {

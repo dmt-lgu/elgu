@@ -6,9 +6,12 @@ import Swal from 'sweetalert2';
 const moduleConfig: Record<string, { title: string; endpoint: string }> = {
   general: { title: 'General',                                      endpoint: 'api/v1/elgu/general/' },
   bp1:  { title: 'Business Permit (BP1)',                           endpoint: 'api/v1/elgu/bp1/' },
-  wp:   { title: 'Working Permit (WP)',                           endpoint: 'api/v1/elgu/wp/' },
-  bc:   { title: 'Barangay Clearance (BC)',                       endpoint: 'api/v1/elgu/bc/' },
-  bpco: { title: 'Cert. of Occupancy & Bldg. Permit (BPCO)',      endpoint: 'api/v1/elgu/bpco/' },
+  wp:   { title: 'Working Permit (WP)',                             endpoint: 'api/v1/elgu/wp/' },
+  bc:   { title: 'Barangay Clearance (BC)',                         endpoint: 'api/v1/elgu/bc/' },
+  bpco: { title: 'Cert. of Occupancy & Bldg. Permit (BPCO)',        endpoint: 'api/v1/elgu/bpco/' },
+  lcr:    { title: 'Local Civil Registry (LCR)',    endpoint: 'api/v1/elgu/lcr/'    },
+  enews:  { title: 'eNews',                         endpoint: 'api/v1/elgu/enews/'  },
+  cedula: { title: 'Cedula',                        endpoint: 'api/v1/elgu/cedula/' },
 };
 
 const currentYear = new Date().getFullYear();
@@ -283,9 +286,9 @@ function ModuleManage() {
   const yearOptions = useMemo(() => [2023, 2024, 2025, 2026, 2027, 2028, 2029, 2030], []);
 
   const statusOptions = useMemo(() => {
-    if (moduleId === 'bc') return bcStatusOptions;
-    if (moduleId === 'wp') return wpStatusOptions;
-    return bpStatusOptions;
+    if (moduleId === 'bc')  return bcStatusOptions;
+    if (moduleId === 'wp')  return wpStatusOptions;
+    return bpStatusOptions; // bp1, bpco, lcr all use same [1]-style options
   }, [moduleId]);
 
   const fetchRecords = useCallback(() => {

@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import DashboardProgressIndicator from './../Admin/Dashboard/components/DashboardProgressIndicator.tsx';
 import { useLocation } from "react-router-dom";
-import Logo from './../../assets/logo/dict-logo.png'
+// import Logo from './../../assets/logo/dict-logo.png'
 import React, { useEffect, useRef, useState } from "react";
 
 import eLGULogo from "./../../assets/logo/eLGU-Logo-white.png";
@@ -999,11 +999,11 @@ function main() {
       </nav>
 
       {/* DICT Logo */}
-      <div className="flex justify-center gap-1.5 bg-[#fafafa] py-2">
+      {/* <div className="flex justify-center gap-1.5 bg-[#fafafa] py-2">
         <a href="https://dict.gov.ph" className="flex items-center gap-1.5">
           <img src={Logo} className="h-20 object-contain" alt="" />
         </a>
-      </div>
+      </div> */}
     </>
   );
 

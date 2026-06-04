@@ -62,7 +62,7 @@ const DashboardProgressIndicator: React.FC<DashboardProgressIndicatorProps> = ({
   };
 
   return (
-    <div className="fixed bottom-8 right-20 z-50 bg-slate-800/50 backdrop-blur-lg text-white rounded-xl shadow-2xl w-80 animate-in fade-in duration-500">
+    <div className="fixed bottom-8 right-10 sm:right-2 z-50 bg-slate-800/50 backdrop-blur-lg text-white rounded-xl shadow-2xl w-80 animate-in fade-in duration-500">
       <div className={`flex items-center gap-3 p-3 ${!isMinimized ? 'border-b border-white/10' : ''}`}>
         {isCompleted ? <CheckCircle2 className="h-6 w-6 text-green-400" /> : <Loader2 className="h-6 w-6 animate-spin text-sky-400" />}
         <div className="flex-1">

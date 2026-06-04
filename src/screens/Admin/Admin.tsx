@@ -756,11 +756,13 @@ function Admin() {
     };
     let totalLguCount = 0;
 
-    // Initialize per-module progress
+    // Initialize per-module progress — only for modules that have a transaction count API
+    const TRANSACTION_MODULES = new Set(['Business Permit', 'Working Permit', 'Barangay Clearance', 'Building Permit', 'Certificate of Occupancy']);
     const selectedModules: string[] = data.modules || [];
     const initialProgress: Record<string, { currentRegion: string; currentIndex: number; totalRegions: number } | null> = {};
     const initialModuleLoading: Record<string, boolean> = {};
     selectedModules.forEach(module => {
+      if (!TRANSACTION_MODULES.has(module)) return;
       initialProgress[module] = { currentRegion: 'Initializing...', currentIndex: 0, totalRegions };
       initialModuleLoading[module] = true;
     });
@@ -1028,6 +1030,9 @@ function Admin() {
     { to: '/elgu/admin/manage/wp',       label: 'Working Permit',                     Icon: BriefcaseIcon },
     { to: '/elgu/admin/manage/bc',       label: 'Barangay Clearance',                 Icon: HomeIcon },
     { to: '/elgu/admin/manage/bpco',     label: 'Cert. of Occupancy & Bldg. Permit',  Icon: BuildingIcon },
+    { to: '/elgu/admin/manage/lcr',      label: 'Local Civil Registry',                Icon: FileTextIcon },
+    { to: '/elgu/admin/manage/enews',    label: 'eNews',                               Icon: FileTextIcon },
+    { to: '/elgu/admin/manage/cedula',   label: 'Cedula',                              Icon: FileTextIcon },
   ];
 
   const navItem = (to: string, label: string, Icon: React.ElementType, onClick?: () => void) => {
@@ -1111,11 +1116,11 @@ function Admin() {
       </nav>
 
 
-  <div className="flex justify-center  gap-1.5 bg-[#fafafa] py-2">
+  {/* <div className="flex justify-center  gap-1.5 bg-[#fafafa] py-2">
              <a href="https://dict.gov.ph" className="flex items-center gap-1.5">
                <img src={Logo} className="h-20 object-contain " alt="" />
              </a>
-          </div>
+          </div> */}
       {/* Footer */}
       <div className="border-t border-white/[0.08] shrink-0">
         <button

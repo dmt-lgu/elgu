@@ -6,7 +6,7 @@ interface DataState {
 
 const initialState: DataState = {
   value: {
-  "modules":["Business Permit","Working Permit","Barangay Clearance","Building Permit","Certificate of Occupancy"],
+  "modules":["Business Permit","Working Permit","Barangay Clearance","Building Permit","Certificate of Occupancy","Local Civil Registry","eNews","Cedula"],
   "selectedTransactionModuleFilter": "All", // New field for transaction module filtering
   "selectedStatusModuleFilter": "All", // New field for status module filtering
   "selectedChartFilter_renew": "All", // Chart-specific filter for renew chart

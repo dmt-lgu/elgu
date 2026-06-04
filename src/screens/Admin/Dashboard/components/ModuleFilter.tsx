@@ -64,11 +64,14 @@ const ModuleFilter: React.FC<ModuleFilterProps> = ({
   }, []);
 
   const availableModules = [
-    { value: 'Business Permit', label: 'Business Permit' },
-    { value: 'Working Permit', label: 'Working Permit' },
-    { value: 'Building Permit', label: 'Building Permit' },
+    { value: 'Business Permit',       label: 'Business Permit' },
+    { value: 'Working Permit',        label: 'Working Permit' },
+    { value: 'Building Permit',       label: 'Building Permit' },
     { value: 'Certificate of Occupancy', label: 'Certificate of Occupancy' },
-    { value: 'Barangay Clearance', label: 'Barangay Clearance' }
+    { value: 'Barangay Clearance',    label: 'Barangay Clearance' },
+    { value: 'Local Civil Registry',  label: 'Local Civil Registry' },
+    { value: 'eNews',                 label: 'eNews' },
+    { value: 'Cedula',                label: 'Cedula' },
   ].filter(module => data.modules?.includes(module.value));
 
   const getDisplayText = () => {

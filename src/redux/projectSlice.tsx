@@ -11,6 +11,9 @@ const initialState: RegionState = {
     "Certificate of Occupancy",
     "Working Permit",
     "Barangay Clearance",
+    "Local Civil Registry",
+    "eNews",
+    "Cedula",
   ], // Initial empty list of regions
 };
 
