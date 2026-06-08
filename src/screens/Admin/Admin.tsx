@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import DashboardProgressIndicator from './Dashboard/components/DashboardProgressIndicator';
 import { useLocation, useNavigate } from "react-router-dom";
-import Logo from './../../assets/logo/dict-logo.png'
+import Logo from './../../assets/logo/DICT-Logo-Final-2-300x153.png'
 import { useEffect, useRef, useState } from "react";
 
 import eLGULogo from "./../../assets/logo/eLGU-Logo-white.png";
@@ -1116,11 +1116,11 @@ function Admin() {
       </nav>
 
 
-  {/* <div className="flex justify-center  gap-1.5 bg-[#fafafa] py-2">
+  <div className="flex justify-center  gap-1.5 py-2  mb-10">
              <a href="https://dict.gov.ph" className="flex items-center gap-1.5">
                <img src={Logo} className="h-20 object-contain " alt="" />
              </a>
-          </div> */}
+          </div>
       {/* Footer */}
       <div className="border-t border-white/[0.08] shrink-0">
         <button
