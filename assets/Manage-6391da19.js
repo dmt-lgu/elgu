@@ -1,0 +1,1 @@
+import{j as e,O as s}from"./index-444f8337.js";function l(){return e.jsx("div",{className:"flex h-full bg-background text-slate-900",children:e.jsx("div",{className:"flex-1 min-w-0 bg-slate-50",children:e.jsx("div",{className:"p-6",children:e.jsx(s,{})})})})}export{l as default};
