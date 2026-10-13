@@ -3,7 +3,8 @@ import FilterSection from './components/FilterSection';
 import axios from '../../../plugin/axios';
 import { regionMapping } from '../../../screens/Admin/Report/utils/mockData';
 import dictImage from '../../../assets/logo/dict.png';
-import { exportReportToPdf, exportReportToExcel } from './utils/reportGenerator';
+import { exportReportToPdf, exportReportToExcel, type ExportPreview } from './utils/reportGenerator';
+import ExportPreviewModal from './components/ExportPreviewModal';
 import { useSelector, useDispatch } from 'react-redux';
 import type { AppDispatch, RootState } from '@/redux/store';
 import { updateFilterField, type FilterState } from '../../../redux/reportFilterSlice';
@@ -443,6 +444,14 @@ const Reports: React.FC = () => {
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [isExportActive, setIsExportActive] = useState(false);
   const [summaryCardsOpen, setSummaryCardsOpen] = useState(true);
+  const [exportPreviews, setExportPreviews] = useState<ExportPreview[]>([]);
+
+  const closeExportPreview = useCallback(() => {
+    setExportPreviews(prev => {
+      prev.forEach(preview => { if (preview.url) URL.revokeObjectURL(preview.url); });
+      return [];
+    });
+  }, []);
 
   useEffect(() => {
     const syncProgressiveState = (state: ProgressiveCacheState) => {
@@ -827,6 +836,9 @@ const Reports: React.FC = () => {
           return "";
       }).filter(Boolean) : (filters.selectedModules || []);
 
+      // Files are generated in preview mode and only saved from the preview modal
+      const previews: ExportPreview[] = [];
+
       for (const moduleKey of modulesToExport) {
           if (exportSignal.aborted) break;
 
@@ -858,23 +870,25 @@ const Reports: React.FC = () => {
           });
 
           try {
+            let preview: ExportPreview | void;
             if (type === "pdf") {
-              await exportReportToPdf({
+              preview = await exportReportToPdf({
                 data: finalSortedData,
                 logoUrl: dictImage,
                 moduleLabel: moduleKey,
                 dateRangeLabel,
                 isDayMode: filters.selectedDateType === 'Day',
                 generatedAt: generatedAt,
-              }, exportSignal);
+              }, exportSignal, { preview: true });
             } else {
-              await exportReportToExcel({
+              preview = exportReportToExcel({
                 data: finalSortedData,
                 moduleLabel: moduleKey,
                 isDayMode: filters.selectedDateType === 'Day',
                 dateRangeLabel,
-              }, exportSignal);
+              }, exportSignal, { preview: true });
             }
+            if (preview) previews.push(preview);
           } catch (err: any) {
             if (err?.name === 'CanceledError' || err?.message === 'canceled') {
               Swal.fire({ icon: 'info', title: 'Export Cancelled', timer: 1000, showConfirmButton: false });
@@ -885,6 +899,10 @@ const Reports: React.FC = () => {
               Swal.fire({ icon: 'error', title: 'Export Failed', text: `Failed to export ${moduleKey}.`, timer: 2000, showConfirmButton: false });
             }
           }
+      }
+      if (previews.length > 0) {
+        closeExportPreview();
+        setExportPreviews(previews);
       }
     } finally {
       // Export done
@@ -1255,6 +1273,7 @@ const Reports: React.FC = () => {
             </div>
           )}
         </div>
+        <ExportPreviewModal previews={exportPreviews} onClose={closeExportPreview} />
         <ScrollToTopButton scrollTargetRef={tableContainerRef} />
         <ProgressIndicator isLoading={isSearchActive || lguRegionLoading} progress={progressState} counts={counts} moduleLoading={moduleLoading} onModuleClick={scrollToReport}/>
       </div>

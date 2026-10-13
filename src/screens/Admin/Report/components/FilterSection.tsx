@@ -417,7 +417,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({
         }
         return checked.map(opt => opt.value);
       },
-      confirmButtonText: 'Download',
+      confirmButtonText: 'Preview',
       showCancelButton: true,
       cancelButtonText: 'Cancel',
       customClass: {

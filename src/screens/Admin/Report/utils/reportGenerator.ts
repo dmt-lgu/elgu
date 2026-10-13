@@ -323,7 +323,17 @@ const addHeader = (doc: jsPDF, params: PdfParams, pageNumber: number, pageCount:
     doc.text(`Page ${pageNumber} of ${pageCount}`, pageWidth - margin, pageHeight - 20, { align: 'right' });
 };
 
-export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal) => {
+// Returned instead of saving when an export is run with { preview: true }
+export interface ExportPreview {
+  moduleLabel: string;
+  type: 'pdf' | 'excel';
+  fileName: string;
+  url?: string;
+  html?: string;
+  save: () => void;
+}
+
+export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal, options?: { preview?: boolean }): Promise<ExportPreview | void> => {
     const baseData = params.data.filter(lgu => !lgu.hasError);
     const exportableData = normalizeReportData(baseData, params.moduleLabel);
     const finalParams = { ...params, generatedAt: new Date() };
@@ -565,7 +575,12 @@ export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal)
         addHeader(doc, finalParams, p, pageCount, base64Logo);
     }
     if (signal?.aborted) { const e: any = new Error('canceled'); e.name = 'CanceledError'; throw e; }
-    doc.save(buildReportFileName(moduleLabel, dateRangeLabel, 'pdf'));
+    const fileName = buildReportFileName(moduleLabel, dateRangeLabel, 'pdf');
+    if (options?.preview) {
+        const url = URL.createObjectURL(doc.output('blob'));
+        return { moduleLabel, type: 'pdf', fileName, url, save: () => doc.save(fileName) };
+    }
+    doc.save(fileName);
 };
 
 // --- FIX: Added ExcelParams interface definition ---
@@ -575,7 +590,7 @@ interface ExcelParams {
   isDayMode: boolean;
   dateRangeLabel: string;
 }
-export const exportReportToExcel = (params: ExcelParams, signal?: AbortSignal) => {
+export const exportReportToExcel = (params: ExcelParams, signal?: AbortSignal, options?: { preview?: boolean }): ExportPreview | void => {
     const baseData = params.data.filter((lgu: any) => !lgu.hasError);
     const exportableData = normalizeReportData(baseData, params.moduleLabel);
     const { moduleLabel, isDayMode, dateRangeLabel } = params;
@@ -717,5 +732,10 @@ export const exportReportToExcel = (params: ExcelParams, signal?: AbortSignal) =
     const wb = xlsx.utils.book_new();
     xlsx.utils.book_append_sheet(wb, ws, 'Report');
     if (signal?.aborted) { const e: any = new Error('canceled'); e.name = 'CanceledError'; throw e; }
-    xlsx.writeFile(wb, buildReportFileName(moduleLabel, dateRangeLabel, 'xlsx'));
+    const fileName = buildReportFileName(moduleLabel, dateRangeLabel, 'xlsx');
+    if (options?.preview) {
+        const html = xlsx.utils.sheet_to_html(ws, { header: '', footer: '' });
+        return { moduleLabel, type: 'excel', fileName, html, save: () => xlsx.writeFile(wb, fileName) };
+    }
+    xlsx.writeFile(wb, fileName);
 };
