@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import * as xlsx from 'xlsx';
+import * as xlsx from 'xlsx-js-style';
 import { format } from 'date-fns';
 
 // --- REGION ORDER (R1..R13, CAR, BARMM1, BARMM2) ---
@@ -583,6 +583,37 @@ export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal,
     doc.save(fileName);
 };
 
+// Header fills, borders, number format and the dark grand-total row for an exported sheet.
+const styleSheet = (ws: xlsx.WorkSheet, headerRowCount: number, totalRowIndex: number | null) => {
+    if (!ws['!ref']) return;
+    const range = xlsx.utils.decode_range(ws['!ref']);
+    const borderSide = { style: 'thin', color: { rgb: 'CBD5E1' } };
+    const border = { top: borderSide, bottom: borderSide, left: borderSide, right: borderSide };
+    for (let r = range.s.r; r <= range.e.r; r++) {
+        for (let c = range.s.c; c <= range.e.c; c++) {
+            const address = xlsx.utils.encode_cell({ r, c });
+            // Empty cells inside merged areas still need a cell object to carry the border and fill
+            const cell = ws[address] || (ws[address] = { t: 's', v: '' });
+            const isHeader = r < headerRowCount;
+            const isTotal = r === totalRowIndex;
+            const style: any = {
+                border,
+                alignment: { vertical: 'center', wrapText: isHeader, horizontal: isHeader || c === 1 ? 'center' : typeof cell.v === 'number' ? 'right' : 'left' },
+            };
+            if (isHeader) {
+                style.font = { bold: true, color: { rgb: '000000' } };
+                style.fill = { patternType: 'solid', fgColor: { rgb: r === 0 ? '9EC6F7' : 'DBEAFE' } };
+            } else if (isTotal) {
+                style.font = { bold: true, color: { rgb: 'FFFFFF' } };
+                style.fill = { patternType: 'solid', fgColor: { rgb: '1E293B' } };
+            }
+            if (typeof cell.v === 'number') cell.z = '#,##0';
+            cell.s = style;
+        }
+    }
+    ws['!rows'] = Array.from({ length: headerRowCount }, (_row, index) => ({ hpt: headerRowCount > 1 && index === 0 ? 24 : 40 }));
+};
+
 // --- FIX: Added ExcelParams interface definition ---
 interface ExcelParams {
   data: any[];
@@ -729,8 +760,24 @@ export const exportReportToExcel = (params: ExcelParams, signal?: AbortSignal, o
   // Make LGU column wider in Excel output only for complex modules (Business/Working Permit)
   ws['!cols'] = lastHeaderRow.map((_c: any, idx: number) => ({ wch: idx === 0 ? 8 : idx === 1 ? 14 : idx === 2 ? (isComplex ? 40 : 30) : 24 }));
 
+    styleSheet(ws, headers.length, allRows.length > 0 ? headers.length + body.length - 1 : null);
+
     const wb = xlsx.utils.book_new();
     xlsx.utils.book_append_sheet(wb, ws, 'Report');
+
+    // LGUs that returned an error are left out of the report sheet, so list them on their own sheet.
+    const seenErrorLgus = new Set<string>();
+    const errorRows = params.data.filter((lgu: any) => {
+        if (!lgu?.hasError || !lgu?.lgu || seenErrorLgus.has(lgu.lgu)) return false;
+        seenErrorLgus.add(lgu.lgu);
+        return true;
+    }).map((lgu: any, index: number) => [index + 1, lgu.lgu, lgu.error || 'No data available', lgu.message || '']);
+    if (errorRows.length > 0) {
+        const errorSheet = xlsx.utils.aoa_to_sheet([['#', 'LGU', 'Error', 'Details'], ...errorRows]);
+        errorSheet['!cols'] = [{ wch: 8 }, { wch: 40 }, { wch: 28 }, { wch: 60 }];
+        styleSheet(errorSheet, 1, null);
+        xlsx.utils.book_append_sheet(wb, errorSheet, 'LGUs with Errors');
+    }
     if (signal?.aborted) { const e: any = new Error('canceled'); e.name = 'CanceledError'; throw e; }
     const fileName = buildReportFileName(moduleLabel, dateRangeLabel, 'xlsx');
     if (options?.preview) {

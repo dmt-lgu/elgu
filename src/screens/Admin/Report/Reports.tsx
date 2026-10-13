@@ -22,7 +22,10 @@ import { setcertificateOfOccupancy, setCertificateOfOccupancyAppliedFilter } fro
 import ProgressIndicator from './components/ProgressIndicator';
 import { filterTableResults, formatNumber, getDateRangeLabel } from './utils/reportUtils';
 import BusinessPermitReport from './table/BusinessPermitReport';
-import { Activity, Building2, ChevronDown, FileCheck, Filter, RefreshCw, Shield, TrendingUp } from 'lucide-react';
+import { Activity, AlertTriangle, Building2, ChevronDown, FileCheck, Filter, Minus, RefreshCw, Shield, TrendingDown, TrendingUp } from 'lucide-react';
+import ReportToolbar from './components/ReportToolbar';
+import ReportCharts from './components/ReportCharts';
+import { applyReportView, compareLastTwoMonths, formatShortMonth, getIssued, DEFAULT_VIEW_OPTIONS, type ReportViewOptions } from './utils/reportView';
 
 
 // Type definitions and helper functions remain the same
@@ -443,8 +446,9 @@ const Reports: React.FC = () => {
   // Track search vs export separately so UI doesn't show cancel/progress during export
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [isExportActive, setIsExportActive] = useState(false);
-  const [summaryCardsOpen, setSummaryCardsOpen] = useState(true);
+  const [summaryCardsOpen, setSummaryCardsOpen] = useState(false);
   const [exportPreviews, setExportPreviews] = useState<ExportPreview[]>([]);
+  const [viewOptions, setViewOptions] = useState<ReportViewOptions>(DEFAULT_VIEW_OPTIONS);
 
   const closeExportPreview = useCallback(() => {
     setExportPreviews(prev => {
@@ -953,27 +957,54 @@ const Reports: React.FC = () => {
     return result;
   }, [rawReportDataByModule, lguToRegion, uiDateRange, uiSelectedRegions, selectedProvinces, selectedCities, uiSelectedIslands]);
 
-  const reportSummaries = useMemo(() => {
-    const selectedModules = displayedModules;
-    const activeDateRange = appliedFilter.dateRange;
-    const activeRegions = appliedFilter.selectedRegions;
-    const activeIslands = appliedFilter.selectedIslands;
-    const activeDateType = appliedFilter.selectedDateType;
+  // Search, status filter and sort from the toolbar only change what the tables show;
+  // summary cards, charts and exports keep using the full search result.
+  const viewReportDataByModule = useMemo<ProgressiveDataState>(() => {
+    const result: ProgressiveDataState = {};
+    SUMMARY_MODULES.forEach(moduleKey => {
+      result[moduleKey] = applyReportView(moduleKey, rawReportDataByModule[moduleKey], viewOptions);
+    });
+    return result;
+  }, [rawReportDataByModule, viewOptions]);
 
-    return selectedModules.map((moduleKey) => {
-      const rawData = rawReportDataByModule[moduleKey];
-
+  const normalizedByModule = useMemo(() => {
+    const result: Record<string, any[]> = {};
+    displayedModules.forEach((moduleKey) => {
       const filtered = filterTableResults({
-        apiData: rawData || { results: [] },
+        apiData: rawReportDataByModule[moduleKey] || { results: [] },
         lguToRegion,
-        dateRange: activeDateRange,
-        selectedRegions: activeRegions,
+        dateRange: appliedFilter.dateRange,
+        selectedRegions: appliedFilter.selectedRegions,
         selectedProvinces,
         selectedCities,
-        selectedIslands: activeIslands,
-        selectedDateType: activeDateType,
+        selectedIslands: appliedFilter.selectedIslands,
+        selectedDateType: appliedFilter.selectedDateType,
       });
-      const normalized = normalizeSummaryResults(filtered || []);
+      result[moduleKey] = normalizeSummaryResults(filtered || []);
+    });
+    return result;
+  }, [
+    displayedModules, appliedFilter,
+    rawReportDataByModule,
+    lguToRegion, selectedProvinces, selectedCities,
+  ]);
+
+  const chartDataByModule = useMemo(() => {
+    const result: Record<string, any[]> = {};
+    Object.keys(normalizedByModule).forEach(moduleKey => {
+      result[moduleKey] = normalizedByModule[moduleKey].filter((lgu: any) => !lgu?.hasError);
+    });
+    return result;
+  }, [normalizedByModule]);
+
+  const reportSummaries = useMemo(() => {
+    const selectedModules = displayedModules;
+    const rangeStart = formatLocalDate(ensureDate(appliedFilter.dateRange?.start));
+    const rangeEnd = formatLocalDate(ensureDate(appliedFilter.dateRange?.end));
+    const today = formatLocalDate(new Date()) as string;
+
+    return selectedModules.map((moduleKey) => {
+      const normalized = normalizedByModule[moduleKey] || [];
 
       const lguNames = new Set<string>();
       let primaryTotal = 0;
@@ -981,12 +1012,21 @@ const Reports: React.FC = () => {
       let pendingTotal = 0;
       let maleTotal = 0;
       let femaleTotal = 0;
+      let registeredTotal = 0;
+      let errorCount = 0;
+      const monthTotals = new Map<string, number>();
 
       (normalized || []).forEach((lgu: any) => {
         if (lgu?.hasError) {
+          errorCount += 1;
           return;
         }
         if (lgu?.lgu) lguNames.add(lgu.lgu);
+        (lgu.monthlyResults || []).forEach((item: any) => {
+          if (!item?.month) return;
+          monthTotals.set(item.month, (monthTotals.get(item.month) || 0) + getIssued(moduleKey, item));
+        });
+        if (moduleKey === BP) registeredTotal += sumMonthly(lgu, item => Number(item.uniqueBusiness || 0));
 
         if (moduleKey === BP || moduleKey === WP) {
           const newIssued = sumMonthly(lgu, item => getLicenseIssued(item, NEW_LICENSE_KEYS, Number(item.newPaid || 0)));
@@ -1043,13 +1083,12 @@ const Reports: React.FC = () => {
         pendingLabel,
         maleTotal,
         femaleTotal,
+        registeredTotal,
+        errorCount,
+        comparison: compareLastTwoMonths(monthTotals, rangeStart, rangeEnd, today),
       };
     });
-  }, [
-    displayedModules, appliedFilter,
-    rawReportDataByModule,
-    lguToRegion, selectedProvinces, selectedCities,
-  ]);
+  }, [displayedModules, appliedFilter, normalizedByModule]);
 
   return (
     <div ref={tableContainerRef} style={{ position: "relative", marginTop: 24, height: "88vh", overflow: "auto" }}>
@@ -1129,10 +1168,30 @@ const Reports: React.FC = () => {
                           </span>
                         </div>
 
-                        <div className="flex items-baseline space-x-2">
-                          <p className={`text-2xl font-bold tabular-nums ${theme.accentColor}`}>{formatNumber(summary.primaryTotal)}</p>
-                          <TrendingUp className="w-3 h-3 text-green-500" />
-                        </div>
+                        <p className={`text-2xl font-bold tabular-nums ${theme.accentColor}`}>{formatNumber(summary.primaryTotal)}</p>
+                        {summary.comparison && (() => {
+                          const { percent, current, previous, currentMonth, previousMonth } = summary.comparison;
+                          const isUp = current > previous;
+                          const isDown = current < previous;
+                          const TrendIcon = isUp ? TrendingUp : isDown ? TrendingDown : Minus;
+                          const trendColor = isUp ? 'text-green-600' : isDown ? 'text-red-600' : 'text-gray-500';
+                          const changeLabel = percent === null
+                            ? (current > 0 ? 'Up from 0' : 'No change')
+                            : `${percent > 0 ? '+' : ''}${percent.toFixed(1)}%`;
+                          return (
+                            <p className="mt-1 flex items-center gap-1 text-xs text-gray-500">
+                              <TrendIcon className={`h-3 w-3 shrink-0 ${trendColor}`} />
+                              <span className={`font-semibold tabular-nums ${trendColor}`}>{changeLabel}</span>
+                              <span className="truncate">{formatShortMonth(currentMonth)} vs {formatShortMonth(previousMonth)}</span>
+                            </p>
+                          );
+                        })()}
+                        {summary.errorCount > 0 && (
+                          <p className="mt-1 flex items-center gap-1 text-xs font-semibold text-red-600">
+                            <AlertTriangle className="h-3 w-3 shrink-0" />
+                            {formatNumber(summary.errorCount)} LGU{summary.errorCount > 1 ? 's' : ''} with errors
+                          </p>
+                        )}
 
                         <div className={`mt-3 grid gap-2 text-xs ${summary.moduleKey === BC ? 'grid-cols-1' : 'grid-cols-2'}`}>
                           <div className="rounded-md bg-gray-50 px-2 py-1.5">
@@ -1146,6 +1205,13 @@ const Reports: React.FC = () => {
                             </div>
                           )}
                         </div>
+
+                        {summary.moduleKey === BP && (
+                          <div className="mt-2 rounded-md bg-gray-50 px-2 py-1.5 text-xs">
+                            <p className="font-semibold tabular-nums text-gray-800">{formatNumber(summary.registeredTotal)}</p>
+                            <p className="text-gray-500">Registered Business</p>
+                          </div>
+                        )}
 
                         {(summary.moduleKey === BP || summary.moduleKey === WP) && (
                           <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
@@ -1167,8 +1233,10 @@ const Reports: React.FC = () => {
             )}
           </div>
         )}
+        {reportSummaries.length > 0 && <ReportCharts modules={displayedModules} dataByModule={chartDataByModule} />}
+        {displayedModules.length > 0 && <ReportToolbar value={viewOptions} onChange={setViewOptions} />}
         <div className="relative flex flex-col gap-6">
-          {displayedModules.includes(BP) && 
+          {displayedModules.includes(BP) &&
             <div ref={reportRefs[BP]}>
               <BusinessPermitReport 
               selectedRegions={hasSearched ? appliedFilter.selectedRegions : uiSelectedRegions}
@@ -1177,7 +1245,7 @@ const Reports: React.FC = () => {
               selectedIslands={hasSearched ? appliedFilter.selectedIslands : uiSelectedIslands}
               selectedProvinces={selectedProvinces} 
               selectedCities={selectedCities} 
-              apiData={rawReportDataByModule[BP]} 
+              apiData={viewReportDataByModule[BP]} 
               loading={moduleLoading[BP] || bpLoading} 
               isProgressive={moduleLoading[BP]} 
               lguToRegion={lguToRegion} 
@@ -1196,7 +1264,7 @@ const Reports: React.FC = () => {
               selectedIslands={hasSearched ? appliedFilter.selectedIslands : uiSelectedIslands}
               selectedProvinces={selectedProvinces} 
               selectedCities={selectedCities} 
-              apiData={rawReportDataByModule[WP]} 
+              apiData={viewReportDataByModule[WP]} 
               loading={moduleLoading[WP] || wpLoading} 
               isProgressive={moduleLoading[WP]} 
               lguToRegion={lguToRegion} 
@@ -1215,7 +1283,7 @@ const Reports: React.FC = () => {
               selectedIslands={hasSearched ? appliedFilter.selectedIslands : uiSelectedIslands}
               selectedProvinces={selectedProvinces} 
               selectedCities={selectedCities} 
-              apiData={rawReportDataByModule[BC]} 
+              apiData={viewReportDataByModule[BC]} 
               loading={moduleLoading[BC] || bcLoading} 
               isProgressive={moduleLoading[BC]} 
               lguToRegion={lguToRegion} 
@@ -1234,7 +1302,7 @@ const Reports: React.FC = () => {
               selectedIslands={hasSearched ? appliedFilter.selectedIslands : uiSelectedIslands}
               selectedProvinces={selectedProvinces} 
               selectedCities={selectedCities} 
-              apiData={rawReportDataByModule[BLDG]} 
+              apiData={viewReportDataByModule[BLDG]} 
               loading={moduleLoading[BLDG] || bldgLoading} 
               isProgressive={moduleLoading[BLDG]} 
               lguToRegion={lguToRegion} 
@@ -1253,7 +1321,7 @@ const Reports: React.FC = () => {
               selectedIslands={hasSearched ? appliedFilter.selectedIslands : uiSelectedIslands}
               selectedProvinces={selectedProvinces} 
               selectedCities={selectedCities} 
-              apiData={rawReportDataByModule[CO]} 
+              apiData={viewReportDataByModule[CO]} 
               loading={moduleLoading[CO] || coLoading} 
               isProgressive={moduleLoading[CO]} 
               lguToRegion={lguToRegion} 
