@@ -174,7 +174,7 @@ const calculateGrandTotals = (data: any[], moduleLabel: string) => {
     renewalIssued: 0, renewalPaid: 0, renewalGeoPay: 0, renewalPending: 0,
     maleIssued: 0, malePaid: 0, malePending: 0,
     femaleIssued: 0, femalePaid: 0, femalePending: 0,
-    paid: 0, pending: 0, totalCount: 0, citizensServed: 0, licenseIssued: 0
+    paid: 0, pending: 0, totalCount: 0, citizensServed: 0, licenseIssued: 0, registeredBusiness: 0
   };
 
   for (const lgu of data) {
@@ -191,6 +191,7 @@ const calculateGrandTotals = (data: any[], moduleLabel: string) => {
       } else {
         const newIssued = getLicenseIssued(item, NEW_LICENSE_KEYS, Number(item.newPaid || 0));
         const renewalIssued = getLicenseIssued(item, RENEW_LICENSE_KEYS, Number(item.renewPaid || 0));
+        totals.registeredBusiness += Number(item.uniqueBusiness || 0);
         totals.newIssued += newIssued;
         totals.newPaid += item.newPaid || 0;
         totals.newGeoPay += item.newPaidViaEgov || 0;
@@ -334,6 +335,8 @@ export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal)
     try { throwIfAborted(); base64Logo = await loadImageAsBase64(finalParams.logoUrl); } catch (error) { if ((error as any)?.name === 'CanceledError') throw error; console.error('Could not load logo for PDF.', error); }
 
     const isComplex = ['Business Permit', 'Working Permit'].includes(moduleLabel);
+    // Registered Business (uniqueBusiness) is only returned for Business Permit
+    const hasRegisteredBusiness = moduleLabel === 'Business Permit';
     const orientation = isComplex ? 'landscape' : 'portrait';
     const pdfFormat = isComplex ? [1400, 842] : 'a4';
     const doc = new jsPDF({ orientation, unit: 'pt', format: pdfFormat });
@@ -348,6 +351,7 @@ export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal)
                 { content: '#', rowSpan: 2, styles: commonRowSpanStyles },
                 { content: 'REGION', rowSpan: 2, styles: commonRowSpanStyles },
                 { content: 'LGU', rowSpan: 2, styles: { ...commonRowSpanStyles, halign: 'left' } },
+                ...(hasRegisteredBusiness ? [{ content: 'REGISTERED BUSINESS', rowSpan: 2, styles: commonRowSpanStyles }] : []),
                 { content: 'CITIZENS SERVED', rowSpan: 2, styles: commonRowSpanStyles },
                 { content: 'TOTAL LICENSE ISSUED\n(NEW & RENEW)', rowSpan: 2, styles: commonRowSpanStyles },
                 { content: 'NEW', colSpan: 5, styles: commonColSpanStyles },
@@ -420,7 +424,7 @@ export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal)
         if (moduleLabel === 'Barangay Clearance') {
             dataRows.push([formatNumberForDisplay(index + 1), { content: regionDisplay, styles: { valign: 'middle' } }, { content: lguText, styles: { halign: 'left' } }, ...dataCells]);
         } else {
-            dataRows.push([formatNumberForDisplay(index + 1), { content: regionDisplay, styles: { valign: 'middle' } }, { content: lguText, styles: { halign: 'left' } }, formatNumberForDisplay(getCitizensServed(lguInfo)), ...dataCells]);
+            dataRows.push([formatNumberForDisplay(index + 1), { content: regionDisplay, styles: { valign: 'middle' } }, { content: lguText, styles: { halign: 'left' } }, ...(hasRegisteredBusiness ? [formatNumberForDisplay(Number(itemToDisplay.uniqueBusiness || 0))] : []), formatNumberForDisplay(getCitizensServed(lguInfo)), ...dataCells]);
         }
     });
 
@@ -431,6 +435,7 @@ export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal)
       const licenseIssuedNewTotal = totals.newIssued;
       const licenseIssuedRenewalTotal = totals.renewalIssued;
             grandTotalRow = [ { content: `GRAND TOTAL\n(${dateRangeLabel})`, colSpan: 3 },
+                ...(hasRegisteredBusiness ? [formatNumberForDisplay(totals.registeredBusiness)] : []),
                 formatNumberForDisplay(totals.citizensServed),
                 formatNumberForDisplay(licenseIssuedNewTotal + licenseIssuedRenewalTotal),
                 formatNumberForDisplay(licenseIssuedNewTotal), formatNumberForDisplay(totals.newPaid + totals.newGeoPay), formatNumberForDisplay(totals.newGeoPay), formatNumberForDisplay(totals.newPending), formatNumberForDisplay(totals.newPaid + totals.newGeoPay + totals.newPending),
@@ -493,7 +498,7 @@ export const exportReportToPdf = async (params: PdfParams, signal?: AbortSignal)
                         const importantBlueColumns = moduleLabel === 'Barangay Clearance'
                             ? [3]
                             : isComplex
-                                ? [4]
+                                ? [hasRegisteredBusiness ? 5 : 4]
                                 : [4, 7];
                         const importantGreenColumns = !isComplex && moduleLabel !== 'Barangay Clearance' ? [5] : [];
                         if (importantBlueColumns.includes(data.column.index)) {
@@ -579,6 +584,8 @@ export const exportReportToExcel = (params: ExcelParams, signal?: AbortSignal) =
 
     const sortedData = [...exportableData].sort(compareByRegion);
     const isComplex = ['Business Permit', 'Working Permit'].includes(moduleLabel);
+    // Registered Business (uniqueBusiness) is only returned for Business Permit
+    const hasRegisteredBusiness = moduleLabel === 'Business Permit';
     let headers: any[][] = [];
     let body: any[][] = [];
     let merges: xlsx.Range[] = [];
@@ -596,8 +603,8 @@ export const exportReportToExcel = (params: ExcelParams, signal?: AbortSignal) =
 
     if (isComplex) {
         headers = [
-            ['#', 'Region', 'LGU', 'Citizens Served', 'Total License Issued\n(New & Renew)', 'New', null, null, null, null, 'Renewal', null, null, null, null, 'Male', null, null, null, 'Female', null, null, null],
-            [null, null, null, null, null, 'License Issued', 'PAID\n(For Issuance and License Issued)', 'PAID (eGOVPay)\n', 'ONGOING\n(For Payment)', 'Total', 'License Issued', 'PAID\n(For Issuance and License Issued)', 'PAID (eGOVPay)\n', 'ONGOING\n(For Payment)', 'Total', 'License Issued', 'PAID\n(For Issuance and License Issued)', 'ONGOING\n(For Payment)', 'Total', 'License Issued', 'PAID\n(For Issuance and License Issued)', 'ONGOING\n(For Payment)', 'Total']
+            ['#', 'Region', 'LGU', ...(hasRegisteredBusiness ? ['Registered Business'] : []), 'Citizens Served', 'Total License Issued\n(New & Renew)', 'New', null, null, null, null, 'Renewal', null, null, null, null, 'Male', null, null, null, 'Female', null, null, null],
+            [null, null, null, ...(hasRegisteredBusiness ? [null] : []), null, null, 'License Issued', 'PAID\n(For Issuance and License Issued)', 'PAID (eGOVPay)\n', 'ONGOING\n(For Payment)', 'Total', 'License Issued', 'PAID\n(For Issuance and License Issued)', 'PAID (eGOVPay)\n', 'ONGOING\n(For Payment)', 'Total', 'License Issued', 'PAID\n(For Issuance and License Issued)', 'ONGOING\n(For Payment)', 'Total', 'License Issued', 'PAID\n(For Issuance and License Issued)', 'ONGOING\n(For Payment)', 'Total']
         ];
     } else if (moduleLabel === 'Building Permit' || moduleLabel === 'Certificate of Occupancy') {
         const title = moduleLabel === 'Building Permit' ? 'Building Permits' : 'Certificate of Occupancy';
@@ -631,6 +638,9 @@ export const exportReportToExcel = (params: ExcelParams, signal?: AbortSignal) =
             row.push(null);
         }
         row.push(`${lguInfo.lgu} ${periodLabel}`);
+        if (hasRegisteredBusiness) {
+            row.push(formatNumberForExcel(Number(itemToDisplay.uniqueBusiness || 0)));
+        }
         if (moduleLabel !== 'Barangay Clearance') {
             row.push(formatNumberForExcel(getCitizensServed(lguInfo)));
         }
@@ -669,7 +679,7 @@ export const exportReportToExcel = (params: ExcelParams, signal?: AbortSignal) =
       // Use the same issued totals shown in the rows for grand totals.
       const licenseIssuedNewTotal = totals.newIssued;
       const licenseIssuedRenewalTotal = totals.renewalIssued;
-            totalRow = [ 'GRAND TOTAL', null, null, totals.citizensServed, licenseIssuedNewTotal + licenseIssuedRenewalTotal, licenseIssuedNewTotal, totals.newPaid + totals.newGeoPay, totals.newGeoPay, totals.newPending, (totals.newPaid + totals.newGeoPay + totals.newPending), licenseIssuedRenewalTotal, totals.renewalPaid + totals.renewalGeoPay, totals.renewalGeoPay, totals.renewalPending, (totals.renewalPaid + totals.renewalGeoPay + totals.renewalPending), totals.maleIssued, totals.malePaid, totals.malePending, (totals.malePaid + totals.malePending), totals.femaleIssued, totals.femalePaid, totals.femalePending, (totals.femalePaid + totals.femalePending) ];
+            totalRow = [ 'GRAND TOTAL', null, null, ...(hasRegisteredBusiness ? [totals.registeredBusiness] : []), totals.citizensServed, licenseIssuedNewTotal + licenseIssuedRenewalTotal, licenseIssuedNewTotal, totals.newPaid + totals.newGeoPay, totals.newGeoPay, totals.newPending, (totals.newPaid + totals.newGeoPay + totals.newPending), licenseIssuedRenewalTotal, totals.renewalPaid + totals.renewalGeoPay, totals.renewalGeoPay, totals.renewalPending, (totals.renewalPaid + totals.renewalGeoPay + totals.renewalPending), totals.maleIssued, totals.malePaid, totals.malePending, (totals.malePaid + totals.malePending), totals.femaleIssued, totals.femalePaid, totals.femalePending, (totals.femalePaid + totals.femalePending) ];
             merges.push({ s: { r: currentRowIndex, c: 0 }, e: { r: currentRowIndex, c: 2 } });
         } else {
             if (moduleLabel === 'Barangay Clearance') {
@@ -686,7 +696,10 @@ export const exportReportToExcel = (params: ExcelParams, signal?: AbortSignal) =
 
     const ws = xlsx.utils.aoa_to_sheet([...headers, ...body]);
     if (isComplex) {
-        merges.push({ s: { r: 0, c: 0 }, e: { r: 1, c: 0 } }, { s: { r: 0, c: 1 }, e: { r: 1, c: 1 } }, { s: { r: 0, c: 2 }, e: { r: 1, c: 2 } }, { s: { r: 0, c: 3 }, e: { r: 1, c: 3 } }, { s: { r: 0, c: 4 }, e: { r: 1, c: 4 } }, { s: { r: 0, c: 5 }, e: { r: 0, c: 9 } }, { s: { r: 0, c: 10 }, e: { r: 0, c: 14 } }, { s: { r: 0, c: 15 }, e: { r: 0, c: 18 } }, { s: { r: 0, c: 19 }, e: { r: 0, c: 22 } });
+        // The Registered Business column shifts every column after LGU by one
+        const o = hasRegisteredBusiness ? 1 : 0;
+        for (let c = 0; c <= 4 + o; c++) merges.push({ s: { r: 0, c }, e: { r: 1, c } });
+        merges.push({ s: { r: 0, c: 5 + o }, e: { r: 0, c: 9 + o } }, { s: { r: 0, c: 10 + o }, e: { r: 0, c: 14 + o } }, { s: { r: 0, c: 15 + o }, e: { r: 0, c: 18 + o } }, { s: { r: 0, c: 19 + o }, e: { r: 0, c: 22 + o } });
     } else if (moduleLabel === 'Building Permit' || moduleLabel === 'Certificate of Occupancy') {
         merges.push(
             { s: { r: 0, c: 0 }, e: { r: 1, c: 0 } },
